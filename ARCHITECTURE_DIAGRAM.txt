@@ -1,0 +1,292 @@
+```
+╔════════════════════════════════════════════════════════════════════════════╗
+║         UNIVERSAL BASE64 IMAGE SOLUTION - SYSTEM ARCHITECTURE              ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ FRONTEND (React)                                                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ Editor Component (WritingEditor, ProjectEditor, BookEditor, etc)     │  │
+│  ├──────────────────────────────────────────────────────────────────────┤  │
+│  │                                                                      │  │
+│  │  ┌─────────────────────────┐   ┌──────────────────────────────┐    │  │
+│  │  │ Textarea                │   │ Word/Char Counter            │    │  │
+│  │  ├─────────────────────────┤   ├──────────────────────────────┤    │  │
+│  │  │ content = "![alt](url)" │   │ countWords(content)          │    │  │
+│  │  │                         │   │ countChars(content)          │    │  │
+│  │  │ paste → upload auto     │   │ (both strip base64 auto)     │    │  │
+│  │  │ drag-drop → upload auto │   │                              │    │  │
+│  │  └─────────────────────────┘   └──────────────────────────────┘    │  │
+│  │                                                                      │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ Save Function                                                        │  │
+│  ├──────────────────────────────────────────────────────────────────────┤  │
+│  │                                                                      │  │
+│  │  content = "![alt](data:base64...)"                                │  │
+│  │           ↓                                                        │  │
+│  │  sanitizeContent(content)  ← MAIN FUNCTION                         │  │
+│  │           ↓                                                        │  │
+│  │  content = "![alt](http://localhost:5000/uploads/file.jpg)"        │  │
+│  │           ↓                                                        │  │
+│  │  api.put('/api/writings', {content})  ← Save cleaned content       │  │
+│  │                                                                      │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    │ sanitizeContent() pipeline:
+                                    │ 1. Extract base64 images
+                                    │ 2. Upload each to /api/media/upload
+                                    │ 3. Replace base64 with URLs
+                                    │ 4. Return cleaned content
+                                    │
+                                    ↓
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ BACKEND API (Express.js)                                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ POST /api/media/upload                                              │  │
+│  ├──────────────────────────────────────────────────────────────────────┤  │
+│  │                                                                      │  │
+│  │  Request (multipart/form-data):                                     │  │
+│  │  - file: [binary data]                                              │  │
+│  │  - altText: "description"                                           │  │
+│  │                                                                      │  │
+│  │  Processing:                                                        │  │
+│  │  1. Validate file type (image/*)                                   │  │
+│  │  2. Validate file size (< 5MB)                                     │  │
+│  │  3. Generate unique filename (timestamp-random.jpg)                │  │
+│  │  4. Save to cms/public/uploads/                                    │  │
+│  │  5. Save metadata to MongoDB 'media' collection                    │  │
+│  │  6. Return imageUrl                                                │  │
+│  │                                                                      │  │
+│  │  Response:                                                          │  │
+│  │  {                                                                  │  │
+│  │    success: true,                                                  │  │
+│  │    imageUrl: "http://localhost:5000/uploads/xxx.jpg"               │  │
+│  │  }                                                                  │  │
+│  │                                                                      │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ Static File Serving                                                 │  │
+│  ├──────────────────────────────────────────────────────────────────────┤  │
+│  │                                                                      │  │
+│  │  express.static('public/uploads')                                   │  │
+│  │  Serves: /uploads/filename.jpg                                      │  │
+│  │                                                                      │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ Other Routes                                                        │  │
+│  ├──────────────────────────────────────────────────────────────────────┤  │
+│  │  GET /api/media/list         - List uploaded images                │  │
+│  │  POST /api/media/batch-upload - Upload multiple                    │  │
+│  │  DELETE /api/media/:filename  - Delete image                       │  │
+│  │                                                                      │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    │
+                                    ↓
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ FILESYSTEM & DATABASE                                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ Filesystem: cms/public/uploads/                                     │  │
+│  ├──────────────────────────────────────────────────────────────────────┤  │
+│  │                                                                      │  │
+│  │  1645283949391-a8f3k2m9.jpg                                         │  │
+│  │  1645283950123-l9p0k2j3.jpg                                         │  │
+│  │  1645283951456-q2w3e4r5.jpg                                         │  │
+│  │                                                                      │  │
+│  │  (Actual image files, easily manageable and deletable)              │  │
+│  │                                                                      │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ MongoDB Collections                                                 │  │
+│  ├──────────────────────────────────────────────────────────────────────┤  │
+│  │                                                                      │  │
+│  │ writings collection:                                                │  │
+│  │ {                                                                   │  │
+│  │   _id: ObjectId(...),                                              │  │
+│  │   id: "my-article",                                                │  │
+│  │   title: "...",                                                    │  │
+│  │   content: "... ![alt](http://localhost:5000/uploads/xxx.jpg) ...", │  │
+│  │   // ✅ NO BASE64! Just regular URL                               │  │
+│  │ }                                                                   │  │
+│  │                                                                      │  │
+│  │ media collection (metadata tracking):                               │  │
+│  │ {                                                                   │  │
+│  │   _id: ObjectId(...),                                              │  │
+│  │   filename: "1645283949391-a8f3k2m9.jpg",                          │  │
+│  │   originalName: "photo.jpg",                                       │  │
+│  │   altText: "My photo",                                             │  │
+│  │   size: 123456,                                                    │  │
+│  │   url: "http://localhost:5000/uploads/1645283949391-a8f3k2m9.jpg", │  │
+│  │   uploadedAt: 2026-03-19T10:00:00Z,                                │  │
+│  │   uploadedBy: "admin"                                              │  │
+│  │ }                                                                   │  │
+│  │                                                                      │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+USER JOURNEY - COMPLETE FLOW:
+
+1️⃣  User opens WritingEditor
+    ↓
+2️⃣  User pastes/drags image into textarea
+    ↓
+3️⃣  attachUploadHandler() detected file, calls uploadImage()
+    ↓
+4️⃣  uploadImage() compresses & POSTs to /api/media/upload
+    ↓
+5️⃣  Backend saves file to cms/public/uploads/ + metadata to MongoDB
+    ↓
+6️⃣  Backend returns imageUrl: "http://localhost:5000/uploads/xxx.jpg"
+    ↓
+7️⃣  Frontend inserts markdown: ![alt](http://localhost:5000/uploads/xxx.jpg)
+    ↓
+8️⃣  User sees image in editor (now as URL, not base64)
+    ↓
+9️⃣  User clicks Save
+    ↓
+🔟 handleSave() calls sanitizeContent()
+    - Extracts any remaining base64 images
+    - Uploads them (if any)
+    - Replaces with URLs
+    - Returns cleaned content
+    ↓
+1️⃣1️⃣ Frontend POSTs content with URLs to /api/writings
+    ↓
+1️⃣2️⃣ Backend saves to MongoDB
+    ↓
+1️⃣3️⃣ ✅ Content in database has URLs, not base64!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+KEY UTILITIES:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ src/utils/media.ts - CORE FUNCTIONS                                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  countWords(content)                                                        │
+│  ├─ Strip base64 images                                                     │
+│  ├─ Remove markdown syntax                                                  │
+│  └─ Return word count (accurate)                                            │
+│                                                                             │
+│  countChars(content)                                                        │
+│  ├─ Strip base64 images                                                     │
+│  ├─ Remove markdown syntax                                                  │
+│  └─ Return character count (accurate)                                       │
+│                                                                             │
+│  sanitizeContent(content)                                                   │
+│  ├─ extractBase64Images(content)                                            │
+│  ├─ For each image: uploadImage(file) → get URL                            │
+│  ├─ replaceBase64WithUrl(content, urlMap)                                  │
+│  └─ Return cleaned content ready to save                                    │
+│                                                                             │
+│  SUPPORTING:                                                                │
+│  ├─ stripBase64() - Remove base64 from string                              │
+│  ├─ extractBase64Images() - Parse all base64 images                        │
+│  ├─ replaceBase64WithUrl() - Replace base64 with URLs                      │
+│  ├─ compressImage() - Client-side compression                              │
+│  ├─ validateFile() - File validation                                       │
+│  └─ getContentStats() - Content analysis                                   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ src/lib/mediaUploader.ts - INTEGRATION FUNCTIONS                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  attachUploadHandler(textarea, callback, config)                            │
+│  ├─ Auto-detect paste event (image/*)                                      │
+│  ├─ Auto-detect drag-drop (image/*)                                        │
+│  ├─ Auto-detect file input                                                 │
+│  └─ Call callback(imageMarkdown) for each upload                           │
+│                                                                             │
+│  uploadImage(file, config)                                                  │
+│  ├─ Compress image (canvas)                                                │
+│  ├─ POST to /api/media/upload                                              │
+│  └─ Return imageUrl                                                         │
+│                                                                             │
+│  uploadImages(files, config)                                                │
+│  ├─ For each file: uploadImage()                                           │
+│  └─ Return array of {file, url}                                             │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+INTEGRATION IN EACH SECTION:
+
+WRITINGS Section (WritingEditor.tsx):
+├─ Line 1: import { countWords, countChars, sanitizeContent } ...
+├─ Line 2: import { attachUploadHandler } ...
+├─ Line ~50: const wordCount = countWords(writing.content);
+├─ Line ~51: const characterCount = countChars(writing.content);
+├─ Line ~100: useEffect(() => attachUploadHandler(...), []);
+└─ Line ~150: const sanitized = await sanitizeContent(writing.content);
+
+PROJECTS Section (ProjectEditor.tsx):
+└─ Same pattern, replace 'writing' → 'project', /api/writings → /api/projects
+
+BOOKS Section (BookEditor.tsx):
+└─ Same pattern, replace 'writing' → 'book', /api/writings → /api/books
+
+ABOUT Section (AboutManager.tsx):
+└─ Same pattern, replace 'writing' → 'about', /api/writings → /api/about
+
+HOME Section (HomeManager.tsx):
+└─ Same pattern, replace 'writing' → 'home', /api/writings → /api/home
+
+═══════════════════════════════════════════════════════════════════════════════
+
+BACKEND FLOW:
+
+Express.js Server (cms/server/index.js)
+├─ CORS enabled
+├─ JSON body parser (10MB limit)
+├─ Static file serving: app.use('/uploads', express.static('public/uploads'))
+└─ Route: app.use('/api/media', mediaRoutes(db))
+   │
+   ├─ POST /api/media/upload
+   │  ├─ multer.single('file')
+   │  ├─ Validate file type & size
+   │  ├─ Generate unique filename
+   │  ├─ Save to disk
+   │  ├─ Save metadata to MongoDB
+   │  └─ Return { imageUrl, success, ... }
+   │
+   ├─ POST /api/media/batch-upload
+   │  ├─ multer.array('files', 10)
+   │  ├─ Loop & upload each
+   │  └─ Return results array
+   │
+   ├─ GET /api/media/list
+   │  ├─ Query: limit, offset, sort
+   │  └─ Return paginated media items
+   │
+   └─ DELETE /api/media/:filename
+      ├─ Security: validate filename
+      ├─ Delete file from disk
+      ├─ Delete metadata from DB
+      └─ Return success
+
+═══════════════════════════════════════════════════════════════════════════════
+```

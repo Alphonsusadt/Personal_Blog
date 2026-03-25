@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+cms/node_modules/
+
+# Environment variables - JANGAN COMMIT FILE INI
+.env
+.env.local
+.env.production
+cms/.env
+cms/.env.local
+cms/.env.production
+
+# Build output
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
