@@ -184,10 +184,103 @@ Partial Least Squares Regression (PLSR) used for multivariate calibration:
 $$X = T P^T + E$$
 $$Y = U Q^T + F$$
 
-where X is spectral data and Y is glucose concentration.
+concentration.
+    `.trim()
+  },
+  {
+    id: 'biomedical-robotics-control',
+    title: 'Biomedical Robotics · Control Systems Integration',
+    description: 'Real-time multi-modal biosensor fusion (ECG, EMG, EEG, SpO2) with PID feedback control driving a multi-jointed robotic arm manipulator',
+    tags: ['Robotics', 'PID Control', 'Biosensors', 'EMG Processing', 'ECG Analysis', 'BCI'],
+    category: 'control',
+    thumbnail: undefined, // Optional future SVG
+    content: `
+# Biomedical Robotics Control Systems Integration
+
+## System Overview
+
+The biomedical robotics platform integrates multiple physiological signals into a unified control system:
+
+$$u(t) = K_p e(t) + K_i \\int e(t) dt + K_d \\frac{de(t)}{dt}$$
+
+where error \\\\$e(t) = r(t) - y(t)\\\\ is derived from fused biosensor data.
+
+## Schematic Architecture
+
+\`\`\`mermaid
+graph TB
+  subgraph id1 ["🔷 Technical Biomedical Robotics Schematic"]
+    style id1 fill:#0a1428,stroke:#00bfff,stroke-width:3px,stroke-dasharray: 5 5
+    
+    subgraph ECG ["ECG SIGNAL 🟢 LIVE"]
+      BASELINE["~~~~~~~ baseline wander"]:::baseline
+      ECG1["P-QRS-T"]:::ecgpeak
+      ECG2["P'-QRS'-T'<br/>var RR int."]:::ecgpeak
+      style ECG fill:#001a00,stroke:#00ff44,stroke-width:5px
+    subgraph EMG ["RAW EMG 🟣 0.4mV"]
+      BURST1["^^^/\\\\\\/\\^ burst"]:::emgchaotic
+      BURST2["\^/\\/\\^\\^\\/ rest"]:::emgchaotic
+      BURST3["\\/\^/\\/ burst"]:::emgchaotic
+      style EMG fill:#1a001a,stroke:#aa44ff,stroke-width:5px
+      classDef emgchaotic fill:#660066,stroke:#cc66ff,stroke-width:3px
+      classDef baseline stroke:#44aa44,stroke-dasharray: 2 2
+    subgraph CONTROL ["PID FEEDBACK 🔵"]
+      REF["REF r(t)"] --> ERROR["(ERROR e(t))"]
+      FEED["FEEDBACK y(t)"] -.->|"dashed"| ERROR
+      ERROR --> PID["PID:<br/>Kp ∫ Ki d/dt Kd"]
+      PID --> PLANT["PLANT Arm"]
+      PLANT --> FEED
+      style CONTROL fill:#000a22,stroke:#4488ff,stroke-width:5px
+      classDef dashed stroke-dasharray: 8 5, stroke:#66aaff
+      linkStyle 6 stroke-dasharray: 8 5
+    subgraph BIOSENSORS ["BIOSENSORS 🟡"]
+      SpO2[SpO2: 98% 🟢]
+      EMGv[EMG: 0.4mV 🟣]
+      EEGf[EEG: 12Hz 🔵]
+      LEGEND[Legend:<br/>🟢=OK 🟣=Active 🔵=Processing 🟡=Monitor]
+      style BIOSENSORS fill:#332200,stroke:#ffaa00,stroke-width:4px
+      classDef yellowStatus fill:#ffcc88,stroke:#aa8800
+      class SpO2,EMGv,EEGf,LEGEND yellowStatus
+    ARM["🦾 Multi-Jointed<br/>Robotic Arm<br/>💙 Energy Joints"]
+    style ARM fill:#112244,stroke:#44aaff,stroke-width:5px
+    
+    %% Connections - colored dotted lines
+    ECG -.->|Green Signal| ARM
+    EMG -.->|"Purple Burst"| ARM
+    CONTROL -.->|"Blue Control"| ARM
+    BIOSENSORS -.->|"Status Fusion"| ARM
+    
+    %% Bottom text
+    TEXT["BIOMEDICAL ROBOTICS · SIGNAL SYSTEMS"]
+    style TEXT fill:#ffffff,stroke:#00bfff,stroke-width:2px,font-size:20px
+    
+  %% Neon grid glow
+  classDef baseline stroke:#44aa44,stroke-width:1.5px,stroke-dasharray: 1 3
+  classDef ecgpeak fill:#004400,stroke:#00ff88,stroke-width:3px
+  classDef emgchaotic fill:#660066,stroke:#cc66ff,stroke-width:3px
+  classDef dashed stroke-dasharray: 8 5, stroke:#66aaff
+  linkStyle default stroke:#224488,stroke-width:1.5px,stroke-dasharray: 3 3
+\`\`\`
+
+## Fixed Signal Pipeline
+
+1. **ECG**: Live irregular P-QRS-T (RR variability added)
+2. **EMG**: Raw stochastic bursts (periodic fix - chaotic noise)
+2. **EMG**: High-frequency stochastic burst envelope extraction (mean 0.4mV during contraction)
+3. **Control Loop**: PID gains tuned for stable arm trajectory tracking
+4. **Biosensors**: Real-time SpO2 (98%), EEG alpha (12Hz), status fusion
+
+## Performance Metrics
+
+- Arm tracking error: <2° per joint
+- EMG response latency: <50ms
+- Control stability: $\\zeta > 0.7$ damping ratio
+
+This architecture enables precise robotic manipulation driven by physiological intent signals.
     `.trim()
   }
 ];
+
 
 export const getProjectById = (id: string): Project | undefined => {
   return projects.find(p => p.id === id);

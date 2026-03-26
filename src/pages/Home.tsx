@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Github, Linkedin, Mail, ExternalLink, ChevronRight } from 'lucide-react';
 import { ProjectCard } from '../components/ProjectCard';
@@ -6,10 +6,144 @@ import { WritingCard } from '../components/WritingCard';
 import { BookCard } from '../components/BookCard';
 import { api } from '../lib/api';
 
+/**
+ * Generates EMG signal path with stochastic high-frequency noise pattern
+ * Simulates muscle bursts (active) and rests (quiet) - NOT periodic like ECG
+ */
+function generateEMGPath(
+  startX: number,
+  baselineY: number,
+  cycleWidth: number,
+  numCycles: number
+): string {
+  const points: string[] = [];
+  points.push(`M${startX},${baselineY}`);
+
+  for (let cycle = 0; cycle < numCycles; cycle++) {
+    const cycleStartX = startX + cycle * cycleWidth;
+
+    // Vary burst timing slightly per cycle
+    const restDuration1 = 17 + (Math.random() - 0.5) * 4;
+    const burstDuration = 18 + (Math.random() - 0.5) * 4;
+    const restDuration2 = cycleWidth - restDuration1 - burstDuration;
+
+    // REST PHASE 1: Very low amplitude noise (quiet muscle)
+    for (let i = 0; i < restDuration1; i += 2) {
+      const x = cycleStartX + i;
+      const y = baselineY + (Math.random() - 0.5) * 3;
+      points.push(`L${x.toFixed(1)},${y.toFixed(1)}`);
+    }
+
+    // BURST PHASE: High-frequency stochastic spikes (muscle activation)
+    const burstStartX = cycleStartX + restDuration1;
+    for (let i = 0; i < burstDuration; i += 1) {
+      const x = burstStartX + i;
+
+      // Envelope: amplitude peaks in middle of burst (natural ramp up/down)
+      const burstProgress = i / burstDuration;
+      const envelope = Math.sin(burstProgress * Math.PI);
+
+      // Random spike with envelope-modulated amplitude
+      const maxAmplitude = 9;
+      const amplitude = maxAmplitude * envelope * (0.4 + Math.random() * 0.6);
+      const direction = Math.random() > 0.5 ? 1 : -1;
+
+      const y = baselineY + direction * amplitude;
+      points.push(`L${x.toFixed(1)},${y.toFixed(1)}`);
+    }
+
+    // REST PHASE 2: Return to quiet baseline
+    const rest2StartX = burstStartX + burstDuration;
+    for (let i = 0; i < restDuration2; i += 2) {
+      const x = rest2StartX + i;
+      const y = baselineY + (Math.random() - 0.5) * 3;
+      points.push(`L${x.toFixed(1)},${y.toFixed(1)}`);
+    }
+  }
+
+  return points.join(' ');
+}
+
+/**
+ * Generates ECG signal path with organic PQRST variation
+ * Adds subtle R-R interval variation and baseline drift for realistic appearance
+ */
+function generateECGPath(
+  startX: number,
+  baselineY: number,
+  cycleWidth: number,
+  numCycles: number
+): string {
+  const points: string[] = [];
+  points.push(`M${startX},${baselineY}`);
+
+  let currentX = startX;
+
+  for (let cycle = 0; cycle < numCycles; cycle++) {
+    // R-R interval variation: +/- 3px (about 6% heart rate variability)
+    const rrVariation = (Math.random() - 0.5) * 6;
+    const effectiveCycleWidth = cycleWidth + rrVariation;
+    const scale = effectiveCycleWidth / cycleWidth;
+
+    // Baseline drift: subtle wandering +/- 2px
+    const baselineDrift = (Math.random() - 0.5) * 4;
+    const localBaseline = baselineY + baselineDrift;
+
+    // Amplitude variations (subtle)
+    const rVariation = 1 + (Math.random() - 0.5) * 0.2;
+    const sVariation = 1 + (Math.random() - 0.5) * 0.2;
+    const pVariation = 1 + (Math.random() - 0.5) * 0.3;
+    const tVariation = 1 + (Math.random() - 0.5) * 0.3;
+
+    const cycleStart = currentX;
+
+    // Flat baseline to P wave start
+    points.push(`L${(cycleStart + 4 * scale).toFixed(1)},${localBaseline.toFixed(1)}`);
+
+    // P wave (small atrial depolarization bump)
+    points.push(`L${(cycleStart + 5 * scale).toFixed(1)},${(localBaseline - 2 * pVariation).toFixed(1)}`);
+    points.push(`L${(cycleStart + 6 * scale).toFixed(1)},${(localBaseline - 3 * pVariation).toFixed(1)}`);
+    points.push(`L${(cycleStart + 8 * scale).toFixed(1)},${(localBaseline - 2 * pVariation).toFixed(1)}`);
+
+    // PR segment (flat, isoelectric)
+    points.push(`L${(cycleStart + 12 * scale).toFixed(1)},${localBaseline.toFixed(1)}`);
+
+    // Q wave (small dip before R)
+    points.push(`L${(cycleStart + 13 * scale).toFixed(1)},${(localBaseline + 4 * sVariation).toFixed(1)}`);
+
+    // R wave (tall sharp spike - ventricular depolarization)
+    points.push(`L${(cycleStart + 14 * scale).toFixed(1)},${(localBaseline - 24 * rVariation).toFixed(1)}`);
+
+    // S wave (dip below baseline)
+    points.push(`L${(cycleStart + 15 * scale).toFixed(1)},${(localBaseline + 10 * sVariation).toFixed(1)}`);
+
+    // Return to baseline (ST segment)
+    points.push(`L${(cycleStart + 16 * scale).toFixed(1)},${localBaseline.toFixed(1)}`);
+
+    // T wave (ventricular repolarization - broader, gentler)
+    points.push(`L${(cycleStart + 20 * scale).toFixed(1)},${localBaseline.toFixed(1)}`);
+    points.push(`L${(cycleStart + 22 * scale).toFixed(1)},${(localBaseline - 3 * tVariation).toFixed(1)}`);
+    points.push(`L${(cycleStart + 25 * scale).toFixed(1)},${(localBaseline - 4 * tVariation).toFixed(1)}`);
+    points.push(`L${(cycleStart + 28 * scale).toFixed(1)},${(localBaseline - 3 * tVariation).toFixed(1)}`);
+
+    // Return to baseline for rest of cycle
+    points.push(`L${(cycleStart + 32 * scale).toFixed(1)},${localBaseline.toFixed(1)}`);
+
+    currentX = cycleStart + effectiveCycleWidth;
+    points.push(`L${currentX.toFixed(1)},${localBaseline.toFixed(1)}`);
+  }
+
+  return points.join(' ');
+}
+
 export function Home() {
   const [recentProjects, setRecentProjects] = useState<any[]>([]);
   const [recentWritings, setRecentWritings] = useState<any[]>([]);
   const [featuredBooks, setFeaturedBooks] = useState<any[]>([]);
+
+  // Generate signal paths once on mount for organic variation
+  const emgPath = useMemo(() => generateEMGPath(24, 161, 52, 8), []);
+  const ecgPath = useMemo(() => generateECGPath(24, 66, 52, 8), []);
 
   useEffect(() => {
     api.getPublicProjects().then((data: any[]) => setRecentProjects(data.slice(0, 3))).catch(console.error);
@@ -232,36 +366,22 @@ export function Home() {
                   <g clipPath="url(#ecg-clip)">
                     <g className="scroll-ecg">
                       <path
-                        d="M24,66 L28,66 L29,64 L31,63 L33,64 L36,66 L40,66 L41,70 L42,42 L43,76 L44,66 L48,66 L50,63 L52,62 L54,63 L56,66 L76,66
-                           L80,66 L81,64 L83,63 L85,64 L88,66 L92,66 L93,70 L94,42 L95,76 L96,66 L100,66 L102,63 L104,62 L106,63 L108,66 L128,66
-                           L132,66 L133,64 L135,63 L137,64 L140,66 L144,66 L145,70 L146,42 L147,76 L148,66 L152,66 L154,63 L156,62 L158,63 L160,66 L180,66
-                           L184,66 L185,64 L187,63 L189,64 L192,66 L196,66 L197,70 L198,42 L199,76 L200,66 L204,66 L206,63 L208,62 L210,63 L212,66 L232,66
-                           L236,66 L237,64 L239,63 L241,64 L244,66 L248,66 L249,70 L250,42 L251,76 L252,66 L256,66 L258,63 L260,62 L262,63 L264,66 L284,66
-                           L288,66 L289,64 L291,63 L293,64 L296,66 L300,66 L301,70 L302,42 L303,76 L304,66 L308,66 L310,63 L312,62 L314,63 L316,66 L336,66
-                           L340,66 L341,64 L343,63 L345,64 L348,66 L352,66 L353,70 L354,42 L355,76 L356,66 L360,66 L362,63 L364,62 L366,63 L368,66 L388,66
-                           L392,66 L393,64 L395,63 L397,64 L400,66 L404,66 L405,70 L406,42 L407,76 L408,66 L412,66 L414,63 L416,62 L418,63 L420,66 L440,66"
+                        d={ecgPath}
                         stroke="#4ADE80" strokeWidth="1.8" fill="none" filter="url(#glow-green)"
                       />
                     </g>
                   </g>
 
-                  {/* ── EMG PANEL — seamless scrolling burst pattern ── */}
+                  {/* ── EMG PANEL — stochastic noise bursts (muscle activation) ── */}
                   <rect x="18" y="118" width="170" height="70" rx="10" fill="rgba(15,23,42,0.85)" stroke="#C084FC" strokeWidth="1.5"/>
                   <text x="30" y="136" fontSize="9" fill="#E879F9" fontFamily="monospace" fontWeight="bold">EMG SIGNAL</text>
                   <circle cx="170" cy="130" r="5" fill="#C084FC" className="blink2" filter="url(#glow-purple)"/>
                   <rect x="24" y="143" width="158" height="36" rx="4" fill="rgba(2,6,23,0.7)"/>
-                  {/* Clip + scroll: each 52px cycle = 18px quiet + 16px burst + 18px quiet */}
+                  {/* Clip + scroll: stochastic bursts with quiet rest periods */}
                   <g clipPath="url(#emg-clip)">
                     <g className="scroll-emg">
                       <path
-                        d="M24,161 L42,161 L43,157 L44,167 L45,152 L46,170 L47,153 L48,169 L49,157 L50,165 L51,159 L52,163 L53,161 L54,161 L76,161
-                           L94,161 L95,156 L96,168 L97,151 L98,171 L99,154 L100,169 L101,157 L102,164 L103,160 L104,163 L105,161 L106,161 L128,161
-                           L146,161 L147,157 L148,167 L149,152 L150,170 L151,153 L152,168 L153,158 L154,165 L155,159 L156,163 L157,161 L158,161 L180,161
-                           L198,161 L199,156 L200,167 L201,152 L202,170 L203,154 L204,169 L205,157 L206,164 L207,160 L208,163 L209,161 L210,161 L232,161
-                           L250,161 L251,157 L252,168 L253,152 L254,171 L255,153 L256,169 L257,158 L258,165 L259,159 L260,163 L261,161 L262,161 L284,161
-                           L302,161 L303,156 L304,168 L305,151 L306,170 L307,154 L308,169 L309,157 L310,164 L311,160 L312,163 L313,161 L314,161 L336,161
-                           L354,161 L355,157 L356,167 L357,152 L358,170 L359,153 L360,168 L361,158 L362,165 L363,159 L364,163 L365,161 L366,161 L388,161
-                           L406,161 L407,156 L408,167 L409,152 L410,170 L411,154 L412,169 L413,157 L414,164 L415,160 L416,163 L417,161 L418,161 L440,161"
+                        d={emgPath}
                         stroke="#E879F9" strokeWidth="1.5" fill="none" filter="url(#glow-purple)"
                       />
                     </g>
@@ -279,18 +399,61 @@ export function Home() {
                   <circle r="2.5" fill="#E879F9" filter="url(#glow-purple)" className="emg-dot-2"/>
                   <circle r="2.5" fill="#E879F9" filter="url(#glow-purple)" className="emg-dot-3"/>
 
-                  {/* ── CONTROL SYSTEM (top right) ── */}
+                  {/* ── CONTROL SYSTEM (top right) - Closed-Loop Feedback ── */}
                   <rect x="294" y="18" width="170" height="90" rx="10" fill="rgba(15,23,42,0.85)" stroke="#38BDF8" strokeWidth="1.5"/>
                   <text x="306" y="36" fontSize="9" fill="#7DD3FC" fontFamily="monospace" fontWeight="bold">CONTROL SYSTEM</text>
-                  <rect x="306" y="44" width="42" height="22" rx="4" fill="#0E4872"/>
-                  <text x="327" y="59" fontSize="7.5" fill="#38BDF8" textAnchor="middle" fontFamily="monospace">REF</text>
-                  <rect x="370" y="44" width="42" height="22" rx="4" fill="#0E4872"/>
-                  <text x="391" y="59" fontSize="7.5" fill="#38BDF8" textAnchor="middle" fontFamily="monospace">PLANT</text>
-                  <line x1="348" y1="55" x2="368" y2="55" stroke="#38BDF8" strokeWidth="1.5" className="flow-dash"/>
-                  <path d="M412 66 Q430 66 430 80 Q430 92 391 92 Q348 92 330 92 Q306 92 306 80 L306 66" stroke="#38BDF8" strokeWidth="1" fill="none" strokeDasharray="4 3" className="fade-loop"/>
-                  <text x="360" y="88" fontSize="7" fill="#7DD3FC" textAnchor="middle" fontFamily="monospace">feedback</text>
-                  <circle cx="358" cy="55" r="7" fill="none" stroke="#38BDF8" strokeWidth="1.5"/>
-                  <text x="358" y="59" fontSize="9" fill="#7DD3FC" textAnchor="middle">+</text>
+
+                  {/* REF Node */}
+                  <rect x="302" y="46" width="26" height="18" rx="3" fill="#0E4872"/>
+                  <text x="315" y="58" fontSize="6.5" fill="#38BDF8" textAnchor="middle" fontFamily="monospace">REF</text>
+
+                  {/* Arrow: REF -> SUM */}
+                  <line x1="328" y1="55" x2="336" y2="55" stroke="#38BDF8" strokeWidth="1.2" className="flow-dash"/>
+                  <polygon points="336,55 333,52.5 333,57.5" fill="#38BDF8"/>
+
+                  {/* SUM (Error) Circle with Σ symbol */}
+                  <circle cx="344" cy="55" r="7" fill="none" stroke="#38BDF8" strokeWidth="1.5"/>
+                  <text x="344" y="58.5" fontSize="9" fill="#7DD3FC" textAnchor="middle" fontFamily="monospace">Σ</text>
+                  {/* Plus sign indicator on left input */}
+                  <text x="334" y="50" fontSize="5" fill="#4ADE80" fontFamily="monospace">+</text>
+                  {/* Minus sign indicator on bottom (feedback) input */}
+                  <text x="339" y="68" fontSize="6" fill="#F87171" fontFamily="monospace">−</text>
+
+                  {/* Arrow: SUM -> PID */}
+                  <line x1="351" y1="55" x2="359" y2="55" stroke="#38BDF8" strokeWidth="1.2" className="flow-dash"/>
+                  <polygon points="359,55 356,52.5 356,57.5" fill="#38BDF8"/>
+
+                  {/* CONTROLLER (PID) Node */}
+                  <rect x="360" y="46" width="32" height="18" rx="3" fill="#0E4872"/>
+                  <text x="376" y="58" fontSize="6.5" fill="#38BDF8" textAnchor="middle" fontFamily="monospace">PID</text>
+
+                  {/* Arrow: PID -> PLANT */}
+                  <line x1="392" y1="55" x2="400" y2="55" stroke="#38BDF8" strokeWidth="1.2" className="flow-dash"/>
+                  <polygon points="400,55 397,52.5 397,57.5" fill="#38BDF8"/>
+
+                  {/* PLANT Node */}
+                  <rect x="401" y="46" width="40" height="18" rx="3" fill="#0E4872"/>
+                  <text x="421" y="58" fontSize="6.5" fill="#38BDF8" textAnchor="middle" fontFamily="monospace">PLANT</text>
+
+                  {/* Output arrow from PLANT */}
+                  <line x1="441" y1="55" x2="450" y2="55" stroke="#38BDF8" strokeWidth="1.2"/>
+                  <polygon points="450,55 447,52.5 447,57.5" fill="#38BDF8"/>
+                  <text x="455" y="58" fontSize="5" fill="#7DD3FC" fontFamily="monospace">y</text>
+
+                  {/* FEEDBACK PATH (dashed, clearly visible) - curves from output back down to SUM */}
+                  <path
+                    d="M448,55 Q456,55 456,70 Q456,82 421,82 Q380,82 344,82 L344,62"
+                    stroke="#38BDF8"
+                    strokeWidth="1.5"
+                    fill="none"
+                    strokeDasharray="4 2"
+                    className="fade-loop"
+                  />
+                  {/* Arrow at end of feedback (pointing up into SUM) */}
+                  <polygon points="344,62 341,66 347,66" fill="#38BDF8"/>
+
+                  {/* Feedback label */}
+                  <text x="400" y="90" fontSize="6" fill="#7DD3FC" textAnchor="middle" fontFamily="monospace">feedback</text>
 
                   {/* ── SENSOR NODE (bottom right) ── */}
                   <rect x="294" y="124" width="170" height="90" rx="10" fill="rgba(15,23,42,0.85)" stroke="#FCD34D" strokeWidth="1.5"/>
