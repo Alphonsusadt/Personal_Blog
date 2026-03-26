@@ -5,7 +5,8 @@ import { BookToolbar } from '../../components/BookToolbar';
 import { BookSidebar } from '../../components/BookSidebar';
 import { sanitizeMarkdown } from '../../lib/mediaUploader';
 import { hasBase64Images } from '../../utils/media';
-import { ArrowLeft, Check, Clock } from 'lucide-react';
+import { ArrowLeft, Check, Clock, Eye, EyeOff } from 'lucide-react';
+import { renderMarkdown } from '../../utils/renderers';
 
 interface Book {
   _id?: string;
@@ -42,6 +43,7 @@ export function BookEditor() {
   const [loading, setLoading] = useState(!!slug);
   const [isSaving, setIsSaving] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     if (!slug || slug === 'new') {
@@ -243,17 +245,70 @@ export function BookEditor() {
               />
             </div>
 
-            {/* Toolbar */}
-            <BookToolbar textareaRef={textareaRef} onInsert={insertMarkdown} />
+            {/* Toolbar with Preview Toggle */}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <BookToolbar textareaRef={textareaRef} onInsert={insertMarkdown} />
 
-            {/* Review Textarea */}
-            <textarea
-              ref={textareaRef}
-              value={book.review}
-              onChange={e => setBook({ ...book, review: e.target.value })}
-              placeholder="Book review... (Markdown supported)"
-              className="w-full min-h-[70vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
-            />
+              {/* Live Preview Toggle */}
+              <button
+                onClick={() => setShowPreview(!showPreview)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  showPreview
+                    ? 'bg-[#1E40AF] text-white'
+                    : 'bg-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC] border border-[#334155]'
+                }`}
+              >
+                {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                <span className="hidden sm:inline">{showPreview ? 'Hide Preview' : 'Live Preview'}</span>
+              </button>
+            </div>
+
+            {/* Content Area - Editor or Split View */}
+            {showPreview ? (
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+                {/* Editor */}
+                <div className="space-y-2">
+                  <label className="text-xs text-[#94A3B8] font-medium">MARKDOWN</label>
+                  <textarea
+                    ref={textareaRef}
+                    value={book.review}
+                    onChange={e => setBook({ ...book, review: e.target.value })}
+                    placeholder="Book review... (Markdown, LaTeX $$...$$ supported)"
+                    className="w-full min-h-[60vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
+                  />
+                </div>
+
+                {/* Preview */}
+                <div className="space-y-2">
+                  <label className="text-xs text-[#94A3B8] font-medium">PREVIEW</label>
+                  <div
+                    className="w-full min-h-[60vh] bg-[#1E293B] border border-[#475569] rounded-lg px-4 py-4 overflow-auto prose prose-sm max-w-none
+                      prose-h1:text-[#E2E8F0] prose-h2:text-[#CBD5E1] prose-h3:text-[#CBD5E1]
+                      prose-h1:font-bold prose-h2:font-semibold prose-h3:font-semibold
+                      prose-p:text-[#E2E8F0]
+                      prose-a:text-[#60A5FA] prose-a:hover:text-[#93C5FD]
+                      prose-strong:text-[#F1F5F9] prose-strong:font-semibold
+                      prose-em:text-[#E2E8F0]
+                      prose-code:text-[#FCA5A5] prose-code:bg-[#0F172A] prose-code:px-2 prose-code:py-1 prose-code:rounded
+                      prose-pre:bg-[#0F172A] prose-pre:text-[#E2E8F0]
+                      prose-blockquote:text-[#CBD5E1] prose-blockquote:border-l-[#60A5FA]
+                      prose-ul:text-[#E2E8F0]
+                      prose-ol:text-[#E2E8F0]
+                      prose-li:text-[#E2E8F0]"
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(book.review || '*Start writing to see preview...*') }}
+                  />
+                </div>
+              </div>
+            ) : (
+              /* Full Editor (no preview) */
+              <textarea
+                ref={textareaRef}
+                value={book.review}
+                onChange={e => setBook({ ...book, review: e.target.value })}
+                placeholder="Book review... (Markdown, LaTeX $$...$$ supported)"
+                className="w-full min-h-[70vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
+              />
+            )}
           </div>
 
           {/* Sidebar - Right */}

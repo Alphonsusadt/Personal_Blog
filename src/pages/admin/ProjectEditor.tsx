@@ -112,13 +112,17 @@ export function ProjectEditor() {
     });
   };
 
-  const handleSave = async () => {
+  const handleSave = async (shouldPublish: boolean = false) => {
     if (!project.title || !project.id) {
       alert('Title and Slug are required');
       return;
     }
 
-    let payload: Project = { ...project };
+    let payload: Project = {
+      ...project,
+      // If button says "Publish" (not already published), set status to published
+      status: shouldPublish ? 'published' : project.status
+    };
 
     // Sanitize base64 images to URLs if present
     if (hasBase64Images(payload.content)) {
@@ -220,7 +224,7 @@ export function ProjectEditor() {
             )}
 
             <button
-              onClick={handleSave}
+              onClick={() => handleSave(project.status !== 'published')}
               disabled={isSaving || !project.title || !project.id}
               className="px-3 sm:px-4 py-2 bg-[#1E40AF] text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-[#1E3A8A] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
@@ -266,7 +270,7 @@ export function ProjectEditor() {
 
             {/* Content Area - Editor or Split View */}
             {showPreview ? (
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
                 {/* Editor */}
                 <div className="space-y-2">
                   <label className="text-xs text-[#94A3B8] font-medium">MARKDOWN</label>
@@ -283,7 +287,19 @@ export function ProjectEditor() {
                 <div className="space-y-2">
                   <label className="text-xs text-[#94A3B8] font-medium">PREVIEW</label>
                   <div
-                    className="w-full min-h-[60vh] bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-4 overflow-auto prose prose-invert prose-sm max-w-none"
+                    className="w-full min-h-[60vh] bg-[#1E293B] border border-[#475569] rounded-lg px-4 py-4 overflow-auto prose prose-sm max-w-none
+                      prose-h1:text-[#E2E8F0] prose-h2:text-[#CBD5E1] prose-h3:text-[#CBD5E1]
+                      prose-h1:font-bold prose-h2:font-semibold prose-h3:font-semibold
+                      prose-p:text-[#E2E8F0]
+                      prose-a:text-[#60A5FA] prose-a:hover:text-[#93C5FD]
+                      prose-strong:text-[#F1F5F9] prose-strong:font-semibold
+                      prose-em:text-[#E2E8F0]
+                      prose-code:text-[#FCA5A5] prose-code:bg-[#0F172A] prose-code:px-2 prose-code:py-1 prose-code:rounded
+                      prose-pre:bg-[#0F172A] prose-pre:text-[#E2E8F0]
+                      prose-blockquote:text-[#CBD5E1] prose-blockquote:border-l-[#60A5FA]
+                      prose-ul:text-[#E2E8F0]
+                      prose-ol:text-[#E2E8F0]
+                      prose-li:text-[#E2E8F0]"
                     dangerouslySetInnerHTML={{ __html: renderMarkdown(project.content || '*Start writing to see preview...*') }}
                   />
                 </div>
