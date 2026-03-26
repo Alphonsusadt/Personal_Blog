@@ -90,3 +90,27 @@
 .dark .tag {
   @apply bg-[#334155] text-[#94A3B8];
 }
+
+/* Custom scrollbar for preview sections */
+.preview-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 #1E293B;
+}
+
+.preview-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.preview-scroll::-webkit-scrollbar-track {
+  background: #1E293B;
+  border-radius: 4px;
+}
+
+.preview-scroll::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+.preview-scroll::-webkit-scrollbar-thumb:hover {
+  background: #64748B;
+}

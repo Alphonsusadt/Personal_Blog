@@ -335,36 +335,36 @@ export function WritingEditor() {
 
             {/* Content Area - Editor or Split View */}
             {showPreview ? (
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {/* Editor */}
-                <div className="space-y-2">
-                  <label className="text-xs text-[#94A3B8] font-medium">MARKDOWN</label>
+                <div className="flex flex-col h-full">
+                  <label className="text-xs text-[#94A3B8] font-medium mb-2">MARKDOWN</label>
                   <textarea
                     ref={textareaRef}
                     value={writing.content}
                     onChange={e => setWriting({ ...writing, content: e.target.value })}
                     placeholder="Start writing... (Markdown, LaTeX $$...$$ supported)"
-                    className="w-full min-h-[60vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
+                    className="flex-1 min-h-[60vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
                   />
                 </div>
 
                 {/* Preview */}
-                <div className="space-y-2">
-                  <label className="text-xs text-[#94A3B8] font-medium">PREVIEW</label>
+                <div className="flex flex-col h-full">
+                  <label className="text-xs text-[#94A3B8] font-medium mb-2">PREVIEW</label>
                   <div
-                    className="w-full min-h-[60vh] bg-[#1E293B] border border-[#475569] rounded-lg px-4 py-4 overflow-auto prose prose-sm max-w-none
-                      prose-h1:text-[#E2E8F0] prose-h2:text-[#CBD5E1] prose-h3:text-[#CBD5E1]
+                    className="flex-1 min-h-[60vh] bg-[#1E293B] border border-[#475569] rounded-lg px-4 py-4 overflow-y-auto prose prose-sm max-w-none preview-scroll
+                      prose-h1:text-[#FFFFFF] prose-h2:text-[#F1F5F9] prose-h3:text-[#F1F5F9]
                       prose-h1:font-bold prose-h2:font-semibold prose-h3:font-semibold
-                      prose-p:text-[#E2E8F0]
-                      prose-a:text-[#60A5FA] prose-a:hover:text-[#93C5FD]
-                      prose-strong:text-[#F1F5F9] prose-strong:font-semibold
-                      prose-em:text-[#E2E8F0]
-                      prose-code:text-[#FCA5A5] prose-code:bg-[#0F172A] prose-code:px-2 prose-code:py-1 prose-code:rounded
-                      prose-pre:bg-[#0F172A] prose-pre:text-[#E2E8F0]
-                      prose-blockquote:text-[#CBD5E1] prose-blockquote:border-l-[#60A5FA]
-                      prose-ul:text-[#E2E8F0]
-                      prose-ol:text-[#E2E8F0]
-                      prose-li:text-[#E2E8F0]"
+                      prose-p:text-[#F1F5F9]
+                      prose-a:text-[#93C5FD] prose-a:hover:text-[#BFDBFE]
+                      prose-strong:text-[#FFFFFF] prose-strong:font-semibold
+                      prose-em:text-[#F1F5F9]
+                      prose-code:text-[#FEA5A5] prose-code:bg-[#0F172A] prose-code:px-2 prose-code:py-1 prose-code:rounded
+                      prose-pre:bg-[#0F172A] prose-pre:text-[#F1F5F9]
+                      prose-blockquote:text-[#F1F5F9] prose-blockquote:border-l-[#93C5FD]
+                      prose-ul:text-[#F1F5F9]
+                      prose-ol:text-[#F1F5F9]
+                      prose-li:text-[#F1F5F9]"
                     dangerouslySetInnerHTML={{ __html: renderMarkdown(writing.content || '*Start writing to see preview...*') }}
                   />
                 </div>
