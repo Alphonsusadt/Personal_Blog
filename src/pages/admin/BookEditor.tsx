@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { BookToolbar } from '../../components/BookToolbar';
 import { BookSidebar } from '../../components/BookSidebar';
+import { ImageUploadDialog } from '../../components/ImageUploadDialog';
 import { sanitizeMarkdown } from '../../lib/mediaUploader';
 import { hasBase64Images } from '../../utils/media';
 import { ArrowLeft, Check, Clock, Eye, EyeOff } from 'lucide-react';
@@ -44,6 +45,7 @@ export function BookEditor() {
   const [isSaving, setIsSaving] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showPreview, setShowPreview] = useState(false);
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!slug || slug === 'new') {
@@ -282,19 +284,19 @@ export function BookEditor() {
                 <div className="flex flex-col h-full">
                   <label className="text-xs text-[#94A3B8] font-medium mb-2">PREVIEW</label>
                   <div
-                    className="flex-1 min-h-[60vh] bg-[#1E293B] border border-[#475569] rounded-lg px-4 py-4 overflow-y-auto prose prose-sm max-w-none preview-scroll
-                      prose-h1:text-[#FFFFFF] prose-h2:text-[#F1F5F9] prose-h3:text-[#F1F5F9]
+                    className="flex-1 min-h-[60vh] bg-white border border-[#E5E7EB] rounded-lg px-4 py-4 overflow-y-auto prose prose-sm max-w-none preview-scroll-light
+                      prose-h1:text-[#1A1A1A] prose-h2:text-[#2D3748] prose-h3:text-[#2D3748]
                       prose-h1:font-bold prose-h2:font-semibold prose-h3:font-semibold
-                      prose-p:text-[#F1F5F9]
-                      prose-a:text-[#93C5FD] prose-a:hover:text-[#BFDBFE]
-                      prose-strong:text-[#FFFFFF] prose-strong:font-semibold
-                      prose-em:text-[#F1F5F9]
-                      prose-code:text-[#FEA5A5] prose-code:bg-[#0F172A] prose-code:px-2 prose-code:py-1 prose-code:rounded
-                      prose-pre:bg-[#0F172A] prose-pre:text-[#F1F5F9]
-                      prose-blockquote:text-[#F1F5F9] prose-blockquote:border-l-[#93C5FD]
-                      prose-ul:text-[#F1F5F9]
-                      prose-ol:text-[#F1F5F9]
-                      prose-li:text-[#F1F5F9]"
+                      prose-p:text-[#374151]
+                      prose-a:text-[#1E40AF] prose-a:hover:text-[#1E3A8A]
+                      prose-strong:text-[#1A1A1A] prose-strong:font-semibold
+                      prose-em:text-[#374151]
+                      prose-code:text-[#DC2626] prose-code:bg-[#FEE2E2] prose-code:px-2 prose-code:py-1 prose-code:rounded
+                      prose-pre:bg-[#F3F4F6] prose-pre:text-[#1F2937]
+                      prose-blockquote:text-[#4B5563] prose-blockquote:border-l-[#1E40AF]
+                      prose-ul:text-[#374151]
+                      prose-ol:text-[#374151]
+                      prose-li:text-[#374151]"
                     dangerouslySetInnerHTML={{ __html: renderMarkdown(book.review || '*Start writing to see preview...*') }}
                   />
                 </div>
