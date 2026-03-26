@@ -5,7 +5,8 @@ import { ProjectToolbar } from '../../components/ProjectToolbar';
 import { ProjectSidebar } from '../../components/ProjectSidebar';
 import { sanitizeMarkdown } from '../../lib/mediaUploader';
 import { hasBase64Images } from '../../utils/media';
-import { ArrowLeft, Check, Clock } from 'lucide-react';
+import { ArrowLeft, Check, Clock, Eye, EyeOff } from 'lucide-react';
+import { renderMarkdown } from '../../utils/renderers';
 
 interface Project {
   _id?: string;
@@ -16,6 +17,11 @@ interface Project {
   category: string;
   content: string;
   status?: 'draft' | 'published';
+  devStatus?: 'planning' | 'ongoing' | 'completed';
+  date?: string;
+  githubUrl?: string;
+  paperUrl?: string;
+  demoUrl?: string;
 }
 
 const emptyProject: Project = {
@@ -26,6 +32,11 @@ const emptyProject: Project = {
   category: 'signal-processing',
   content: '',
   status: 'draft',
+  devStatus: 'planning',
+  date: new Date().toISOString().split('T')[0],
+  githubUrl: '',
+  paperUrl: '',
+  demoUrl: '',
 };
 
 export function ProjectEditor() {
@@ -38,6 +49,7 @@ export function ProjectEditor() {
   const [loading, setLoading] = useState(!!slug);
   const [isSaving, setIsSaving] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     if (!slug || slug === 'new') {
@@ -116,7 +128,7 @@ export function ProjectEditor() {
         payload.content = sanitized;
       } catch (err) {
         console.error('Image sanitization failed:', err);
-        alert('Peringatan: Beberapa gambar mungkin gagal diupload, namun konten akan disimpan');
+        alert('Warning: Some images may have failed to upload, but content will be saved');
       }
     }
 
@@ -139,7 +151,7 @@ export function ProjectEditor() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-[#0F172A]">
         <p className="text-[#94A3B8]">Loading...</p>
       </div>
     );
@@ -148,9 +160,9 @@ export function ProjectEditor() {
   return (
     <div className="flex flex-col min-h-screen bg-[#0F172A]">
       {/* Sticky Header */}
-      <header className="sticky top-0 z-40 bg-[#1E293B] border-b border-[#334155] py-3 px-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <header className="sticky top-0 z-40 bg-[#1E293B] border-b border-[#334155] py-3 px-4 sm:px-6">
+        <div className="flex items-center justify-between max-w-[90rem] mx-auto">
+          <div className="flex items-center gap-3 sm:gap-4">
             <button
               onClick={() => navigate('/admin/projects')}
               className="p-2 text-[#94A3B8] hover:text-[#60A5FA] transition-colors"
@@ -158,16 +170,18 @@ export function ProjectEditor() {
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-lg font-bold text-[#F8FAFC]">
+              <h1 className="text-base sm:text-lg font-bold text-[#F8FAFC]">
                 {project._id ? 'Edit Project' : 'New Project'}
               </h1>
-              <p className="text-xs text-[#94A3B8]">{project.title || 'Untitled'}</p>
+              <p className="text-xs text-[#94A3B8] truncate max-w-[150px] sm:max-w-none">
+                {project.title || 'Untitled'}
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {autosaveStatus !== 'idle' && (
-              <div className="flex items-center gap-1 text-xs text-[#94A3B8]">
+              <div className="hidden sm:flex items-center gap-1 text-xs text-[#94A3B8]">
                 {autosaveStatus === 'saving' && (
                   <>
                     <Clock className="w-3 h-3 animate-spin" />
@@ -199,7 +213,7 @@ export function ProjectEditor() {
                     alert('Failed');
                   }
                 }}
-                className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 transition-colors"
+                className="px-3 sm:px-4 py-2 bg-orange-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-orange-700 transition-colors"
               >
                 Withdraw
               </button>
@@ -208,7 +222,7 @@ export function ProjectEditor() {
             <button
               onClick={handleSave}
               disabled={isSaving || !project.title || !project.id}
-              className="px-4 py-2 bg-[#1E40AF] text-white rounded-lg text-sm font-medium hover:bg-[#1E3A8A] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-3 sm:px-4 py-2 bg-[#1E40AF] text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-[#1E3A8A] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSaving ? 'Saving...' : project.status === 'published' ? 'Update' : 'Publish'}
             </button>
@@ -216,11 +230,11 @@ export function ProjectEditor() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 p-6 overflow-auto">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl">
-          {/* Editor Area - Left */}
-          <div className="md:col-span-2 space-y-4">
+      {/* Main Content - 12 Column Grid */}
+      <main className="flex-1 p-4 sm:p-6 overflow-auto">
+        <div className="grid grid-cols-12 gap-4 sm:gap-6 lg:gap-8 max-w-[90rem] mx-auto">
+          {/* Editor Area - col-span-8 on large screens */}
+          <div className="col-span-12 lg:col-span-8 space-y-4">
             {/* Title Input */}
             <div>
               <input
@@ -228,42 +242,74 @@ export function ProjectEditor() {
                 value={project.title}
                 onChange={e => setProject({ ...project, title: e.target.value })}
                 placeholder="Project Title..."
-                className="w-full text-3xl font-bold text-[#F8FAFC] bg-transparent border-b-2 border-[#334155] pb-3 focus:outline-none focus:border-[#60A5FA] transition-colors placeholder:text-[#475569]"
+                className="w-full text-2xl sm:text-3xl font-bold text-[#F8FAFC] bg-transparent border-b-2 border-[#334155] pb-3 focus:outline-none focus:border-[#60A5FA] transition-colors placeholder:text-[#475569]"
               />
             </div>
 
-            {/* Description Input */}
-            <div>
+            {/* Toolbar with Preview Toggle */}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <ProjectToolbar textareaRef={textareaRef} onInsert={insertMarkdown} />
+
+              {/* Live Preview Toggle */}
+              <button
+                onClick={() => setShowPreview(!showPreview)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  showPreview
+                    ? 'bg-[#1E40AF] text-white'
+                    : 'bg-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC] border border-[#334155]'
+                }`}
+              >
+                {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                <span className="hidden sm:inline">{showPreview ? 'Hide Preview' : 'Live Preview'}</span>
+              </button>
+            </div>
+
+            {/* Content Area - Editor or Split View */}
+            {showPreview ? (
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                {/* Editor */}
+                <div className="space-y-2">
+                  <label className="text-xs text-[#94A3B8] font-medium">MARKDOWN</label>
+                  <textarea
+                    ref={textareaRef}
+                    value={project.content}
+                    onChange={e => setProject({ ...project, content: e.target.value })}
+                    placeholder="Project content... (Markdown, LaTeX $$...$$ supported)"
+                    className="w-full min-h-[60vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
+                  />
+                </div>
+
+                {/* Preview */}
+                <div className="space-y-2">
+                  <label className="text-xs text-[#94A3B8] font-medium">PREVIEW</label>
+                  <div
+                    className="w-full min-h-[60vh] bg-[#0F172A] border border-[#334155] rounded-lg px-4 py-4 overflow-auto prose prose-invert prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(project.content || '*Start writing to see preview...*') }}
+                  />
+                </div>
+              </div>
+            ) : (
+              /* Full Editor (no preview) */
               <textarea
-                value={project.description}
-                onChange={e => setProject({ ...project, description: e.target.value })}
-                placeholder="Brief project description..."
-                rows={2}
-                className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[#60A5FA]"
+                ref={textareaRef}
+                value={project.content}
+                onChange={e => setProject({ ...project, content: e.target.value })}
+                placeholder="Project content... (Markdown, LaTeX $$...$$ supported)"
+                className="w-full min-h-[70vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
               />
-            </div>
-
-            {/* Toolbar */}
-            <ProjectToolbar textareaRef={textareaRef} onInsert={insertMarkdown} />
-
-            {/* Content Textarea */}
-            <textarea
-              ref={textareaRef}
-              value={project.content}
-              onChange={e => setProject({ ...project, content: e.target.value })}
-              placeholder="Project content... (Markdown supported)"
-              className="w-full min-h-[70vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
-            />
+            )}
           </div>
 
-          {/* Sidebar - Right */}
-          <div className="md:col-span-1">
-            <ProjectSidebar
-              project={project}
-              onUpdate={setProject}
-              onSave={handleSave}
-              isSaving={isSaving}
-            />
+          {/* Sidebar - col-span-4 on large screens */}
+          <div className="col-span-12 lg:col-span-4">
+            <div className="lg:sticky lg:top-20">
+              <ProjectSidebar
+                project={project}
+                onUpdate={setProject}
+                onSave={handleSave}
+                isSaving={isSaving}
+              />
+            </div>
           </div>
         </div>
       </main>

@@ -127,3 +127,12 @@ export function markdownToHtml(content: string): string {
 
   return content;
 }
+
+// Combined Markdown + LaTeX renderer for live preview
+export function renderMarkdown(content: string): string {
+  // First render LaTeX equations
+  let processed = renderLaTeX(content);
+  // Then convert markdown to HTML
+  processed = markdownToHtml(processed);
+  return processed;
+}

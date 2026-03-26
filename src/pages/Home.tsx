@@ -226,8 +226,8 @@ export function Home() {
                       <feMerge><feMergeNode in="blur"/><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
                     </filter>
                     <filter id="glow-green" x="-40%" y="-40%" width="180%" height="180%">
-                      <feGaussianBlur stdDeviation="3.5" result="blur"/>
-                      <feMerge><feMergeNode in="blur"/><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                      <feGaussianBlur stdDeviation="2" result="blur"/>
+                      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
                     </filter>
                     <filter id="glow-purple" x="-40%" y="-40%" width="180%" height="180%">
                       <feGaussianBlur stdDeviation="3" result="blur"/>
@@ -367,7 +367,7 @@ export function Home() {
                     <g className="scroll-ecg">
                       <path
                         d={ecgPath}
-                        stroke="#4ADE80" strokeWidth="1.8" fill="none" filter="url(#glow-green)"
+                        stroke="#4ADE80" strokeWidth="1.2" fill="none" filter="url(#glow-green)"
                       />
                     </g>
                   </g>
@@ -451,6 +451,8 @@ export function Home() {
                   />
                   {/* Arrow at end of feedback (pointing up into SUM) */}
                   <polygon points="344,62 341,66 347,66" fill="#38BDF8"/>
+                  {/* Minus sign at feedback arrow entry point (negative feedback indicator) */}
+                  <text x="350" y="65" fontSize="8" fill="#F87171" fontFamily="monospace" fontWeight="bold">−</text>
 
                   {/* Feedback label */}
                   <text x="400" y="90" fontSize="6" fill="#7DD3FC" textAnchor="middle" fontFamily="monospace">feedback</text>

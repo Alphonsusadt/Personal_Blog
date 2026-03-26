@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { X, Github, FileText, ExternalLink } from 'lucide-react';
 import React from 'react';
 
 interface Project {
@@ -10,6 +10,11 @@ interface Project {
   category: string;
   content: string;
   status?: 'draft' | 'published';
+  devStatus?: 'planning' | 'ongoing' | 'completed';
+  date?: string;
+  githubUrl?: string;
+  paperUrl?: string;
+  demoUrl?: string;
 }
 
 interface ProjectSidebarProps {
@@ -20,6 +25,11 @@ interface ProjectSidebarProps {
 }
 
 const categories = ['signal-processing', 'control', 'data-analysis'];
+const devStatuses = [
+  { value: 'planning', label: 'Planning', color: 'bg-blue-500' },
+  { value: 'ongoing', label: 'Ongoing', color: 'bg-yellow-500' },
+  { value: 'completed', label: 'Completed', color: 'bg-green-500' },
+];
 
 export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectSidebarProps) {
   const [tagInput, setTagInput] = React.useState('');
@@ -51,10 +61,12 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectS
     </div>
   );
 
+  const currentDevStatus = devStatuses.find(s => s.value === project.devStatus) || devStatuses[0];
+
   return (
     <aside className="space-y-4">
-      {/* Status Card */}
-      <SidebarCard title="Status" cardKey="status">
+      {/* Publication Status Card */}
+      <SidebarCard title="Publication Status" cardKey="status">
         <div className="space-y-3">
           <select
             value={project.status || 'draft'}
@@ -73,6 +85,82 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectS
         </div>
       </SidebarCard>
 
+      {/* Development Status Card */}
+      <SidebarCard title="Development Status" cardKey="devStatus">
+        <div className="space-y-3">
+          <select
+            value={project.devStatus || 'planning'}
+            onChange={e => onUpdate({ ...project, devStatus: e.target.value as 'planning' | 'ongoing' | 'completed' })}
+            className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+          >
+            {devStatuses.map(s => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+          <div className="flex items-center gap-2 p-2 bg-[#0F172A] rounded-lg border border-[#334155]">
+            <span className={`inline-block w-2.5 h-2.5 rounded-full ${currentDevStatus.color}`}></span>
+            <span className="text-xs text-[#94A3B8]">{currentDevStatus.label}</span>
+          </div>
+        </div>
+      </SidebarCard>
+
+      {/* Short Description Card (like Excerpt) */}
+      <SidebarCard title="Short Description" cardKey="description">
+        <textarea
+          value={project.description}
+          onChange={e => onUpdate({ ...project, description: e.target.value })}
+          rows={3}
+          placeholder="Brief summary of your project..."
+          className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] resize-none"
+        />
+        <p className="text-[11px] text-[#94A3B8] mt-2">Appears in project cards and previews</p>
+      </SidebarCard>
+
+      {/* Project Links Card */}
+      <SidebarCard title="Project Links" cardKey="links">
+        <div className="space-y-3">
+          <div>
+            <label className="flex items-center gap-2 text-xs text-[#94A3B8] mb-1">
+              <Github className="w-3.5 h-3.5" />
+              GitHub Repository
+            </label>
+            <input
+              type="url"
+              value={project.githubUrl || ''}
+              onChange={e => onUpdate({ ...project, githubUrl: e.target.value })}
+              placeholder="https://github.com/..."
+              className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+            />
+          </div>
+          <div>
+            <label className="flex items-center gap-2 text-xs text-[#94A3B8] mb-1">
+              <FileText className="w-3.5 h-3.5" />
+              Paper / Documentation
+            </label>
+            <input
+              type="url"
+              value={project.paperUrl || ''}
+              onChange={e => onUpdate({ ...project, paperUrl: e.target.value })}
+              placeholder="https://..."
+              className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+            />
+          </div>
+          <div>
+            <label className="flex items-center gap-2 text-xs text-[#94A3B8] mb-1">
+              <ExternalLink className="w-3.5 h-3.5" />
+              Live Demo
+            </label>
+            <input
+              type="url"
+              value={project.demoUrl || ''}
+              onChange={e => onUpdate({ ...project, demoUrl: e.target.value })}
+              placeholder="https://..."
+              className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+            />
+          </div>
+        </div>
+      </SidebarCard>
+
       {/* Category Card */}
       <SidebarCard title="Category" cardKey="category">
         <select
@@ -81,13 +169,13 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectS
           className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
         >
           {categories.map(c => (
-            <option key={c} value={c}>{c.replace('-', ' ').toUpperCase()}</option>
+            <option key={c} value={c}>{c.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</option>
           ))}
         </select>
       </SidebarCard>
 
-      {/* Tags Card */}
-      <SidebarCard title="Tags" cardKey="tags">
+      {/* Tech Stack & Tags Card */}
+      <SidebarCard title="Tech Stack & Tags" cardKey="tags">
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2 mb-3">
             {project.tags.map((tag, i) => (
@@ -104,7 +192,7 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectS
               value={tagInput}
               onChange={e => setTagInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())}
-              placeholder="Add tag..."
+              placeholder="e.g., Python, MATLAB..."
               className="flex-1 bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />
             <button
@@ -114,6 +202,20 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectS
               Add
             </button>
           </div>
+          <p className="text-[11px] text-[#94A3B8]">Add tools: MATLAB, Python, Signal Processing, etc.</p>
+        </div>
+      </SidebarCard>
+
+      {/* Date Card */}
+      <SidebarCard title="Project Date" cardKey="date">
+        <div>
+          <label className="block text-xs text-[#94A3B8] mb-1">Start/Completion Date</label>
+          <input
+            type="date"
+            value={project.date || ''}
+            onChange={e => onUpdate({ ...project, date: e.target.value })}
+            className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+          />
         </div>
       </SidebarCard>
 
