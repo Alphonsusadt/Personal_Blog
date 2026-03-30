@@ -104,6 +104,9 @@ export function markdownToHtml(content: string): string {
   content = content.replace(/^## (.*$)/gim, '<h2 class="text-2xl font-semibold mt-8 mb-4">$1</h2>');
   content = content.replace(/^# (.*$)/gim, '<h1 class="text-3xl font-bold mt-10 mb-6">$1</h1>');
 
+  // Images - render before links to prevent conflicts
+  content = content.replace(/!\[([^\]]*)\]\(([^\)]+)\)/g, '<img src="$2" alt="$1" class="max-w-full h-auto rounded-lg my-4 shadow-md" loading="lazy" />');
+
   // Bold
   content = content.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 
@@ -122,8 +125,18 @@ export function markdownToHtml(content: string): string {
   // Inline code
   content = content.replace(/`([^`]+)`/g, '<code class="bg-[#F1F5F9] dark:bg-[#1E293B] px-1.5 py-0.5 rounded text-sm mono-font">$1</code>');
 
+  // Unordered lists
+  content = content.replace(/^[\-\*] (.*)$/gim, '<li class="ml-4 list-disc">$1</li>');
+  content = content.replace(/(<li[^>]*>.*<\/li>\n?)+/g, '<ul class="my-4 space-y-1">$&</ul>');
+
+  // Ordered lists
+  content = content.replace(/^\d+\. (.*)$/gim, '<li class="ml-4 list-decimal">$1</li>');
+
+  // Horizontal rule
+  content = content.replace(/^---$/gim, '<hr class="my-6 border-t border-gray-300" />');
+
   // Paragraphs (for lines that don't start with HTML tags)
-  content = content.replace(/^(?!<[h1-6]|<blockquote|<pre|<div|<p)(.+)$/gim, '<p class="mb-4">$1</p>');
+  content = content.replace(/^(?!<[h1-6]|<blockquote|<pre|<div|<p|<img|<ul|<li|<hr)(.+)$/gim, '<p class="mb-4">$1</p>');
 
   return content;
 }
