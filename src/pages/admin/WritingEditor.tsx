@@ -4,10 +4,12 @@ import { api } from '../../lib/api';
 import { WritingToolbar } from '../../components/WritingToolbar';
 import { WritingSidebar } from '../../components/WritingSidebar';
 import { ImageUploadDialog } from '../../components/ImageUploadDialog';
+import { FullPagePreview } from '../../components/FullPagePreview';
 import { sanitizeMarkdown } from '../../lib/mediaUploader';
 import { hasBase64Images } from '../../utils/media';
-import { ArrowLeft, Check, Clock, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Check, Clock, Eye, EyeOff, Maximize2, HardDrive, AlertCircle } from 'lucide-react';
 import { renderMarkdown } from '../../utils/renderers';
+import { formatDraftTime } from '../../hooks/useLocalDraft';
 
 interface Writing {
   _id?: string;
@@ -48,6 +50,12 @@ export function WritingEditor() {
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showFullPreview, setShowFullPreview] = useState(false);
+  const [localDraftStatus, setLocalDraftStatus] = useState<'idle' | 'saved'>('idle');
+  const [showDraftRecovery, setShowDraftRecovery] = useState(false);
+  const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null);
+
+  const draftKey = `writing_draft_${slug || 'new'}`;
 
   const plainContent = writing.content
     .replace(/```[\s\S]*?```/g, ' ')
@@ -59,6 +67,23 @@ export function WritingEditor() {
     .trim();
   const wordCount = plainContent ? plainContent.split(' ').length : 0;
   const characterCount = plainContent.length;
+
+  // Check for local draft on mount
+  useEffect(() => {
+    try {
+      const savedDraft = localStorage.getItem(draftKey);
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        setDraftTimestamp(parsed.timestamp);
+        // Show recovery dialog only if there's content and it's newer than 5 minutes
+        if (parsed.data.content && (Date.now() - parsed.timestamp) < 86400000) { // 24 hours
+          setShowDraftRecovery(true);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to check draft:', e);
+    }
+  }, [draftKey]);
 
   // Load writing if editing existing one
   useEffect(() => {
@@ -79,7 +104,28 @@ export function WritingEditor() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // Autosave logic
+  // Local storage autosave (immediate backup)
+  useEffect(() => {
+    if (loading) return;
+    
+    const timeout = setTimeout(() => {
+      try {
+        const draftData = {
+          data: writing,
+          timestamp: Date.now(),
+        };
+        localStorage.setItem(draftKey, JSON.stringify(draftData));
+        setLocalDraftStatus('saved');
+        setTimeout(() => setLocalDraftStatus('idle'), 1500);
+      } catch (e) {
+        console.error('Failed to save local draft:', e);
+      }
+    }, 1000); // Save to localStorage after 1 second
+
+    return () => clearTimeout(timeout);
+  }, [writing, loading, draftKey]);
+
+  // Server autosave logic (3 seconds delay)
   useEffect(() => {
     if (loading || !writing.title) return;
 
@@ -103,6 +149,39 @@ export function WritingEditor() {
 
     return () => clearTimeout(autoSaveTimeoutRef.current);
   }, [writing, loading]);
+
+  // Restore draft from localStorage
+  const restoreDraft = () => {
+    try {
+      const savedDraft = localStorage.getItem(draftKey);
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        setWriting(parsed.data);
+      }
+    } catch (e) {
+      console.error('Failed to restore draft:', e);
+    }
+    setShowDraftRecovery(false);
+  };
+
+  // Discard draft
+  const discardDraft = () => {
+    try {
+      localStorage.removeItem(draftKey);
+    } catch (e) {
+      console.error('Failed to discard draft:', e);
+    }
+    setShowDraftRecovery(false);
+  };
+
+  // Clear draft after successful publish
+  const clearLocalDraft = () => {
+    try {
+      localStorage.removeItem(draftKey);
+    } catch (e) {
+      console.error('Failed to clear draft:', e);
+    }
+  };
 
   const insertMarkdown = (before: string, after: string = '') => {
     const textarea = textareaRef.current;
@@ -180,6 +259,7 @@ export function WritingEditor() {
       } else {
         await api.post('/api/writings', payload);
       }
+      clearLocalDraft(); // Clear local draft after successful save
       alert('Writing saved successfully!');
       navigate('/admin/writings');
     } catch (err) {
@@ -231,7 +311,15 @@ export function WritingEditor() {
               </div>
             </div>
 
-            {/* Autosave Indicator */}
+            {/* Local Draft Indicator */}
+            {localDraftStatus === 'saved' && (
+              <div className="flex items-center gap-1 text-xs text-green-400">
+                <HardDrive className="w-3 h-3" />
+                <span className="hidden sm:inline">Local saved</span>
+              </div>
+            )}
+
+            {/* Server Autosave Indicator */}
             {autosaveStatus !== 'idle' && (
               <div className="flex items-center gap-1 text-xs text-[#94A3B8]">
                 {autosaveStatus === 'saving' && (
@@ -242,12 +330,22 @@ export function WritingEditor() {
                 )}
                 {autosaveStatus === 'saved' && (
                   <>
-                    <Check className="w-3 h-3" />
-                    Saved
+                    <Check className="w-3 h-3 text-green-400" />
+                    Server saved
                   </>
                 )}
               </div>
             )}
+
+            {/* Full Page Preview Button */}
+            <button
+              onClick={() => setShowFullPreview(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-[#334155] text-[#F8FAFC] rounded-lg text-sm font-medium hover:bg-[#475569] transition-colors"
+              title="Preview Halaman Penuh"
+            >
+              <Maximize2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Preview</span>
+            </button>
 
             {/* Unpublish Button - Only show if published */}
             {writing.status === 'published' && (
@@ -406,6 +504,53 @@ export function WritingEditor() {
           }
         }}
       />
+
+      {/* Full Page Preview Modal */}
+      <FullPagePreview
+        isOpen={showFullPreview}
+        onClose={() => setShowFullPreview(false)}
+        type="writing"
+        data={writing}
+      />
+
+      {/* Draft Recovery Dialog */}
+      {showDraftRecovery && (
+        <div className="fixed inset-0 z-[110] bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-[#1E293B] rounded-xl p-6 max-w-md w-full border border-[#334155] shadow-2xl">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="p-3 bg-amber-500/20 rounded-full">
+                <AlertCircle className="w-6 h-6 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-[#F8FAFC] mb-1">Draft Ditemukan</h3>
+                <p className="text-sm text-[#94A3B8]">
+                  Anda memiliki draft yang belum disimpan dari{' '}
+                  <span className="text-[#F8FAFC] font-medium">
+                    {draftTimestamp ? formatDraftTime(draftTimestamp) : 'sebelumnya'}
+                  </span>
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-[#94A3B8] mb-6">
+              Apakah Anda ingin melanjutkan dari draft tersebut atau memulai dari awal?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={discardDraft}
+                className="flex-1 px-4 py-2.5 bg-[#334155] text-[#F8FAFC] rounded-lg text-sm font-medium hover:bg-[#475569] transition-colors"
+              >
+                Mulai Baru
+              </button>
+              <button
+                onClick={restoreDraft}
+                className="flex-1 px-4 py-2.5 bg-[#1E40AF] text-white rounded-lg text-sm font-medium hover:bg-[#1E3A8A] transition-colors"
+              >
+                Pulihkan Draft
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

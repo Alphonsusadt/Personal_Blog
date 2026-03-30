@@ -4,10 +4,12 @@ import { api } from '../../lib/api';
 import { BookToolbar } from '../../components/BookToolbar';
 import { BookSidebar } from '../../components/BookSidebar';
 import { ImageUploadDialog } from '../../components/ImageUploadDialog';
+import { FullPagePreview } from '../../components/FullPagePreview';
 import { sanitizeMarkdown } from '../../lib/mediaUploader';
 import { hasBase64Images } from '../../utils/media';
-import { ArrowLeft, Check, Clock, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Check, Clock, Eye, EyeOff, Maximize2, HardDrive, AlertCircle } from 'lucide-react';
 import { renderMarkdown } from '../../utils/renderers';
+import { formatDraftTime } from '../../hooks/useLocalDraft';
 
 interface Book {
   _id?: string;
@@ -46,6 +48,28 @@ export function BookEditor() {
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showPreview, setShowPreview] = useState(false);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const [showFullPreview, setShowFullPreview] = useState(false);
+  const [localDraftStatus, setLocalDraftStatus] = useState<'idle' | 'saved'>('idle');
+  const [showDraftRecovery, setShowDraftRecovery] = useState(false);
+  const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null);
+
+  const draftKey = `book_draft_${slug || 'new'}`;
+
+  // Check for local draft on mount
+  useEffect(() => {
+    try {
+      const savedDraft = localStorage.getItem(draftKey);
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        setDraftTimestamp(parsed.timestamp);
+        if (parsed.data.review && (Date.now() - parsed.timestamp) < 86400000) {
+          setShowDraftRecovery(true);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to check draft:', e);
+    }
+  }, [draftKey]);
 
   useEffect(() => {
     if (!slug || slug === 'new') {
@@ -65,6 +89,25 @@ export function BookEditor() {
       .finally(() => setLoading(false));
   }, [slug]);
 
+  // Local storage autosave
+  useEffect(() => {
+    if (loading) return;
+    
+    const timeout = setTimeout(() => {
+      try {
+        const draftData = { data: book, timestamp: Date.now() };
+        localStorage.setItem(draftKey, JSON.stringify(draftData));
+        setLocalDraftStatus('saved');
+        setTimeout(() => setLocalDraftStatus('idle'), 1500);
+      } catch (e) {
+        console.error('Failed to save local draft:', e);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timeout);
+  }, [book, loading, draftKey]);
+
+  // Server autosave
   useEffect(() => {
     if (loading || !book.title) return;
 
@@ -88,6 +131,36 @@ export function BookEditor() {
 
     return () => clearTimeout(autoSaveTimeoutRef.current);
   }, [book, loading]);
+
+  const restoreDraft = () => {
+    try {
+      const savedDraft = localStorage.getItem(draftKey);
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        setBook(parsed.data);
+      }
+    } catch (e) {
+      console.error('Failed to restore draft:', e);
+    }
+    setShowDraftRecovery(false);
+  };
+
+  const discardDraft = () => {
+    try {
+      localStorage.removeItem(draftKey);
+    } catch (e) {
+      console.error('Failed to discard draft:', e);
+    }
+    setShowDraftRecovery(false);
+  };
+
+  const clearLocalDraft = () => {
+    try {
+      localStorage.removeItem(draftKey);
+    } catch (e) {
+      console.error('Failed to clear draft:', e);
+    }
+  };
 
   const insertMarkdown = (before: string, after: string = '') => {
     const textarea = textareaRef.current;
@@ -156,6 +229,7 @@ export function BookEditor() {
       } else {
         await api.post('/api/books', payload);
       }
+      clearLocalDraft();
       alert('Book saved successfully!');
       navigate('/admin/books');
     } catch (err) {
@@ -195,6 +269,14 @@ export function BookEditor() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Local Draft Indicator */}
+            {localDraftStatus === 'saved' && (
+              <div className="flex items-center gap-1 text-xs text-green-400">
+                <HardDrive className="w-3 h-3" />
+                <span className="hidden sm:inline">Local</span>
+              </div>
+            )}
+
             {autosaveStatus !== 'idle' && (
               <div className="flex items-center gap-1 text-xs text-[#94A3B8]">
                 {autosaveStatus === 'saving' && (
@@ -205,12 +287,22 @@ export function BookEditor() {
                 )}
                 {autosaveStatus === 'saved' && (
                   <>
-                    <Check className="w-3 h-3" />
-                    Saved
+                    <Check className="w-3 h-3 text-green-400" />
+                    Server
                   </>
                 )}
               </div>
             )}
+
+            {/* Full Page Preview Button */}
+            <button
+              onClick={() => setShowFullPreview(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-[#334155] text-[#F8FAFC] rounded-lg text-sm font-medium hover:bg-[#475569] transition-colors"
+              title="Preview Halaman Penuh"
+            >
+              <Maximize2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Preview</span>
+            </button>
 
             {book.status === 'published' && (
               <button
@@ -357,6 +449,53 @@ export function BookEditor() {
         onClose={() => setImageDialogOpen(false)}
         onInsert={insertImageMarkdown}
       />
+
+      {/* Full Page Preview Modal */}
+      <FullPagePreview
+        isOpen={showFullPreview}
+        onClose={() => setShowFullPreview(false)}
+        type="book"
+        data={book}
+      />
+
+      {/* Draft Recovery Dialog */}
+      {showDraftRecovery && (
+        <div className="fixed inset-0 z-[110] bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-[#1E293B] rounded-xl p-6 max-w-md w-full border border-[#334155] shadow-2xl">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="p-3 bg-amber-500/20 rounded-full">
+                <AlertCircle className="w-6 h-6 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-[#F8FAFC] mb-1">Draft Ditemukan</h3>
+                <p className="text-sm text-[#94A3B8]">
+                  Anda memiliki draft yang belum disimpan dari{' '}
+                  <span className="text-[#F8FAFC] font-medium">
+                    {draftTimestamp ? formatDraftTime(draftTimestamp) : 'sebelumnya'}
+                  </span>
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-[#94A3B8] mb-6">
+              Apakah Anda ingin melanjutkan dari draft tersebut atau memulai dari awal?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={discardDraft}
+                className="flex-1 px-4 py-2.5 bg-[#334155] text-[#F8FAFC] rounded-lg text-sm font-medium hover:bg-[#475569] transition-colors"
+              >
+                Mulai Baru
+              </button>
+              <button
+                onClick={restoreDraft}
+                className="flex-1 px-4 py-2.5 bg-[#1E40AF] text-white rounded-lg text-sm font-medium hover:bg-[#1E3A8A] transition-colors"
+              >
+                Pulihkan Draft
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
