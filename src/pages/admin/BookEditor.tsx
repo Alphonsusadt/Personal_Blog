@@ -21,7 +21,10 @@ interface Book {
   category: string;
   takeaways: string[];
   review: string;
-  status?: 'draft' | 'published';
+  status?: 'draft' | 'published' | 'scheduled';
+  publishAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 const emptyBook: Book = {

@@ -12,7 +12,10 @@ interface Book {
   category: string;
   takeaways: string[];
   review: string;
-  status?: 'draft' | 'published';
+  status?: 'draft' | 'published' | 'scheduled';
+  publishAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface BookSidebarProps {
@@ -27,6 +30,19 @@ const categories = ['technical', 'biography', 'spiritual', 'philosophy'];
 export function BookSidebar({ book, onUpdate, onSave, isSaving }: BookSidebarProps) {
   const [takeawayInput, setTakeawayInput] = React.useState('');
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
+
+  const toDateTimeLocal = (value?: string) => {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '';
+    const offset = parsed.getTimezoneOffset() * 60_000;
+    return new Date(parsed.getTime() - offset).toISOString().slice(0, 16);
+  };
+
+  const fromDateTimeLocal = (value: string) => {
+    if (!value) return '';
+    return new Date(value).toISOString();
+  };
 
   const toggleCard = (cardName: string) => {
     setCollapsed(prev => ({ ...prev, [cardName]: !prev[cardName] }));
@@ -57,20 +73,54 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving }: BookSidebarPro
   return (
     <aside className="space-y-4">
       {/* Status Card */}
-      <SidebarCard title="Status" cardKey="status">
+      <SidebarCard title="Status & Scheduling" cardKey="status">
         <div className="space-y-3">
           <select
             value={book.status || 'draft'}
-            onChange={e => onUpdate({ ...book, status: e.target.value as 'draft' | 'published' })}
+            onChange={e => {
+              const newStatus = e.target.value as 'draft' | 'published' | 'scheduled';
+              const updates: Partial<Book> = { status: newStatus };
+              if (newStatus === 'scheduled' && !book.publishAt) {
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                tomorrow.setHours(9, 0, 0, 0);
+                updates.publishAt = tomorrow.toISOString();
+              }
+              onUpdate({ ...book, ...updates });
+            }}
             className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
           >
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
+            <option value="draft">📝 Draft</option>
+            <option value="published">✅ Published</option>
+            <option value="scheduled">⏰ Scheduled</option>
           </select>
+
+          {/* Datetime picker untuk scheduled */}
+          {book.status === 'scheduled' && (
+            <div>
+              <label className="block text-xs text-[#94A3B8] mb-1">Publish At</label>
+              <input
+                type="datetime-local"
+                value={toDateTimeLocal(book.publishAt)}
+                onChange={e => onUpdate({ ...book, publishAt: fromDateTimeLocal(e.target.value) })}
+                className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+              />
+              <p className="text-[11px] text-[#94A3B8] mt-1">
+                Akan otomatis tampil saat waktunya tiba.
+              </p>
+            </div>
+          )}
+
+          {/* Status indicator */}
           <div className="flex items-center gap-2 p-2 bg-[#0F172A] rounded-lg border border-[#334155]">
-            <span className={`inline-block w-2.5 h-2.5 rounded-full ${book.status === 'published' ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
+            <span className={`inline-block w-2.5 h-2.5 rounded-full ${
+              book.status === 'published' ? 'bg-green-500' : 
+              book.status === 'scheduled' ? 'bg-blue-500' : 'bg-yellow-500'
+            }`}></span>
             <span className="text-xs text-[#94A3B8]">
-              {book.status === 'published' ? 'Published' : 'Draft'}
+              {book.status === 'published' ? 'Live - Sudah dipublikasi' : 
+               book.status === 'scheduled' ? `Terjadwal - ${book.publishAt ? new Date(book.publishAt).toLocaleString('id-ID') : ''}` : 
+               'Draft - Belum dipublikasi'}
             </span>
           </div>
         </div>

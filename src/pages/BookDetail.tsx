@@ -1,6 +1,35 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Star, StarHalf, Book, User, Sparkles, CheckCircle } from 'lucide-react';
-import { getBookById, Book as BookType } from '../data/library';
+import { ArrowLeft, Star, StarHalf, Book, User, Sparkles, CheckCircle, Calendar, Clock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { api } from '../lib/api';
+
+interface BookType {
+  _id?: string;
+  id: string;
+  title: string;
+  author: string;
+  cover: string;
+  rating: number;
+  category: 'technical' | 'biography' | 'spiritual' | 'philosophy';
+  takeaways: string[];
+  review: string;
+  status?: 'draft' | 'published' | 'scheduled';
+  publishAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+function formatDateTimeDetailed(dateString?: string) {
+  if (!dateString) return null;
+  const date = new Date(dateString);
+  return date.toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
 
 function CategoryBadge({ category }: { category: BookType['category'] }) {
   const getStyle = () => {
@@ -85,7 +114,30 @@ function StarRating({ rating }: { rating: number }) {
 export function BookDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const book = id ? getBookById(id) : undefined;
+  const [book, setBook] = useState<BookType | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    api.get(`/api/books/public/${id}`, false)
+      .then((data: BookType) => setBook(data))
+      .catch(() => setBook(null))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen py-16">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-center text-[#6B7280]">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!book) {
     return (
@@ -153,12 +205,30 @@ export function BookDetail() {
               </p>
 
               {/* Rating */}
-              <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-3 mb-4">
                 <StarRating rating={book.rating} />
                 <span className="text-[#6B7280] text-sm">
                   {book.rating} / 5
                 </span>
               </div>
+
+              {/* Timestamps */}
+              {(book.createdAt || book.updatedAt) && (
+                <div className="flex flex-wrap items-center gap-4 text-xs text-[#9CA3AF] dark:text-[#6B7280] mb-4">
+                  {book.createdAt && (
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      Diposting: {formatDateTimeDetailed(book.createdAt)}
+                    </span>
+                  )}
+                  {book.updatedAt && book.updatedAt !== book.createdAt && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      Diperbarui: {formatDateTimeDetailed(book.updatedAt)}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </header>

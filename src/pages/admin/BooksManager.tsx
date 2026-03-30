@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Clock, Calendar } from 'lucide-react';
 
 interface Book {
   _id?: string;
@@ -13,8 +13,17 @@ interface Book {
   category: string;
   takeaways: string[];
   review: string;
-  status?: 'draft' | 'published';
+  status?: 'draft' | 'published' | 'scheduled';
+  publishAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
+
+const formatDateTime = (dateStr?: string) => {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+};
 
 export function BooksManager() {
   const navigate = useNavigate();
@@ -42,6 +51,7 @@ export function BooksManager() {
             <thead><tr className="border-b border-[#334155] text-left">
               <th className="px-6 py-3 text-xs font-medium text-[#94A3B8] uppercase">Book</th>
               <th className="px-6 py-3 text-xs font-medium text-[#94A3B8] uppercase hidden md:table-cell">Category</th>
+              <th className="px-6 py-3 text-xs font-medium text-[#94A3B8] uppercase hidden lg:table-cell">Created / Updated</th>
               <th className="px-6 py-3 text-xs font-medium text-[#94A3B8] uppercase hidden md:table-cell">Status</th>
               <th className="px-6 py-3 text-xs font-medium text-[#94A3B8] uppercase text-right">Actions</th>
             </tr></thead>
@@ -50,12 +60,23 @@ export function BooksManager() {
                 <tr key={item._id} className="border-b border-[#334155] last:border-0 hover:bg-[#334155]/20 transition-colors">
                   <td className="px-6 py-4"><p className="text-[#F8FAFC] font-medium text-sm">{item.title}</p><p className="text-[#94A3B8] text-xs mt-1">{item.author}</p></td>
                   <td className="px-6 py-4 hidden md:table-cell"><span className="text-xs bg-[#334155] text-[#94A3B8] px-2 py-1 rounded">{item.category}</span></td>
+                  <td className="px-6 py-4 hidden lg:table-cell">
+                    <div className="text-xs text-[#94A3B8] space-y-1">
+                      <div className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {formatDateTime(item.createdAt)}</div>
+                      <div className="flex items-center gap-1"><Clock className="w-3 h-3" /> {formatDateTime(item.updatedAt)}</div>
+                    </div>
+                  </td>
                   <td className="px-6 py-4 hidden md:table-cell">
                     <div className="flex items-center gap-2">
-                      <span className={`inline-block w-2.5 h-2.5 rounded-full ${item.status === 'published' ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
-                      <span className="text-xs font-medium text-[#94A3B8]">
-                        {item.status === 'published' ? 'Published' : 'Draft'}
-                      </span>
+                      <span className={`inline-block w-2.5 h-2.5 rounded-full ${item.status === 'published' ? 'bg-green-500' : item.status === 'scheduled' ? 'bg-blue-500' : 'bg-yellow-500'}`}></span>
+                      <div>
+                        <span className="text-xs font-medium text-[#94A3B8]">
+                          {item.status === 'published' ? 'Published' : item.status === 'scheduled' ? 'Scheduled' : 'Draft'}
+                        </span>
+                        {item.status === 'scheduled' && item.publishAt && (
+                          <p className="text-[10px] text-blue-400">{formatDateTime(item.publishAt)}</p>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right"><div className="flex items-center justify-end gap-2">
@@ -64,7 +85,7 @@ export function BooksManager() {
                   </div></td>
                 </tr>
               ))}
-              {items.length === 0 && <tr><td colSpan={4} className="px-6 py-8 text-center text-[#94A3B8]">No books yet</td></tr>}
+              {items.length === 0 && <tr><td colSpan={5} className="px-6 py-8 text-center text-[#94A3B8]">No books yet</td></tr>}
             </tbody>
           </table>
         </div>

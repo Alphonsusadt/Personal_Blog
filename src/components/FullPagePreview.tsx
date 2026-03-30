@@ -10,6 +10,8 @@ interface Writing {
   category: string;
   tags: string[];
   content: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface Book {
@@ -20,6 +22,8 @@ interface Book {
   category: string;
   takeaways: string[];
   review: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface Project {
@@ -33,6 +37,8 @@ interface Project {
   githubUrl?: string;
   paperUrl?: string;
   demoUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 type PreviewType = 'writing' | 'book' | 'project';

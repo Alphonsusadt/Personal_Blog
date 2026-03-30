@@ -7,26 +7,26 @@ export default function writingsRoutes(db) {
   const col = db.collection('writings');
 
   router.get('/public', async (_req, res) => {
-    const nowIso = new Date().toISOString();
+    const now = new Date();
     const items = await col
       .find({
         $or: [
           { status: 'published' },
-          { status: 'scheduled', publishAt: { $lte: nowIso } },
+          { status: 'scheduled', publishAt: { $lte: now } },
         ],
       })
-      .sort({ date: -1 })
+      .sort({ createdAt: -1, date: -1 })
       .toArray();
     res.json(items);
   });
 
   router.get('/public/:id', async (req, res) => {
-    const nowIso = new Date().toISOString();
+    const now = new Date();
     const item = await col.findOne({
       id: req.params.id,
       $or: [
         { status: 'published' },
-        { status: 'scheduled', publishAt: { $lte: nowIso } },
+        { status: 'scheduled', publishAt: { $lte: now } },
       ],
     });
     if (!item) return res.status(404).json({ error: 'Not found' });
@@ -34,13 +34,18 @@ export default function writingsRoutes(db) {
   });
 
   router.get('/', authMiddleware, async (_req, res) => {
-    const items = await col.find().sort({ date: -1 }).toArray();
+    const items = await col.find().sort({ updatedAt: -1, createdAt: -1, date: -1 }).toArray();
     res.json(items);
   });
 
   router.post('/', authMiddleware, async (req, res) => {
     const data = req.body;
     data.createdAt = new Date();
+    data.updatedAt = new Date();
+    // Convert publishAt string to Date if present
+    if (data.publishAt) {
+      data.publishAt = new Date(data.publishAt);
+    }
     const result = await col.insertOne(data);
     res.status(201).json({ ...data, _id: result.insertedId });
   });
@@ -48,6 +53,10 @@ export default function writingsRoutes(db) {
   router.put('/:id', authMiddleware, async (req, res) => {
     const { _id, ...data } = req.body;
     data.updatedAt = new Date();
+    // Convert publishAt string to Date if present
+    if (data.publishAt) {
+      data.publishAt = new Date(data.publishAt);
+    }
     const result = await col.updateOne(
       { _id: new ObjectId(req.params.id) },
       { $set: data }

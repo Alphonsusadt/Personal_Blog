@@ -11,7 +11,10 @@ interface Project {
   category: 'signal-processing' | 'control' | 'data-analysis';
   content: string;
   featured?: boolean;
-  status?: 'draft' | 'published';
+  status?: 'draft' | 'published' | 'scheduled';
+  publishAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export function Engineering() {

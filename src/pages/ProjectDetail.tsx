@@ -1,9 +1,28 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Tag, ExternalLink } from 'lucide-react';
-import { useEffect, useRef, useMemo } from 'react';
-import { getProjectById, Project } from '../data/projects';
+import { ArrowLeft, Calendar, Tag, ExternalLink, Clock } from 'lucide-react';
+import { useEffect, useRef, useMemo, useState } from 'react';
+import { api } from '../lib/api';
 import katex from 'katex';
 import mermaid from 'mermaid';
+
+interface Project {
+  _id?: string;
+  id: string;
+  title: string;
+  description: string;
+  tags: string[];
+  category: 'signal-processing' | 'control' | 'data-analysis';
+  content: string;
+  status?: 'draft' | 'published' | 'scheduled';
+  publishAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  devStatus?: 'planning' | 'ongoing' | 'completed';
+  date?: string;
+  githubUrl?: string;
+  paperUrl?: string;
+  demoUrl?: string;
+}
 
 // Initialize mermaid
 mermaid.initialize({
@@ -11,6 +30,18 @@ mermaid.initialize({
   theme: 'neutral',
   securityLevel: 'loose',
 });
+
+function formatDateTimeDetailed(dateString?: string) {
+  if (!dateString) return null;
+  const date = new Date(dateString);
+  return date.toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
 
 function CategoryBadge({ category }: { category: Project['category'] }) {
   const getStyle = () => {
@@ -159,12 +190,35 @@ function MermaidDiagram({ code, id }: { code: string; id: string }) {
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const project = id ? getProjectById(id) : undefined;
+  const [project, setProject] = useState<Project | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    api.get(`/api/projects/public/${id}`, false)
+      .then((data: Project) => setProject(data))
+      .catch(() => setProject(null))
+      .finally(() => setLoading(false));
+  }, [id]);
 
   const contentParts = useMemo(() => {
     if (!project) return [];
     return parseContent(project.content);
   }, [project]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen py-16">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-center text-[#6B7280]">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!project) {
     return (
@@ -209,19 +263,39 @@ export function ProjectDetail() {
         <div className="mb-10">
           <div className="flex flex-wrap items-center gap-3 mb-4">
             <CategoryBadge category={project.category} />
-            <span className="text-[#6B7280] text-sm flex items-center">
-              <Calendar className="w-4 h-4 mr-1" />
-              2024
-            </span>
+            {project.date && (
+              <span className="text-[#6B7280] text-sm flex items-center">
+                <Calendar className="w-4 h-4 mr-1" />
+                {new Date(project.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'long' })}
+              </span>
+            )}
           </div>
 
           <h1 className="text-4xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-4">
             {project.title}
           </h1>
 
-          <p className="text-xl text-[#6B7280] mb-6">
+          <p className="text-xl text-[#6B7280] mb-4">
             {project.description}
           </p>
+
+          {/* Timestamps */}
+          {(project.createdAt || project.updatedAt) && (
+            <div className="flex flex-wrap items-center gap-4 text-xs text-[#9CA3AF] dark:text-[#6B7280] mb-4">
+              {project.createdAt && (
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  Diposting: {formatDateTimeDetailed(project.createdAt)}
+                </span>
+              )}
+              {project.updatedAt && project.updatedAt !== project.createdAt && (
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  Diperbarui: {formatDateTimeDetailed(project.updatedAt)}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Tags */}
           <div className="flex flex-wrap gap-2">

@@ -6,6 +6,15 @@ export interface Project {
   category: 'signal-processing' | 'control' | 'data-analysis';
   thumbnail?: string;
   content: string;
+  status?: 'draft' | 'published' | 'scheduled';
+  publishAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  devStatus?: 'planning' | 'ongoing' | 'completed';
+  date?: string;
+  githubUrl?: string;
+  paperUrl?: string;
+  demoUrl?: string;
 }
 
 export const projects: Project[] = [

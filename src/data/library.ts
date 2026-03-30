@@ -7,6 +7,10 @@ export interface Book {
   category: 'technical' | 'biography' | 'spiritual' | 'philosophy';
   takeaways: string[];
   review: string;
+  status?: 'draft' | 'published' | 'scheduled';
+  publishAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export const books: Book[] = [

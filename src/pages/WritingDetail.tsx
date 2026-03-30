@@ -14,7 +14,10 @@ interface Writing {
   category: 'reflections' | 'stories' | 'fiction';
   tags?: string[];
   content: string;
-  status?: 'draft' | 'published';
+  status?: 'draft' | 'published' | 'scheduled';
+  publishAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 mermaid.initialize({
@@ -221,6 +224,18 @@ export function WritingDetail() {
     });
   };
 
+  const formatDateTimeDetailed = (dateString?: string) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    return date.toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen py-16">
@@ -295,6 +310,18 @@ export function WritingDetail() {
               {writing.readTime} read
             </span>
           </div>
+
+          {/* Timestamps */}
+          {(writing.createdAt || writing.updatedAt) && (
+            <div className="flex flex-wrap items-center gap-4 text-xs text-[#9CA3AF] dark:text-[#6B7280] mb-4">
+              {writing.createdAt && (
+                <span>Diposting: {formatDateTimeDetailed(writing.createdAt)}</span>
+              )}
+              {writing.updatedAt && writing.updatedAt !== writing.createdAt && (
+                <span>• Diperbarui: {formatDateTimeDetailed(writing.updatedAt)}</span>
+              )}
+            </div>
+          )}
 
           {/* Tags */}
           {writing.tags && writing.tags.length > 0 && (

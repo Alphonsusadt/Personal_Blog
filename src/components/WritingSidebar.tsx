@@ -14,6 +14,8 @@ interface Writing {
   content: string;
   status?: 'draft' | 'published' | 'scheduled';
   publishAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface WritingSidebarProps {
