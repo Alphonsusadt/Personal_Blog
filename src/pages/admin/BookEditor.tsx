@@ -147,7 +147,6 @@ export function BookEditor() {
 
     return () => clearTimeout(autoSaveTimeoutRef.current);
   }, [book, loading]);
-  }, [book, loading]);
 
   const restoreDraft = () => {
     try {

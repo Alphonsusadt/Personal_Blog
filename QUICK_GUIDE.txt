@@ -1,0 +1,130 @@
+╔════════════════════════════════════════════════════════════════╗
+║                                                                ║
+║           🚀 CARA MENJALANKAN WEBSITE INI                      ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+
+📁 LOKASI: d:\alphonsus-portfolio-website-design
+
+
+═══════════════════════════════════════════════════════════════
+  METHOD 1: QUICK START (PALING MUDAH) ⭐
+═══════════════════════════════════════════════════════════════
+
+1. Dobel-klik file ini:
+   
+   📄 QUICK_START.bat
+   
+2. Dua terminal window akan muncul:
+   • CMS Backend (port 5001)
+   • Frontend (port 5173)
+   
+3. Tunggu 15-30 detik sampai loading selesai
+
+4. Buka browser: http://localhost:5173
+
+✅ SELESAI!
+
+
+═══════════════════════════════════════════════════════════════
+  METHOD 2: MANUAL (Jika Method 1 tidak work)
+═══════════════════════════════════════════════════════════════
+
+TERMINAL 1 - Start CMS Backend:
+┌─────────────────────────────────────────┐
+│ cd d:\alphonsus-portfolio-website-design\cms │
+│ npm run dev                              │
+└─────────────────────────────────────────┘
+
+Tunggu sampai muncul:
+✓ CMS Backend running on port 5001
+
+
+TERMINAL 2 - Start Frontend:
+┌─────────────────────────────────────────┐
+│ cd d:\alphonsus-portfolio-website-design │
+│ npm run dev                              │
+└─────────────────────────────────────────┘
+
+Tunggu sampai muncul:
+➜ Local: http://localhost:5173
+
+
+═══════════════════════════════════════════════════════════════
+  CEK STATUS SERVER
+═══════════════════════════════════════════════════════════════
+
+Untuk mengecek apakah server sudah jalan, dobel-klik:
+
+   📄 CHECK_SERVERS.bat
+
+Output akan menunjukkan:
+✓ Server yang RUNNING
+✗ Server yang TIDAK running
+
+
+═══════════════════════════════════════════════════════════════
+  TROUBLESHOOTING - HALAMAN PUTIH?
+═══════════════════════════════════════════════════════════════
+
+Jika halaman browser putih kosong:
+
+1. ✅ Pastikan KEDUA server jalan (CMS + Frontend)
+2. 🔄 Hard refresh browser: Ctrl+Shift+R
+3. 🔍 Buka Browser Console (F12) untuk cek error
+4. 📖 Baca file: TROUBLESHOOTING.md
+
+
+═══════════════════════════════════════════════════════════════
+  AKSES WEBSITE
+═══════════════════════════════════════════════════════════════
+
+🌐 Homepage:        http://localhost:5173
+📝 Writings:        http://localhost:5173/writings
+🔧 Engineering:     http://localhost:5173/engineering
+📚 Library:         http://localhost:5173/library
+ℹ️  About:          http://localhost:5173/about
+
+👨‍💼 Admin Panel:     http://localhost:5173/admin
+   Username: admin
+   Password: (lihat di cms/.env file)
+
+
+═══════════════════════════════════════════════════════════════
+  SYSTEM REQUIREMENTS
+═══════════════════════════════════════════════════════════════
+
+✅ Node.js installed
+✅ npm installed
+✅ MongoDB installed dan running (untuk CMS)
+
+
+MongoDB tidak jalan?
+→ Download: https://www.mongodb.com/try/download/community
+→ Start service: net start MongoDB
+
+
+═══════════════════════════════════════════════════════════════
+  NOTES
+═══════════════════════════════════════════════════════════════
+
+• CMS Backend HARUS jalan terlebih dahulu
+• Frontend membutuhkan CMS untuk load data
+• Jika MongoDB tidak jalan, CMS akan error
+• Port 5001 dan 5173 harus available (tidak dipakai app lain)
+
+
+═══════════════════════════════════════════════════════════════
+  NEED HELP?
+═══════════════════════════════════════════════════════════════
+
+📖 Baca: TROUBLESHOOTING.md
+📋 Run: CHECK_SERVERS.bat
+💬 Ask Copilot dengan screenshot error Anda
+
+
+════════════════════════════════════════════════════════════════
+
+HAPPY CODING! 🎉
+
+════════════════════════════════════════════════════════════════

@@ -99,6 +99,9 @@ Achieved Dice coefficient of 0.89 on test dataset.`
     description: 'Design and development of an affordable pulse oximeter for remote areas',
     tags: ['Arduino', 'Hardware Design', 'Embedded Systems', 'Biomedical'],
     category: 'control',
+    githubUrl: 'https://github.com/alphonsus/pulse-oximeter',
+    paperUrl: 'https://ieeexplore.ieee.org/document/9999999',
+    demoUrl: 'https://pulse-demo.medical-iot.tech',
     content: `# Low-Cost Pulse Oximeter
 
 Design of a portable pulse oximeter using red and infrared LEDs for SpO2 measurement.
@@ -126,6 +129,7 @@ Total BOM cost under $15, making it suitable for developing regions.`
     description: 'Brain-computer interface for controlling robotic arm using motor imagery',
     tags: ['Python', 'OpenBCI', 'Machine Learning', 'Signal Processing'],
     category: 'signal-processing',
+    githubUrl: 'https://github.com/alphonsus/eeg-bci-motor-imagery',
     content: `# EEG-based BCI for Motor Imagery
 
 Classification of motor imagery tasks from EEG signals using Common Spatial Patterns (CSP).

@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Debug Portfolio - Diagnosa Halaman Putih</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .test-card {
+            background: white;
+            padding: 25px;
+            margin-bottom: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .test-card h2 {
+            color: #555;
+            font-size: 20px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status {
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            display: inline-block;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        .success { background: #d4edda; color: #155724; border: 2px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 2px solid #f5c6cb; }
+        .warning { background: #fff3cd; color: #856404; border: 2px solid #ffeaa7; }
+        .loading { background: #d1ecf1; color: #0c5460; border: 2px solid #bee5eb; }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px 5px 5px 0;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        button:hover { background: #5568d3; transform: translateY(-2px); }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 13px;
+            border: 1px solid #e9ecef;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .instruction {
+            background: #e7f3ff;
+            padding: 15px;
+            border-left: 4px solid #2196F3;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .instruction strong { color: #1976D2; }
+        code {
+            background: #f4f4f4;
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #c7254e;
+        }
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 30px;
+            font-size: 14px;
+        }
+        .emoji { font-size: 24px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><span class="emoji">🔍</span> Diagnosa Halaman Putih Portfolio</h1>
+            <p style="color: #666; margin-top: 10px;">Tool ini akan membantu menemukan kenapa website menampilkan halaman putih kosong.</p>
+        </div>
+
+        <div class="test-card">
+            <h2><span class="emoji">🖥️</span> Test 1: CMS Backend Server</h2>
+            <p style="color: #666; margin-bottom: 10px;">Mengecek koneksi ke: <code>http://localhost:5001</code></p>
+            <div id="cms-status" class="status loading">⏳ Sedang testing...</div>
+            <button onclick="testCMS()">🔄 Test Ulang</button>
+            <pre id="cms-result">Menunggu hasil test...</pre>
+        </div>
+
+        <div class="test-card">
+            <h2><span class="emoji">📡</span> Test 2: API Endpoints</h2>
+            <p style="color: #666; margin-bottom: 10px;">Mengecek semua API endpoint CMS</p>
+            <div id="api-status" class="status loading">⏳ Sedang testing...</div>
+            <button onclick="testAPI()">🔄 Test Ulang</button>
+            <pre id="api-result">Menunggu hasil test...</pre>
+        </div>
+
+        <div class="test-card">
+            <h2><span class="emoji">📝</span> Test 3: Database Content</h2>
+            <p style="color: #666; margin-bottom: 10px;">Mengecek apakah database memiliki data</p>
+            <div id="db-status" class="status loading">⏳ Sedang testing...</div>
+            <button onclick="testDatabase()">🔄 Test Ulang</button>
+            <pre id="db-result">Menunggu hasil test...</pre>
+        </div>
+
+        <div class="test-card">
+            <h2><span class="emoji">🌐</span> Test 4: Frontend Server</h2>
+            <p style="color: #666; margin-bottom: 10px;">Anda saat ini di: <code id="current-url"></code></p>
+            <div class="status success">✅ Frontend berfungsi (Anda bisa lihat halaman ini)</div>
+            <button onclick="window.open('http://localhost:5173', '_blank')">🔗 Buka Website Utama</button>
+        </div>
+
+        <div class="test-card" id="diagnosis-card" style="display: none;">
+            <h2><span class="emoji">📊</span> Hasil Diagnosa</h2>
+            <div id="diagnosis"></div>
+        </div>
+
+        <div class="test-card">
+            <h2><span class="emoji">🛠️</span> Solusi Cepat</h2>
+            
+            <div class="instruction">
+                <strong>❌ Jika CMS Backend tidak jalan:</strong><br>
+                1. Buka Command Prompt / Terminal<br>
+                2. Jalankan: <code>cd d:\alphonsus-portfolio-website-design\cms</code><br>
+                3. Jalankan: <code>npm run dev</code><br>
+                4. Tunggu sampai muncul "CMS Backend running on port 5001"
+            </div>
+
+            <div class="instruction">
+                <strong>🗄️ Jika MongoDB tidak running:</strong><br>
+                1. Tekan Windows+R, ketik: <code>services.msc</code><br>
+                2. Cari service "MongoDB" dan klik Start<br>
+                Atau jalankan di Command Prompt: <code>net start MongoDB</code>
+            </div>
+
+            <div class="instruction">
+                <strong>📭 Jika Database kosong:</strong><br>
+                1. Buka terminal di folder CMS<br>
+                2. Jalankan: <code>npm run seed</code><br>
+                3. Ini akan populate database dengan sample data
+            </div>
+
+            <div class="instruction">
+                <strong>🚀 Quick Start (Termudah):</strong><br>
+                Dobel-klik file: <code>QUICK_START.bat</code> di folder project Anda
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>💡 Tip: Tekan F12 untuk membuka Browser Console dan lihat error details</p>
+        <p style="margin-top: 10px;">Made with ❤️ by Copilot</p>
+    </div>
+
+    <script>
+        document.getElementById('current-url').textContent = window.location.href;
+
+        async function testCMS() {
+            const statusEl = document.getElementById('cms-status');
+            const resultEl = document.getElementById('cms-result');
+            
+            statusEl.className = 'status loading';
+            statusEl.textContent = '⏳ Menghubungi CMS Backend...';
+            
+            try {
+                const response = await fetch('http://localhost:5001/api/settings/public', {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    statusEl.className = 'status success';
+                    statusEl.textContent = '✅ CMS Backend BERJALAN dengan baik!';
+                    resultEl.textContent = '✅ Status: Connected\n✅ Response Code: 200 OK\n✅ Port: 5001\n\nSample Response:\n' + JSON.stringify(data, null, 2);
+                } else {
+                    statusEl.className = 'status error';
+                    statusEl.textContent = `❌ CMS Backend error: ${response.status}`;
+                    resultEl.textContent = `❌ HTTP Status: ${response.status} ${response.statusText}\n\nCMS Backend ada tapi mengembalikan error.`;
+                }
+            } catch (error) {
+                statusEl.className = 'status error';
+                statusEl.textContent = '❌ TIDAK BISA terhubung ke CMS Backend';
+                resultEl.textContent = '❌ Error: ' + error.message + '\n\n' +
+                    '📌 MASALAH: CMS Backend TIDAK berjalan di port 5001\n\n' +
+                    '✅ SOLUSI:\n' +
+                    '1. Buka terminal\n' +
+                    '2. cd d:\\alphonsus-portfolio-website-design\\cms\n' +
+                    '3. npm run dev\n' +
+                    '4. Tunggu sampai muncul pesan "running on port 5001"';
+            }
+        }
+
+        async function testAPI() {
+            const statusEl = document.getElementById('api-status');
+            const resultEl = document.getElementById('api-result');
+            
+            statusEl.className = 'status loading';
+            statusEl.textContent = '⏳ Testing semua API endpoints...';
+            
+            const endpoints = [
+                { path: '/api/projects/public', name: 'Projects' },
+                { path: '/api/writings/public', name: 'Writings' },
+                { path: '/api/books/public', name: 'Books' },
+                { path: '/api/about/public', name: 'About' },
+                { path: '/api/home/public', name: 'Home' }
+            ];
+            
+            let results = [];
+            let successCount = 0;
+            
+            for (const endpoint of endpoints) {
+                try {
+                    const response = await fetch('http://localhost:5001' + endpoint.path);
+                    if (response.ok) {
+                        const data = await response.json();
+                        const itemCount = Array.isArray(data) ? data.length : 'OK';
+                        results.push(`✅ ${endpoint.name}: ${itemCount} ${Array.isArray(data) ? 'items' : ''}`);
+                        successCount++;
+                    } else {
+                        results.push(`❌ ${endpoint.name}: HTTP ${response.status}`);
+                    }
+                } catch (error) {
+                    results.push(`❌ ${endpoint.name}: Connection failed`);
+                }
+            }
+            
+            if (successCount === endpoints.length) {
+                statusEl.className = 'status success';
+                statusEl.textContent = '✅ Semua API endpoint berfungsi!';
+            } else if (successCount > 0) {
+                statusEl.className = 'status warning';
+                statusEl.textContent = `⚠️ ${successCount}/${endpoints.length} endpoints berhasil`;
+            } else {
+                statusEl.className = 'status error';
+                statusEl.textContent = '❌ Semua API endpoint gagal';
+            }
+            
+            resultEl.textContent = results.join('\n');
+        }
+
+        async function testDatabase() {
+            const statusEl = document.getElementById('db-status');
+            const resultEl = document.getElementById('db-result');
+            
+            statusEl.className = 'status loading';
+            statusEl.textContent = '⏳ Mengecek database content...';
+            
+            try {
+                const endpoints = [
+                    { url: '/api/writings/public', name: 'Writings' },
+                    { url: '/api/projects/public', name: 'Projects' },
+                    { url: '/api/books/public', name: 'Books' }
+                ];
+                
+                let results = [];
+                let totalItems = 0;
+                
+                for (const ep of endpoints) {
+                    try {
+                        const response = await fetch('http://localhost:5001' + ep.url);
+                        const data = await response.json();
+                        const count = Array.isArray(data) ? data.length : 0;
+                        totalItems += count;
+                        results.push(`${ep.name}: ${count} items`);
+                    } catch (error) {
+                        results.push(`${ep.name}: Error`);
+                    }
+                }
+                
+                if (totalItems > 0) {
+                    statusEl.className = 'status success';
+                    statusEl.textContent = `✅ Database berisi ${totalItems} items`;
+                    resultEl.textContent = '✅ Database Status: HAS DATA\n\n' + results.join('\n');
+                } else {
+                    statusEl.className = 'status warning';
+                    statusEl.textContent = '⚠️ Database KOSONG - tidak ada data';
+                    resultEl.textContent = '⚠️ Database Status: EMPTY\n\n' +
+                        results.join('\n') + '\n\n' +
+                        '📌 SOLUSI: Jalankan seed untuk populate data\n' +
+                        '   cd cms && npm run seed';
+                }
+            } catch (error) {
+                statusEl.className = 'status error';
+                statusEl.textContent = '❌ Tidak bisa mengecek database';
+                resultEl.textContent = '❌ Error: ' + error.message;
+            }
+        }
+
+        async function runAllTests() {
+            await testCMS();
+            await new Promise(r => setTimeout(r, 800));
+            await testAPI();
+            await new Promise(r => setTimeout(r, 800));
+            await testDatabase();
+            
+            setTimeout(generateDiagnosis, 500);
+        }
+
+        function generateDiagnosis() {
+            const diagEl = document.getElementById('diagnosis');
+            const diagCard = document.getElementById('diagnosis-card');
+            const cmsStatus = document.getElementById('cms-status').textContent;
+            const apiStatus = document.getElementById('api-status').textContent;
+            const dbStatus = document.getElementById('db-status').textContent;
+            
+            diagCard.style.display = 'block';
+            
+            let diagnosis = '';
+            let hasError = false;
+            
+            if (cmsStatus.includes('✅')) {
+                diagnosis += '<div class="instruction" style="border-color: #28a745; background: #d4edda;">✅ <strong>CMS Backend:</strong> Berfungsi dengan baik</div>';
+            } else {
+                diagnosis += '<div class="instruction" style="border-color: #dc3545; background: #f8d7da;">❌ <strong>MASALAH UTAMA: CMS Backend tidak jalan!</strong><br>Ini adalah penyebab halaman putih. Website tidak bisa load data tanpa CMS Backend.</div>';
+                hasError = true;
+            }
+            
+            if (apiStatus.includes('✅')) {
+                diagnosis += '<div class="instruction" style="border-color: #28a745; background: #d4edda;">✅ <strong>API Endpoints:</strong> Semua endpoint merespons</div>';
+            } else if (apiStatus.includes('⚠️')) {
+                diagnosis += '<div class="instruction" style="border-color: #ffc107; background: #fff3cd;">⚠️ <strong>API:</strong> Beberapa endpoint bermasalah - cek MongoDB</div>';
+            }
+            
+            if (dbStatus.includes('✅')) {
+                diagnosis += '<div class="instruction" style="border-color: #28a745; background: #d4edda;">✅ <strong>Database:</strong> Berisi data</div>';
+            } else if (dbStatus.includes('⚠️')) {
+                diagnosis += '<div class="instruction" style="border-color: #ffc107; background: #fff3cd;">⚠️ <strong>Database KOSONG</strong><br>Jalankan: <code>cd cms && npm run seed</code></div>';
+            }
+            
+            if (!hasError && dbStatus.includes('✅') && apiStatus.includes('✅')) {
+                diagnosis += '<div class="instruction" style="border-color: #17a2b8; background: #d1ecf1;"><strong>🎉 Semua sistem normal!</strong><br>Jika masih putih, coba:<br>• Hard refresh browser (Ctrl+Shift+R)<br>• Clear cache browser<br>• Cek Browser Console (F12) untuk error JavaScript</div>';
+            }
+            
+            diagEl.innerHTML = diagnosis;
+        }
+
+        // Auto-run tests on page load
+        window.addEventListener('load', () => {
+            console.log('🔍 Starting diagnostic tests...');
+            setTimeout(runAllTests, 1000);
+        });
+    </script>
+</body>
+</html>

@@ -24,6 +24,8 @@ export const projects: Project[] = [
     description: 'Implemented Butterworth bandpass filter for noise reduction in cardiac signals',
     tags: ['Python', 'MATLAB', 'Signal Processing', 'DSP'],
     category: 'signal-processing',
+    githubUrl: 'https://github.com/alphonsus/ecg-filtering',
+    paperUrl: 'https://arxiv.org/abs/2024.01234',
     content: `
 # ECG Signal Filtering System
 
@@ -59,6 +61,8 @@ graph TD
     description: 'Real-time EMG signal processing for myoelectric prosthetic hand control',
     tags: ['Arduino', 'C++', 'Signal Processing', 'Machine Learning'],
     category: 'signal-processing',
+    githubUrl: 'https://github.com/alphonsus/emg-prosthetic',
+    demoUrl: 'https://demo.prosthetic-control.app',
     content: `
 # EMG Signal Analysis for Prosthetic Control
 
