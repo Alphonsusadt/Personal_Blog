@@ -25,6 +25,11 @@ interface Writing {
   publishAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  // SEO Fields
+  metaDescription?: string;
+  ogImage?: string;
+  keywords?: string;
+  metaTitle?: string;
 }
 
 const emptyWriting: Writing = {
@@ -139,13 +144,21 @@ export function WritingEditor() {
         if (writing._id) {
           await api.put(`/api/writings/${writing._id}`, writing);
         } else if (writing.id) {
-          await api.post('/api/writings', writing);
+          // For new drafts, capture the _id from POST response
+          const response = await api.post('/api/writings', writing);
+          // Update state with the _id so subsequent autosaves use PUT
+          setWriting(prev => ({ ...prev, _id: response._id }));
+        } else {
+          // If no slug yet, don't try to save to server - only local autosave works
+          setAutosaveStatus('idle');
+          return;
         }
         setAutosaveStatus('saved');
         setTimeout(() => setAutosaveStatus('idle'), 2000);
       } catch (err) {
         console.error('Autosave failed:', err);
         setAutosaveStatus('idle');
+        // Don't alert for autosave failures - just silently fail and rely on local draft
       }
     }, 3000);
 
@@ -226,20 +239,39 @@ export function WritingEditor() {
   };
 
   const handleSave = async () => {
-    if (!writing.title || !writing.id) {
-      alert('Title and Slug are required');
+    console.log('handleSave called with writing:', writing);
+    
+    if (!writing.title) {
+      alert('Title is required');
       return;
     }
 
-    if (writing.status === 'scheduled' && !writing.publishAt) {
+    // Auto-generate slug if not provided
+    let finalWriting = { ...writing };
+    if (!finalWriting.id && finalWriting.title) {
+      const autoSlug = finalWriting.title
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+      finalWriting.id = autoSlug;
+      // Update state dengan slug yang di-generate
+      setWriting(prev => ({ ...prev, id: autoSlug }));
+      console.log('Auto-generated slug:', autoSlug);
+    }
+
+    if (finalWriting.status === 'scheduled' && !finalWriting.publishAt) {
       alert('Mohon isi tanggal dan jam publish untuk penjadwalan');
       return;
     }
 
     let payload: Writing = {
-      ...writing,
+      ...finalWriting,
       readTime: `${Math.max(1, Math.ceil(wordCount / 200))} min`,
     };
+
+    console.log('Payload to save:', payload);
 
     // Sanitize base64 images to URLs if present
     if (hasBase64Images(payload.content)) {
@@ -256,17 +288,24 @@ export function WritingEditor() {
 
     setIsSaving(true);
     try {
+      console.log('Making API call...');
       if (writing._id) {
+        console.log('Updating existing writing with _id:', writing._id);
         await api.put(`/api/writings/${writing._id}`, payload);
       } else {
-        await api.post('/api/writings', payload);
+        console.log('Creating new writing...');
+        // Create new writing and capture the _id from response
+        const response = await api.post('/api/writings', payload);
+        console.log('API response:', response);
+        // Update state with the _id returned from server
+        setWriting(prev => ({ ...prev, _id: response._id }));
       }
       clearLocalDraft(); // Clear local draft after successful save
       alert('Writing saved successfully!');
       navigate('/admin/writings');
     } catch (err) {
       console.error('Save failed:', err);
-      alert('Failed to save writing');
+      alert(`Failed to save writing: ${err.message || err}`);
     } finally {
       setIsSaving(false);
     }
@@ -374,7 +413,7 @@ export function WritingEditor() {
 
             <button
               onClick={handleSave}
-              disabled={isSaving || !writing.title || !writing.id}
+              disabled={isSaving || !writing.title}
               className="px-4 py-2 bg-[#1E40AF] text-white rounded-lg text-sm font-medium hover:bg-[#1E3A8A] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSaving

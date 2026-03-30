@@ -25,6 +25,11 @@ interface Book {
   publishAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  // SEO Fields
+  metaDescription?: string;
+  ogImage?: string;
+  keywords?: string;
+  metaTitle?: string;
 }
 
 const emptyBook: Book = {
@@ -110,7 +115,7 @@ export function BookEditor() {
     return () => clearTimeout(timeout);
   }, [book, loading, draftKey]);
 
-  // Server autosave
+  // Server autosave logic (3 seconds delay)
   useEffect(() => {
     if (loading || !book.title) return;
 
@@ -122,17 +127,26 @@ export function BookEditor() {
         if (book._id) {
           await api.put(`/api/books/${book._id}`, book);
         } else if (book.id) {
-          await api.post('/api/books', book);
+          // For new drafts, capture the _id from POST response
+          const response = await api.post('/api/books', book);
+          // Update state with the _id so subsequent autosaves use PUT
+          setBook(prev => ({ ...prev, _id: response._id }));
+        } else {
+          // If no slug yet, don't try to save to server - only local autosave works
+          setAutosaveStatus('idle');
+          return;
         }
         setAutosaveStatus('saved');
         setTimeout(() => setAutosaveStatus('idle'), 2000);
       } catch (err) {
         console.error('Autosave failed:', err);
         setAutosaveStatus('idle');
+        // Don't alert for autosave failures - just silently fail and rely on local draft
       }
     }, 3000);
 
     return () => clearTimeout(autoSaveTimeoutRef.current);
+  }, [book, loading]);
   }, [book, loading]);
 
   const restoreDraft = () => {
@@ -206,12 +220,31 @@ export function BookEditor() {
   };
 
   const handleSave = async () => {
-    if (!book.title || !book.id) {
-      alert('Title and Slug are required');
+    console.log('handleSave called with book:', book);
+    
+    if (!book.title) {
+      alert('Title is required');
       return;
     }
 
-    let payload: Book = { ...book };
+    // Auto-generate slug if not provided
+    let finalBook = { ...book };
+    if (!finalBook.id && finalBook.title) {
+      const autoSlug = finalBook.title
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+      finalBook.id = autoSlug;
+      // Update state dengan slug yang di-generate
+      setBook(prev => ({ ...prev, id: autoSlug }));
+      console.log('Auto-generated slug:', autoSlug);
+    }
+
+    let payload: Book = { ...finalBook };
+
+    console.log('Payload to save:', payload);
 
     // Sanitize base64 images to URLs if present in review
     if (hasBase64Images(payload.review)) {
@@ -227,10 +260,17 @@ export function BookEditor() {
 
     setIsSaving(true);
     try {
+      console.log('Making API call...');
       if (book._id) {
+        console.log('Updating existing book with _id:', book._id);
         await api.put(`/api/books/${book._id}`, payload);
       } else {
-        await api.post('/api/books', payload);
+        console.log('Creating new book...');
+        // Create new book and capture the _id from response
+        const response = await api.post('/api/books', payload);
+        console.log('API response:', response);
+        // Update state with the _id returned from server
+        setBook(prev => ({ ...prev, _id: response._id }));
       }
       clearLocalDraft();
       alert('Book saved successfully!');
@@ -331,7 +371,7 @@ export function BookEditor() {
 
             <button
               onClick={handleSave}
-              disabled={isSaving || !book.title || !book.id}
+              disabled={isSaving || !book.title}
               className="px-4 py-2 bg-[#1E40AF] text-white rounded-lg text-sm font-medium hover:bg-[#1E3A8A] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSaving ? 'Saving...' : book.status === 'published' ? 'Update' : 'Publish'}

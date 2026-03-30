@@ -28,6 +28,11 @@ interface Project {
   githubUrl?: string;
   paperUrl?: string;
   demoUrl?: string;
+  // SEO Fields
+  metaDescription?: string;
+  ogImage?: string;
+  keywords?: string;
+  metaTitle?: string;
 }
 
 const emptyProject: Project = {
@@ -116,7 +121,7 @@ export function ProjectEditor() {
     return () => clearTimeout(timeout);
   }, [project, loading, draftKey]);
 
-  // Server autosave
+  // Server autosave logic (3 seconds delay)
   useEffect(() => {
     if (loading || !project.title) return;
 
@@ -128,13 +133,21 @@ export function ProjectEditor() {
         if (project._id) {
           await api.put(`/api/projects/${project._id}`, project);
         } else if (project.id) {
-          await api.post('/api/projects', project);
+          // For new drafts, capture the _id from POST response
+          const response = await api.post('/api/projects', project);
+          // Update state with the _id so subsequent autosaves use PUT
+          setProject(prev => ({ ...prev, _id: response._id }));
+        } else {
+          // If no slug yet, don't try to save to server - only local autosave works
+          setAutosaveStatus('idle');
+          return;
         }
         setAutosaveStatus('saved');
         setTimeout(() => setAutosaveStatus('idle'), 2000);
       } catch (err) {
         console.error('Autosave failed:', err);
         setAutosaveStatus('idle');
+        // Don't alert for autosave failures - just silently fail and rely on local draft
       }
     }, 3000);
 
@@ -212,16 +225,35 @@ export function ProjectEditor() {
   };
 
   const handleSave = async (shouldPublish: boolean = false) => {
-    if (!project.title || !project.id) {
-      alert('Title and Slug are required');
+    console.log('handleSave called with project:', project);
+    
+    if (!project.title) {
+      alert('Title is required');
       return;
     }
 
+    // Auto-generate slug if not provided
+    let finalProject = { ...project };
+    if (!finalProject.id && finalProject.title) {
+      const autoSlug = finalProject.title
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+      finalProject.id = autoSlug;
+      // Update state dengan slug yang di-generate
+      setProject(prev => ({ ...prev, id: autoSlug }));
+      console.log('Auto-generated slug:', autoSlug);
+    }
+
     let payload: Project = {
-      ...project,
+      ...finalProject,
       // If button says "Publish" (not already published), set status to published
-      status: shouldPublish ? 'published' : project.status
+      status: shouldPublish ? 'published' : finalProject.status
     };
+
+    console.log('Payload to save:', payload);
 
     // Sanitize base64 images to URLs if present
     if (hasBase64Images(payload.content)) {
@@ -237,10 +269,17 @@ export function ProjectEditor() {
 
     setIsSaving(true);
     try {
+      console.log('Making API call...');
       if (project._id) {
+        console.log('Updating existing project with _id:', project._id);
         await api.put(`/api/projects/${project._id}`, payload);
       } else {
-        await api.post('/api/projects', payload);
+        console.log('Creating new project...');
+        // Create new project and capture the _id from response
+        const response = await api.post('/api/projects', payload);
+        console.log('API response:', response);
+        // Update state with the _id returned from server
+        setProject(prev => ({ ...prev, _id: response._id }));
       }
       clearLocalDraft();
       alert('Project saved successfully!');
@@ -343,7 +382,7 @@ export function ProjectEditor() {
 
             <button
               onClick={() => handleSave(project.status !== 'published')}
-              disabled={isSaving || !project.title || !project.id}
+              disabled={isSaving || !project.title}
               className="px-3 sm:px-4 py-2 bg-[#1E40AF] text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-[#1E3A8A] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSaving ? 'Saving...' : project.status === 'published' ? 'Update' : 'Publish'}

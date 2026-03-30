@@ -1,6 +1,7 @@
-import { X } from 'lucide-react';
-import React from 'react';
+import { X, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import { ImageGallery } from './ImageGallery';
+import { generateSlug, isValidSlug } from '../utils/slugify';
 
 interface Writing {
   _id?: string;
@@ -16,6 +17,11 @@ interface Writing {
   publishAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  // SEO Fields
+  metaDescription?: string;
+  ogImage?: string;
+  keywords?: string;
+  metaTitle?: string;
 }
 
 interface WritingSidebarProps {
@@ -32,6 +38,30 @@ const categories = ['reflections', 'stories', 'fiction'];
 
 export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, onRemoveImage }: WritingSidebarProps) {
   const [tagInput, setTagInput] = React.useState('');
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+
+  // Auto-generate slug from title when title changes (only if slug wasn't manually edited)
+  useEffect(() => {
+    if (writing.title && (!writing.id || !slugManuallyEdited)) {
+      const autoSlug = generateSlug(writing.title);
+      if (autoSlug && autoSlug !== writing.id) {
+        onUpdate({ ...writing, id: autoSlug });
+      }
+    }
+  }, [writing.title, slugManuallyEdited, writing.id, onUpdate]);
+
+  const handleSlugChange = (newSlug: string) => {
+    setSlugManuallyEdited(true);
+    onUpdate({ ...writing, id: newSlug });
+  };
+
+  const handleRegenerateSlug = () => {
+    const autoSlug = generateSlug(writing.title);
+    if (autoSlug) {
+      onUpdate({ ...writing, id: autoSlug });
+      setSlugManuallyEdited(false);
+    }
+  };
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
 
   const toDateTimeLocal = (value?: string) => {
@@ -226,14 +256,88 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
 
       {/* ID/Slug Card */}
       <SidebarCard title="ID/Slug" cardKey="slug">
-        <input
-          type="text"
-          value={writing.id}
-          onChange={e => onUpdate({ ...writing, id: e.target.value })}
-          placeholder="unique-slug"
-          className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
-        />
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={writing.id}
+              onChange={e => handleSlugChange(e.target.value)}
+              placeholder="unique-slug"
+              className={`flex-1 bg-[#0F172A] border text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] ${
+                writing.id && !isValidSlug(writing.id) ? 'border-red-500' : 'border-[#334155]'
+              }`}
+            />
+            <button
+              type="button"
+              onClick={handleRegenerateSlug}
+              disabled={!writing.title}
+              className="p-2 text-[#94A3B8] hover:text-[#60A5FA] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Generate from title"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+          {writing.id && !isValidSlug(writing.id) && (
+            <p className="text-xs text-red-400">Invalid slug format (only lowercase, numbers, and hyphens)</p>
+          )}
+        </div>
         <p className="text-xs text-[#94A3B8] mt-2">URL-friendly identifier (no spaces)</p>
+      </SidebarCard>
+
+      {/* SEO Card */}
+      <SidebarCard title="SEO" cardKey="seo">
+        <div className="space-y-3">
+          {/* Meta Title */}
+          <div>
+            <label className="block text-xs text-[#94A3B8] mb-1">Meta Title</label>
+            <input
+              type="text"
+              value={writing.metaTitle || writing.title}
+              onChange={e => onUpdate({ ...writing, metaTitle: e.target.value })}
+              placeholder="Auto-filled from title"
+              className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+            />
+            <p className="text-xs text-[#64748B] mt-1">{(writing.metaTitle || writing.title).length}/60 chars</p>
+          </div>
+
+          {/* Meta Description */}
+          <div>
+            <label className="block text-xs text-[#94A3B8] mb-1">Meta Description</label>
+            <textarea
+              value={writing.metaDescription || writing.excerpt}
+              onChange={e => onUpdate({ ...writing, metaDescription: e.target.value })}
+              placeholder="Auto-filled from excerpt"
+              rows={3}
+              className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] resize-none"
+            />
+            <p className="text-xs text-[#64748B] mt-1">{(writing.metaDescription || writing.excerpt).length}/160 chars</p>
+          </div>
+
+          {/* Keywords */}
+          <div>
+            <label className="block text-xs text-[#94A3B8] mb-1">Keywords</label>
+            <input
+              type="text"
+              value={writing.keywords || writing.tags.join(', ')}
+              onChange={e => onUpdate({ ...writing, keywords: e.target.value })}
+              placeholder="Auto-filled from tags"
+              className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+            />
+          </div>
+
+          {/* OG Image */}
+          <div>
+            <label className="block text-xs text-[#94A3B8] mb-1">OG Image URL</label>
+            <input
+              type="text"
+              value={writing.ogImage || ''}
+              onChange={e => onUpdate({ ...writing, ogImage: e.target.value })}
+              placeholder="https://example.com/image.jpg"
+              className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+            />
+            <p className="text-xs text-[#64748B] mt-1">For social media sharing (1200x630px recommended)</p>
+          </div>
+        </div>
       </SidebarCard>
 
       {/* Update Button */}

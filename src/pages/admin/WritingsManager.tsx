@@ -17,6 +17,11 @@ interface Writing {
   publishAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  // SEO Fields
+  metaDescription?: string;
+  ogImage?: string;
+  keywords?: string;
+  metaTitle?: string;
 }
 
 const formatDateTime = (dateStr?: string) => {

@@ -1,6 +1,7 @@
-import { X, Star } from 'lucide-react';
+import { X, Star, RefreshCw } from 'lucide-react';
 import { ImageGallery } from './ImageGallery';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { generateSlug, isValidSlug } from '../utils/slugify';
 
 interface Book {
   _id?: string;
@@ -16,6 +17,11 @@ interface Book {
   publishAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  // SEO Fields
+  metaDescription?: string;
+  ogImage?: string;
+  keywords?: string;
+  metaTitle?: string;
 }
 
 interface BookSidebarProps {
@@ -30,6 +36,30 @@ const categories = ['technical', 'biography', 'spiritual', 'philosophy'];
 export function BookSidebar({ book, onUpdate, onSave, isSaving }: BookSidebarProps) {
   const [takeawayInput, setTakeawayInput] = React.useState('');
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+
+  // Auto-generate slug from title when title changes (only if slug wasn't manually edited)
+  useEffect(() => {
+    if (book.title && (!book.id || !slugManuallyEdited)) {
+      const autoSlug = generateSlug(book.title);
+      if (autoSlug && autoSlug !== book.id) {
+        onUpdate({ ...book, id: autoSlug });
+      }
+    }
+  }, [book.title, slugManuallyEdited, book.id, onUpdate]);
+
+  const handleSlugChange = (newSlug: string) => {
+    setSlugManuallyEdited(true);
+    onUpdate({ ...book, id: newSlug });
+  };
+
+  const handleRegenerateSlug = () => {
+    const autoSlug = generateSlug(book.title);
+    if (autoSlug) {
+      onUpdate({ ...book, id: autoSlug });
+      setSlugManuallyEdited(false);
+    }
+  };
 
   const toDateTimeLocal = (value?: string) => {
     if (!value) return '';
@@ -198,13 +228,31 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving }: BookSidebarPro
 
       {/* ID/Slug Card */}
       <SidebarCard title="ID/Slug" cardKey="slug">
-        <input
-          type="text"
-          value={book.id}
-          onChange={e => onUpdate({ ...book, id: e.target.value })}
-          placeholder="unique-slug"
-          className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
-        />
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={book.id}
+              onChange={e => handleSlugChange(e.target.value)}
+              placeholder="unique-slug"
+              className={`flex-1 bg-[#0F172A] border text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] ${
+                book.id && !isValidSlug(book.id) ? 'border-red-500' : 'border-[#334155]'
+              }`}
+            />
+            <button
+              type="button"
+              onClick={handleRegenerateSlug}
+              disabled={!book.title}
+              className="p-2 text-[#94A3B8] hover:text-[#60A5FA] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Generate from title"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+          {book.id && !isValidSlug(book.id) && (
+            <p className="text-xs text-red-400">Invalid slug format (only lowercase, numbers, and hyphens)</p>
+          )}
+        </div>
         <p className="text-xs text-[#94A3B8] mt-2">URL-friendly identifier (no spaces)</p>
       </SidebarCard>
 
@@ -217,6 +265,62 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving }: BookSidebarPro
           placeholder="https://..."
           className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
         />
+      </SidebarCard>
+
+      {/* SEO Card */}
+      <SidebarCard title="SEO" cardKey="seo">
+        <div className="space-y-3">
+          {/* Meta Title */}
+          <div>
+            <label className="block text-xs text-[#94A3B8] mb-1">Meta Title</label>
+            <input
+              type="text"
+              value={book.metaTitle || `${book.title} by ${book.author}`}
+              onChange={e => onUpdate({ ...book, metaTitle: e.target.value })}
+              placeholder="Auto-filled from title and author"
+              className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+            />
+            <p className="text-xs text-[#64748B] mt-1">{(book.metaTitle || `${book.title} by ${book.author}`).length}/60 chars</p>
+          </div>
+
+          {/* Meta Description */}
+          <div>
+            <label className="block text-xs text-[#94A3B8] mb-1">Meta Description</label>
+            <textarea
+              value={book.metaDescription || `Book review: ${book.title} by ${book.author}. Rating: ${book.rating}/5 stars.`}
+              onChange={e => onUpdate({ ...book, metaDescription: e.target.value })}
+              placeholder="Auto-generated from book info"
+              rows={3}
+              className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] resize-none"
+            />
+            <p className="text-xs text-[#64748B] mt-1">{(book.metaDescription || `Book review: ${book.title} by ${book.author}. Rating: ${book.rating}/5 stars.`).length}/160 chars</p>
+          </div>
+
+          {/* Keywords */}
+          <div>
+            <label className="block text-xs text-[#94A3B8] mb-1">Keywords</label>
+            <input
+              type="text"
+              value={book.keywords || `${book.title}, ${book.author}, book review, ${book.category}`}
+              onChange={e => onUpdate({ ...book, keywords: e.target.value })}
+              placeholder="Auto-generated from book details"
+              className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+            />
+          </div>
+
+          {/* OG Image */}
+          <div>
+            <label className="block text-xs text-[#94A3B8] mb-1">OG Image URL</label>
+            <input
+              type="text"
+              value={book.ogImage || book.cover}
+              onChange={e => onUpdate({ ...book, ogImage: e.target.value })}
+              placeholder="Uses book cover by default"
+              className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+            />
+            <p className="text-xs text-[#64748B] mt-1">For social media sharing (defaults to book cover)</p>
+          </div>
+        </div>
       </SidebarCard>
 
       {/* Update Button */}
