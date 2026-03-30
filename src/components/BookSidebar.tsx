@@ -1,4 +1,5 @@
 import { X, Star } from 'lucide-react';
+import { ImageGallery } from './ImageGallery';
 import React from 'react';
 
 interface Book {
@@ -132,6 +133,17 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving }: BookSidebarPro
             </button>
           </div>
         </div>
+      </SidebarCard>
+
+      {/* Image Gallery Card */}
+      <SidebarCard title="Images" cardKey="images">
+        <ImageGallery
+          content={book.review}
+          onRemoveImage={(markdown) => {
+            const updatedReview = book.review.replace(markdown, '');
+            onUpdate({ ...book, review: updatedReview });
+          }}
+        />
       </SidebarCard>
 
       {/* ID/Slug Card */}

@@ -9,7 +9,7 @@ interface Book {
   author: string;
   cover: string;
   rating: number;
-  category: string;
+  category: 'technical' | 'biography' | 'spiritual' | 'philosophy';
   takeaways: string[];
   review: string;
   status?: 'draft' | 'published';

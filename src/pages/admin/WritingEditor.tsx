@@ -310,7 +310,6 @@ export function WritingEditor() {
               <WritingToolbar
                 textareaRef={textareaRef}
                 onInsert={insertMarkdown}
-                onInsertImage={insertImageMarkdown}
                 onOpenImageDialog={() => setImageDialogOpen(true)}
               />
 

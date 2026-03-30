@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { ProjectToolbar } from '../../components/ProjectToolbar';
 import { ProjectSidebar } from '../../components/ProjectSidebar';
+import { ImageUploadDialog } from '../../components/ImageUploadDialog';
 import { sanitizeMarkdown } from '../../lib/mediaUploader';
 import { hasBase64Images } from '../../utils/media';
 import { ArrowLeft, Check, Clock, Eye, EyeOff } from 'lucide-react';
@@ -50,6 +51,7 @@ export function ProjectEditor() {
   const [isSaving, setIsSaving] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showPreview, setShowPreview] = useState(false);
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!slug || slug === 'new') {
@@ -109,6 +111,27 @@ export function ProjectEditor() {
       textarea.focus();
       textarea.selectionStart = start + before.length;
       textarea.selectionEnd = start + before.length + selected.length;
+    });
+  };
+
+  const insertImageMarkdown = (imageMarkdown: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      setProject(prev => ({ ...prev, content: `${prev.content}\n${imageMarkdown}\n` }));
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    const newText = `${text.substring(0, start)}${imageMarkdown}${text.substring(end)}`;
+    setProject({ ...project, content: newText });
+
+    setTimeout(() => {
+      textarea.focus();
+      const cursorPos = start + imageMarkdown.length;
+      textarea.selectionStart = cursorPos;
+      textarea.selectionEnd = cursorPos;
     });
   };
 
@@ -252,7 +275,12 @@ export function ProjectEditor() {
 
             {/* Toolbar with Preview Toggle */}
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <ProjectToolbar textareaRef={textareaRef} onInsert={insertMarkdown} />
+              <ProjectToolbar 
+                textareaRef={textareaRef} 
+                onInsert={insertMarkdown}
+                onInsertImage={insertImageMarkdown}
+                onOpenImageDialog={() => setImageDialogOpen(true)}
+              />
 
               {/* Live Preview Toggle */}
               <button
@@ -329,6 +357,13 @@ export function ProjectEditor() {
           </div>
         </div>
       </main>
+
+      {/* Image Upload Dialog */}
+      <ImageUploadDialog
+        isOpen={imageDialogOpen}
+        onClose={() => setImageDialogOpen(false)}
+        onInsert={insertImageMarkdown}
+      />
     </div>
   );
 }

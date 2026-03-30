@@ -8,7 +8,7 @@ interface Project {
   title: string;
   description: string;
   tags: string[];
-  category: string;
+  category: 'signal-processing' | 'control' | 'data-analysis';
   content: string;
   featured?: boolean;
   status?: 'draft' | 'published';

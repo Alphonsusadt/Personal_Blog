@@ -121,7 +121,7 @@ export function ImageUploadDialog({
         method: 'POST',
         body: formData,
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+          'Authorization': `Bearer ${localStorage.getItem('cms_token') || ''}`,
         },
       });
 

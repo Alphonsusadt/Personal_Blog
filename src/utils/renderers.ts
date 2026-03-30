@@ -39,7 +39,7 @@ mermaid.initialize({
 
 export function renderLaTeX(content: string): string {
   // Handle block equations $$...$$
-  content = content.replace(/\$\$([\s\S]*?)\$\$/g, (match, equation) => {
+  content = content.replace(/\$\$([\s\S]*?)\$\$/g, (_match, equation) => {
     try {
       return katex.renderToString(equation.trim(), {
         displayMode: true,
@@ -52,7 +52,7 @@ export function renderLaTeX(content: string): string {
   });
 
   // Handle inline equations $...$
-  content = content.replace(/\$([^$\n]+?)\$/g, (match, equation) => {
+  content = content.replace(/\$([^$\n]+?)\$/g, (_match, equation) => {
     try {
       return katex.renderToString(equation.trim(), {
         displayMode: false,

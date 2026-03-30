@@ -1,14 +1,12 @@
 import { Bold, Italic, Underline, Heading1, Quote, Link, Image, List, Code } from 'lucide-react';
-import { useRef } from 'react';
 
 interface WritingToolbarProps {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   onInsert: (before: string, after?: string) => void;
-  onInsertImage: (imageMarkdown: string) => void;
   onOpenImageDialog?: () => void;
 }
 
-export function WritingToolbar({ textareaRef, onInsert, onInsertImage, onOpenImageDialog }: WritingToolbarProps) {
+export function WritingToolbar({ textareaRef, onInsert, onOpenImageDialog }: WritingToolbarProps) {
   const buttons = [
     { icon: Bold, label: 'Bold', action: () => onInsert('**', '**') },
     { icon: Italic, label: 'Italic', action: () => onInsert('*', '*') },

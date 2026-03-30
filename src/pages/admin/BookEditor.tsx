@@ -108,6 +108,27 @@ export function BookEditor() {
     });
   };
 
+  const insertImageMarkdown = (imageMarkdown: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      setBook(prev => ({ ...prev, review: `${prev.review}\n${imageMarkdown}\n` }));
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    const newText = `${text.substring(0, start)}${imageMarkdown}${text.substring(end)}`;
+    setBook({ ...book, review: newText });
+
+    setTimeout(() => {
+      textarea.focus();
+      const cursorPos = start + imageMarkdown.length;
+      textarea.selectionStart = cursorPos;
+      textarea.selectionEnd = cursorPos;
+    });
+  };
+
   const handleSave = async () => {
     if (!book.title || !book.id) {
       alert('Title and Slug are required');
@@ -249,7 +270,12 @@ export function BookEditor() {
 
             {/* Toolbar with Preview Toggle */}
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <BookToolbar textareaRef={textareaRef} onInsert={insertMarkdown} />
+              <BookToolbar 
+                textareaRef={textareaRef} 
+                onInsert={insertMarkdown}
+                onInsertImage={insertImageMarkdown}
+                onOpenImageDialog={() => setImageDialogOpen(true)}
+              />
 
               {/* Live Preview Toggle */}
               <button
@@ -324,6 +350,13 @@ export function BookEditor() {
           </div>
         </div>
       </main>
+
+      {/* Image Upload Dialog */}
+      <ImageUploadDialog
+        isOpen={imageDialogOpen}
+        onClose={() => setImageDialogOpen(false)}
+        onInsert={insertImageMarkdown}
+      />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { X, Github, FileText, ExternalLink } from 'lucide-react';
+import { ImageGallery } from './ImageGallery';
 import React from 'react';
 
 interface Project {
@@ -20,7 +21,7 @@ interface Project {
 interface ProjectSidebarProps {
   project: Project;
   onUpdate: (project: Project) => void;
-  onSave: () => Promise<void>;
+  onSave: (shouldPublish?: boolean) => Promise<void>;
   isSaving?: boolean;
 }
 
@@ -231,9 +232,20 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectS
         <p className="text-xs text-[#94A3B8] mt-2">URL-friendly identifier (no spaces)</p>
       </SidebarCard>
 
+      {/* Image Gallery Card */}
+      <SidebarCard title="Images" cardKey="images">
+        <ImageGallery
+          content={project.content}
+          onRemoveImage={(markdown) => {
+            const updatedContent = project.content.replace(markdown, '');
+            onUpdate({ ...project, content: updatedContent });
+          }}
+        />
+      </SidebarCard>
+
       {/* Update Button */}
       <button
-        onClick={onSave}
+        onClick={() => onSave()}
         disabled={isSaving}
         className="w-full bg-[#1E40AF] text-white px-4 py-3 rounded-lg font-medium hover:bg-[#1E3A8A] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >

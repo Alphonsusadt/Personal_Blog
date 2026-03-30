@@ -3,9 +3,11 @@ import { Bold, Italic, Underline, Heading1, Quote, Link, Image, List, Code } fro
 interface ProjectToolbarProps {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   onInsert: (before: string, after?: string) => void;
+  onInsertImage?: (imageMarkdown: string) => void;
+  onOpenImageDialog?: () => void;
 }
 
-export function ProjectToolbar({ textareaRef, onInsert }: ProjectToolbarProps) {
+export function ProjectToolbar({ textareaRef, onInsert, onOpenImageDialog }: ProjectToolbarProps) {
   const buttons = [
     { icon: Bold, label: 'Bold', action: () => onInsert('**', '**') },
     { icon: Italic, label: 'Italic', action: () => onInsert('*', '*') },
@@ -14,7 +16,13 @@ export function ProjectToolbar({ textareaRef, onInsert }: ProjectToolbarProps) {
     { icon: Code, label: 'Code', action: () => onInsert('`', '`') },
     { icon: Quote, label: 'Quote', action: () => onInsert('> ') },
     { icon: Link, label: 'Link', action: () => onInsert('[text](', ')') },
-    { icon: Image, label: 'Image', action: () => onInsert('![alt](', ')') },
+    { 
+      icon: Image, 
+      label: 'Image', 
+      action: onOpenImageDialog 
+        ? () => onOpenImageDialog() 
+        : () => onInsert('![alt](', ')') 
+    },
     { icon: List, label: 'List', action: () => onInsert('- ') },
   ];
 

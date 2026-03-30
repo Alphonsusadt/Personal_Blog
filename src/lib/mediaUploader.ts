@@ -63,7 +63,7 @@ export async function uploadImage(
       method: 'POST',
       body: formData,
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        'Authorization': `Bearer ${localStorage.getItem('cms_token') || ''}`,
       },
     });
 
@@ -156,9 +156,11 @@ export function attachUploadHandler(
       const item = items[i];
       if (item.kind === 'file' && item.type.startsWith('image/')) {
         e.preventDefault();
-        const file = item.getAsFile();
+        const file = (item as DataTransferItem & { getAsFile(): File | null }).getAsFile();
         if (file) {
-          handleFiles(new DataTransfer().items.add(file).files);
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          handleFiles(dt.files);
         }
       }
     }
@@ -294,7 +296,7 @@ function dataURLtoBlob(dataURL: string): Blob {
  */
 export async function sanitizeMarkdown(
   markdownContent: string,
-  authToken?: string,
+  _authToken?: string,
   onProgress?: (progress: number) => void
 ): Promise<string> {
   const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';

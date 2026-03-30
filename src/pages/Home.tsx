@@ -5,6 +5,9 @@ import { ProjectCard } from '../components/ProjectCard';
 import { WritingCard } from '../components/WritingCard';
 import { BookCard } from '../components/BookCard';
 import { api } from '../lib/api';
+import type { Project } from '../data/projects';
+import type { Writing } from '../data/writings';
+import type { Book } from '../data/library';
 
 /**
  * Generates EMG signal path with stochastic high-frequency noise pattern
@@ -137,18 +140,18 @@ function generateECGPath(
 }
 
 export function Home() {
-  const [recentProjects, setRecentProjects] = useState<any[]>([]);
-  const [recentWritings, setRecentWritings] = useState<any[]>([]);
-  const [featuredBooks, setFeaturedBooks] = useState<any[]>([]);
+  const [recentProjects, setRecentProjects] = useState<Project[]>([]);
+  const [recentWritings, setRecentWritings] = useState<Writing[]>([]);
+  const [featuredBooks, setFeaturedBooks] = useState<Book[]>([]);
 
   // Generate signal paths once on mount for organic variation
   const emgPath = useMemo(() => generateEMGPath(24, 161, 52, 8), []);
   const ecgPath = useMemo(() => generateECGPath(24, 66, 52, 8), []);
 
   useEffect(() => {
-    api.getPublicProjects().then((data: any[]) => setRecentProjects(data.slice(0, 3))).catch(console.error);
-    api.getPublicWritings().then((data: any[]) => setRecentWritings(data.slice(0, 3))).catch(console.error);
-    api.getPublicBooks().then((data: any[]) => setFeaturedBooks(data.slice(0, 3))).catch(console.error);
+    api.getPublicProjects().then((data: Project[]) => setRecentProjects(data.slice(0, 3))).catch(console.error);
+    api.getPublicWritings().then((data: Writing[]) => setRecentWritings(data.slice(0, 3))).catch(console.error);
+    api.getPublicBooks().then((data: Book[]) => setFeaturedBooks(data.slice(0, 3))).catch(console.error);
   }, []);
 
   return (
