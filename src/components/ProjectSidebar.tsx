@@ -1,7 +1,8 @@
 import { X, Github, FileText, ExternalLink, RefreshCw } from 'lucide-react';
 import { ImageGallery } from './ImageGallery';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { generateSlug, isValidSlug } from '../utils/slugify';
+import { IsolatedInput, IsolatedTextarea, IsolatedTagInput } from './IsolatedInput';
 
 interface Project {
   _id?: string;
@@ -42,19 +43,40 @@ const devStatuses = [
 ];
 
 export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectSidebarProps) {
-  const [tagInput, setTagInput] = React.useState('');
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
 
-  // Auto-generate slug from title when title changes (only if slug wasn't manually edited)
-  useEffect(() => {
-    if (project.title && (!project.id || !slugManuallyEdited)) {
-      const autoSlug = generateSlug(project.title);
-      if (autoSlug && autoSlug !== project.id) {
-        onUpdate({ ...project, id: autoSlug });
-      }
-    }
-  }, [project.title, slugManuallyEdited, project.id, onUpdate]);
+  // Stable callbacks using useCallback - won't cause re-renders
+  const handleDescriptionCommit = useCallback((value: string) => {
+    onUpdate({ ...project, description: value });
+  }, [project, onUpdate]);
+
+  const handleGithubUrlCommit = useCallback((value: string) => {
+    onUpdate({ ...project, githubUrl: value });
+  }, [project, onUpdate]);
+
+  const handlePaperUrlCommit = useCallback((value: string) => {
+    onUpdate({ ...project, paperUrl: value });
+  }, [project, onUpdate]);
+
+  const handleDemoUrlCommit = useCallback((value: string) => {
+    onUpdate({ ...project, demoUrl: value });
+  }, [project, onUpdate]);
+
+  const handleAddTag = useCallback((tag: string) => {
+    onUpdate({ ...project, tags: [...project.tags, tag] });
+  }, [project, onUpdate]);
+
+  // Auto-generate slug ONLY when: 1) Creating new item, 2) User clicks regenerate
+  // REMOVED auto-generation on title change - causes re-renders and scroll jumps!
+  // useEffect(() => {
+  //   if (project.title && (!project.id || !slugManuallyEdited)) {
+  //     const autoSlug = generateSlug(project.title);
+  //     if (autoSlug && autoSlug !== project.id) {
+  //       onUpdate({ ...project, id: autoSlug });
+  //     }
+  //   }
+  // }, [project.title, slugManuallyEdited, project.id]);
 
   const handleSlugChange = (newSlug: string) => {
     setSlugManuallyEdited(true);
@@ -67,6 +89,10 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectS
       onUpdate({ ...project, id: autoSlug });
       setSlugManuallyEdited(false);
     }
+  };
+
+  const removeTag = (index: number) => {
+    onUpdate({ ...project, tags: project.tags.filter((_, i) => i !== index) });
   };
 
   const toDateTimeLocal = (value?: string) => {
@@ -84,17 +110,6 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectS
 
   const toggleCard = (cardName: string) => {
     setCollapsed(prev => ({ ...prev, [cardName]: !prev[cardName] }));
-  };
-
-  const addTag = () => {
-    if (!tagInput.trim()) return;
-    const newTags = [...project.tags, tagInput.trim()];
-    onUpdate({ ...project, tags: newTags });
-    setTagInput('');
-  };
-
-  const removeTag = (index: number) => {
-    onUpdate({ ...project, tags: project.tags.filter((_, i) => i !== index) });
   };
 
   const SidebarCard = ({ title, cardKey, children }: { title: string; cardKey: string; children: React.ReactNode }) => (
@@ -187,9 +202,10 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectS
 
       {/* Short Description Card (like Excerpt) */}
       <SidebarCard title="Short Description" cardKey="description">
-        <textarea
-          value={project.description}
-          onChange={e => onUpdate({ ...project, description: e.target.value })}
+        <IsolatedTextarea
+          id={project.id}
+          initialValue={project.description}
+          onCommit={handleDescriptionCommit}
           rows={3}
           placeholder="Brief summary of your project..."
           className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] resize-none"
@@ -205,10 +221,11 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectS
               <Github className="w-3.5 h-3.5" />
               GitHub Repository
             </label>
-            <input
+            <IsolatedInput
+              id={project.id}
               type="url"
-              value={project.githubUrl || ''}
-              onChange={e => onUpdate({ ...project, githubUrl: e.target.value })}
+              initialValue={project.githubUrl || ''}
+              onCommit={handleGithubUrlCommit}
               placeholder="https://github.com/..."
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />
@@ -218,10 +235,11 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectS
               <FileText className="w-3.5 h-3.5" />
               Paper / Documentation
             </label>
-            <input
+            <IsolatedInput
+              id={project.id}
               type="url"
-              value={project.paperUrl || ''}
-              onChange={e => onUpdate({ ...project, paperUrl: e.target.value })}
+              initialValue={project.paperUrl || ''}
+              onCommit={handlePaperUrlCommit}
               placeholder="https://..."
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />
@@ -231,10 +249,11 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectS
               <ExternalLink className="w-3.5 h-3.5" />
               Live Demo
             </label>
-            <input
+            <IsolatedInput
+              id={project.id}
               type="url"
-              value={project.demoUrl || ''}
-              onChange={e => onUpdate({ ...project, demoUrl: e.target.value })}
+              initialValue={project.demoUrl || ''}
+              onCommit={handleDemoUrlCommit}
               placeholder="https://..."
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />
@@ -268,22 +287,12 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectS
               </span>
             ))}
           </div>
-          <div className="flex gap-2">
-            <input
-              value={tagInput}
-              onChange={e => setTagInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())}
-              placeholder="e.g., Python, MATLAB..."
-              className="flex-1 bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
-            />
-            <button
-              onClick={addTag}
-              className="bg-[#334155] text-[#F8FAFC] px-3 py-2 rounded-lg text-sm hover:bg-[#475569] transition-colors"
-            >
-              Add
-            </button>
-          </div>
-          <p className="text-[11px] text-[#94A3B8]">Add tools: MATLAB, Python, Signal Processing, etc.</p>
+          <IsolatedTagInput
+            onAddTag={handleAddTag}
+            placeholder="e.g., Python, MATLAB..."
+            className="flex-1 bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+          />
+          <p className="text-[11px] text-[#94A3B8] mt-2">Add tools: MATLAB, Python, Signal Processing, etc.</p>
         </div>
       </SidebarCard>
 

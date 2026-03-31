@@ -1,7 +1,8 @@
 import { X, RefreshCw } from 'lucide-react';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ImageGallery } from './ImageGallery';
 import { generateSlug, isValidSlug } from '../utils/slugify';
+import { IsolatedInput, IsolatedTextarea, IsolatedTagInput } from './IsolatedInput';
 
 interface Writing {
   _id?: string;
@@ -37,18 +38,32 @@ interface WritingSidebarProps {
 const categories = ['reflections', 'stories', 'fiction'];
 
 export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, onRemoveImage }: WritingSidebarProps) {
-  const [tagInput, setTagInput] = React.useState('');
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+  const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
 
-  // Auto-generate slug from title when title changes (only if slug wasn't manually edited)
-  useEffect(() => {
-    if (writing.title && (!writing.id || !slugManuallyEdited)) {
-      const autoSlug = generateSlug(writing.title);
-      if (autoSlug && autoSlug !== writing.id) {
-        onUpdate({ ...writing, id: autoSlug });
-      }
-    }
-  }, [writing.title, slugManuallyEdited, writing.id, onUpdate]);
+  // Stable callbacks for isolated inputs
+  const handleExcerptCommit = useCallback((value: string) => {
+    onUpdate({ ...writing, excerpt: value });
+  }, [writing, onUpdate]);
+
+  const handleReadTimeCommit = useCallback((value: string) => {
+    onUpdate({ ...writing, readTime: value });
+  }, [writing, onUpdate]);
+
+  const handleAddTag = useCallback((tag: string) => {
+    onUpdate({ ...writing, tags: [...writing.tags, tag] });
+  }, [writing, onUpdate]);
+
+  // Auto-generate slug ONLY when: 1) Creating new item, 2) User clicks regenerate
+  // REMOVED auto-generation on title change - causes re-renders and scroll jumps!
+  // useEffect(() => {
+  //   if (writing.title && (!writing.id || !slugManuallyEdited)) {
+  //     const autoSlug = generateSlug(writing.title);
+  //     if (autoSlug && autoSlug !== writing.id) {
+  //       onUpdate({ ...writing, id: autoSlug });
+  //     }
+  //   }
+  // }, [writing.title, slugManuallyEdited, writing.id]);
 
   const handleSlugChange = (newSlug: string) => {
     setSlugManuallyEdited(true);
@@ -62,7 +77,6 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
       setSlugManuallyEdited(false);
     }
   };
-  const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
 
   const toDateTimeLocal = (value?: string) => {
     if (!value) return '';
@@ -79,13 +93,6 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
 
   const toggleCard = (cardName: string) => {
     setCollapsed(prev => ({ ...prev, [cardName]: !prev[cardName] }));
-  };
-
-  const addTag = () => {
-    if (!tagInput.trim()) return;
-    const newTags = [...writing.tags, tagInput.trim()];
-    onUpdate({ ...writing, tags: newTags });
-    setTagInput('');
   };
 
   const removeTag = (index: number) => {
@@ -201,29 +208,20 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
               </span>
             ))}
           </div>
-          <div className="flex gap-2">
-            <input
-              value={tagInput}
-              onChange={e => setTagInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())}
-              placeholder="Add tag..."
-              className="flex-1 bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
-            />
-            <button
-              onClick={addTag}
-              className="bg-[#334155] text-[#F8FAFC] px-3 py-2 rounded-lg text-sm hover:bg-[#475569] transition-colors"
-            >
-              Add
-            </button>
-          </div>
+          <IsolatedTagInput
+            onAddTag={handleAddTag}
+            placeholder="Add tag..."
+            className="flex-1 bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+          />
         </div>
       </SidebarCard>
 
       {/* Excerpt Card */}
       <SidebarCard title="Excerpt" cardKey="excerpt">
-        <textarea
-          value={writing.excerpt}
-          onChange={e => onUpdate({ ...writing, excerpt: e.target.value })}
+        <IsolatedTextarea
+          id={writing.id}
+          initialValue={writing.excerpt}
+          onCommit={handleExcerptCommit}
           rows={3}
           placeholder="Brief summary of your writing..."
           className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] resize-none"
@@ -244,9 +242,10 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
           </div>
           <div>
             <label className="block text-xs text-[#94A3B8] mb-1">Read Time</label>
-            <input
-              value={writing.readTime}
-              onChange={e => onUpdate({ ...writing, readTime: e.target.value })}
+            <IsolatedInput
+              id={writing.id}
+              initialValue={writing.readTime}
+              onCommit={handleReadTimeCommit}
               placeholder="e.g., 5 min"
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />

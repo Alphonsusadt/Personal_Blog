@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { ProjectToolbar } from '../../components/ProjectToolbar';
@@ -55,8 +55,10 @@ export function ProjectEditor() {
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const titleUpdateTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   const [project, setProject] = useState<Project>(emptyProject);
+  const [localTitle, setLocalTitle] = useState(''); // Local state for smooth title typing
   const [loading, setLoading] = useState(!!slug);
   const [isSaving, setIsSaving] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -68,6 +70,20 @@ export function ProjectEditor() {
   const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null);
 
   const draftKey = `project_draft_${slug || 'new'}`;
+
+  // Sync localTitle when project changes from external source
+  useEffect(() => {
+    setLocalTitle(project.title);
+  }, [project.id]);
+
+  // Debounced title update
+  const handleTitleChange = (value: string) => {
+    setLocalTitle(value); // Immediate local update
+    clearTimeout(titleUpdateTimeoutRef.current);
+    titleUpdateTimeoutRef.current = setTimeout(() => {
+      setProject(prev => ({ ...prev, title: value }));
+    }, 500);
+  };
 
   // Check for local draft on mount
   useEffect(() => {
@@ -103,7 +119,7 @@ export function ProjectEditor() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // Local storage autosave
+  // Local storage autosave - FIXED: No status updates during typing
   useEffect(() => {
     if (loading) return;
     
@@ -111,24 +127,24 @@ export function ProjectEditor() {
       try {
         const draftData = { data: project, timestamp: Date.now() };
         localStorage.setItem(draftKey, JSON.stringify(draftData));
-        setLocalDraftStatus('saved');
-        setTimeout(() => setLocalDraftStatus('idle'), 1500);
+        // REMOVED: setLocalDraftStatus calls - they cause re-renders!
       } catch (e) {
         console.error('Failed to save local draft:', e);
       }
-    }, 1000);
+    }, 2000); // Increased to 2s
 
     return () => clearTimeout(timeout);
   }, [project, loading, draftKey]);
 
-  // Server autosave logic (3 seconds delay)
+  // Server autosave logic (5 seconds delay) - FIXED: Don't set 'saving' immediately
   useEffect(() => {
     if (loading || !project.title) return;
 
-    setAutosaveStatus('saving');
+    // Don't set 'saving' immediately - this causes re-render!
     clearTimeout(autoSaveTimeoutRef.current);
 
     autoSaveTimeoutRef.current = setTimeout(async () => {
+      setAutosaveStatus('saving'); // Only show 'saving' when actually saving
       try {
         if (project._id) {
           await api.put(`/api/projects/${project._id}`, project);
@@ -149,7 +165,7 @@ export function ProjectEditor() {
         setAutosaveStatus('idle');
         // Don't alert for autosave failures - just silently fail and rely on local draft
       }
-    }, 3000);
+    }, 5000); // Increased to 5s
 
     return () => clearTimeout(autoSaveTimeoutRef.current);
   }, [project, loading]);
@@ -183,6 +199,11 @@ export function ProjectEditor() {
       console.error('Failed to clear draft:', e);
     }
   };
+
+  // Stable update callback
+  const handleUpdateProject = useCallback((updatedProject: Project) => {
+    setProject(updatedProject);
+  }, []);
 
   const insertMarkdown = (before: string, after: string = '') => {
     const textarea = textareaRef.current;
@@ -400,8 +421,8 @@ export function ProjectEditor() {
             <div>
               <input
                 type="text"
-                value={project.title}
-                onChange={e => setProject({ ...project, title: e.target.value })}
+                value={localTitle}
+                onChange={e => handleTitleChange(e.target.value)}
                 placeholder="Project Title..."
                 className="w-full text-2xl sm:text-3xl font-bold text-[#F8FAFC] bg-transparent border-b-2 border-[#334155] pb-3 focus:outline-none focus:border-[#60A5FA] transition-colors placeholder:text-[#475569]"
               />
@@ -483,7 +504,7 @@ export function ProjectEditor() {
             <div className="lg:sticky lg:top-20">
               <ProjectSidebar
                 project={project}
-                onUpdate={setProject}
+                onUpdate={handleUpdateProject}
                 onSave={handleSave}
                 isSaving={isSaving}
               />

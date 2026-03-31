@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { WritingToolbar } from '../../components/WritingToolbar';
@@ -50,8 +50,10 @@ export function WritingEditor() {
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const titleUpdateTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   const [writing, setWriting] = useState<Writing>(emptyWriting);
+  const [localTitle, setLocalTitle] = useState(''); // Local state for smooth title typing
   const [loading, setLoading] = useState(!!slug);
   const [isSaving, setIsSaving] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -61,8 +63,23 @@ export function WritingEditor() {
   const [localDraftStatus, setLocalDraftStatus] = useState<'idle' | 'saved'>('idle');
   const [showDraftRecovery, setShowDraftRecovery] = useState(false);
   const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null);
+  const scrollPositionRef = useRef<number>(0);
 
   const draftKey = `writing_draft_${slug || 'new'}`;
+
+  // Sync localTitle when writing changes from external source (load, restore)
+  useEffect(() => {
+    setLocalTitle(writing.title);
+  }, [writing.id]);
+
+  // Debounced title update - only update parent after user stops typing
+  const handleTitleChange = (value: string) => {
+    setLocalTitle(value); // Immediate local update (smooth typing!)
+    clearTimeout(titleUpdateTimeoutRef.current);
+    titleUpdateTimeoutRef.current = setTimeout(() => {
+      setWriting(prev => ({ ...prev, title: value }));
+    }, 500); // 500ms debounce
+  };
 
   const plainContent = writing.content
     .replace(/```[\s\S]*?```/g, ' ')
@@ -111,7 +128,7 @@ export function WritingEditor() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // Local storage autosave (immediate backup)
+  // Local storage autosave (immediate backup) - FIXED: No status updates during typing
   useEffect(() => {
     if (loading) return;
     
@@ -122,34 +139,31 @@ export function WritingEditor() {
           timestamp: Date.now(),
         };
         localStorage.setItem(draftKey, JSON.stringify(draftData));
-        setLocalDraftStatus('saved');
-        setTimeout(() => setLocalDraftStatus('idle'), 1500);
+        // REMOVED: setLocalDraftStatus calls - they cause re-renders!
       } catch (e) {
         console.error('Failed to save local draft:', e);
       }
-    }, 1000); // Save to localStorage after 1 second
+    }, 2000); // Increased to 2s
 
     return () => clearTimeout(timeout);
   }, [writing, loading, draftKey]);
 
-  // Server autosave logic (3 seconds delay)
+  // Server autosave logic (5 seconds delay) - FIXED: Don't set 'saving' immediately
   useEffect(() => {
     if (loading || !writing.title) return;
 
-    setAutosaveStatus('saving');
+    // Don't set 'saving' immediately - this causes re-render!
     clearTimeout(autoSaveTimeoutRef.current);
 
     autoSaveTimeoutRef.current = setTimeout(async () => {
+      setAutosaveStatus('saving'); // Only show 'saving' when actually saving
       try {
         if (writing._id) {
           await api.put(`/api/writings/${writing._id}`, writing);
         } else if (writing.id) {
-          // For new drafts, capture the _id from POST response
           const response = await api.post('/api/writings', writing);
-          // Update state with the _id so subsequent autosaves use PUT
           setWriting(prev => ({ ...prev, _id: response._id }));
         } else {
-          // If no slug yet, don't try to save to server - only local autosave works
           setAutosaveStatus('idle');
           return;
         }
@@ -158,9 +172,8 @@ export function WritingEditor() {
       } catch (err) {
         console.error('Autosave failed:', err);
         setAutosaveStatus('idle');
-        // Don't alert for autosave failures - just silently fail and rely on local draft
       }
-    }, 3000);
+    }, 5000);
 
     return () => clearTimeout(autoSaveTimeoutRef.current);
   }, [writing, loading]);
@@ -197,6 +210,11 @@ export function WritingEditor() {
       console.error('Failed to clear draft:', e);
     }
   };
+
+  // Stable update callback using useCallback
+  const handleUpdateWriting = useCallback((updatedWriting: Writing) => {
+    setWriting(updatedWriting);
+  }, []);
 
   const insertMarkdown = (before: string, after: string = '') => {
     const textarea = textareaRef.current;
@@ -437,8 +455,8 @@ export function WritingEditor() {
             <div>
               <input
                 type="text"
-                value={writing.title}
-                onChange={e => setWriting({ ...writing, title: e.target.value })}
+                value={localTitle}
+                onChange={e => handleTitleChange(e.target.value)}
                 placeholder="Writing Title..."
                 className="w-full text-3xl font-bold text-[#F8FAFC] bg-transparent border-b-2 border-[#334155] pb-3 focus:outline-none focus:border-[#60A5FA] transition-colors placeholder:text-[#475569]"
               />
@@ -521,15 +539,17 @@ export function WritingEditor() {
 
           {/* Sidebar - Right (1/3 width) */}
           <div className="md:col-span-1">
-            <WritingSidebar
-              writing={writing}
-              onUpdate={setWriting}
-              onSave={handleSave}
-              isSaving={isSaving}
-              wordCount={wordCount}
-              characterCount={characterCount}
-              onRemoveImage={() => {}}
-            />
+            <div className="md:sticky md:top-20">
+              <WritingSidebar
+                writing={writing}
+                onUpdate={handleUpdateWriting}
+                onSave={handleSave}
+                isSaving={isSaving}
+                wordCount={wordCount}
+                characterCount={characterCount}
+                onRemoveImage={() => {}}
+              />
+            </div>
           </div>
         </div>
       </main>

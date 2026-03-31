@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { BookToolbar } from '../../components/BookToolbar';
@@ -49,8 +49,10 @@ export function BookEditor() {
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const titleUpdateTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   const [book, setBook] = useState<Book>(emptyBook);
+  const [localTitle, setLocalTitle] = useState(''); // Local state for smooth title typing
   const [loading, setLoading] = useState(!!slug);
   const [isSaving, setIsSaving] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -62,6 +64,20 @@ export function BookEditor() {
   const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null);
 
   const draftKey = `book_draft_${slug || 'new'}`;
+
+  // Sync localTitle when book changes from external source
+  useEffect(() => {
+    setLocalTitle(book.title);
+  }, [book.id]);
+
+  // Debounced title update
+  const handleTitleChange = (value: string) => {
+    setLocalTitle(value); // Immediate local update
+    clearTimeout(titleUpdateTimeoutRef.current);
+    titleUpdateTimeoutRef.current = setTimeout(() => {
+      setBook(prev => ({ ...prev, title: value }));
+    }, 500);
+  };
 
   // Check for local draft on mount
   useEffect(() => {
@@ -97,7 +113,7 @@ export function BookEditor() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // Local storage autosave
+  // Local storage autosave - FIXED: No status updates during typing
   useEffect(() => {
     if (loading) return;
     
@@ -105,24 +121,24 @@ export function BookEditor() {
       try {
         const draftData = { data: book, timestamp: Date.now() };
         localStorage.setItem(draftKey, JSON.stringify(draftData));
-        setLocalDraftStatus('saved');
-        setTimeout(() => setLocalDraftStatus('idle'), 1500);
+        // REMOVED: setLocalDraftStatus calls - they cause re-renders!
       } catch (e) {
         console.error('Failed to save local draft:', e);
       }
-    }, 1000);
+    }, 2000); // Increased to 2s
 
     return () => clearTimeout(timeout);
   }, [book, loading, draftKey]);
 
-  // Server autosave logic (3 seconds delay)
+  // Server autosave logic (5 seconds delay) - FIXED: Don't set 'saving' immediately
   useEffect(() => {
     if (loading || !book.title) return;
 
-    setAutosaveStatus('saving');
+    // Don't set 'saving' immediately - this causes re-render!
     clearTimeout(autoSaveTimeoutRef.current);
 
     autoSaveTimeoutRef.current = setTimeout(async () => {
+      setAutosaveStatus('saving'); // Only show 'saving' when actually saving
       try {
         if (book._id) {
           await api.put(`/api/books/${book._id}`, book);
@@ -143,7 +159,7 @@ export function BookEditor() {
         setAutosaveStatus('idle');
         // Don't alert for autosave failures - just silently fail and rely on local draft
       }
-    }, 3000);
+    }, 5000); // Increased to 5s
 
     return () => clearTimeout(autoSaveTimeoutRef.current);
   }, [book, loading]);
@@ -177,6 +193,11 @@ export function BookEditor() {
       console.error('Failed to clear draft:', e);
     }
   };
+
+  // Stable update callback
+  const handleUpdateBook = useCallback((updatedBook: Book) => {
+    setBook(updatedBook);
+  }, []);
 
   const insertMarkdown = (before: string, after: string = '') => {
     const textarea = textareaRef.current;
@@ -388,8 +409,8 @@ export function BookEditor() {
             <div className="space-y-3">
               <input
                 type="text"
-                value={book.title}
-                onChange={e => setBook({ ...book, title: e.target.value })}
+                value={localTitle}
+                onChange={e => handleTitleChange(e.target.value)}
                 placeholder="Book Title..."
                 className="w-full text-3xl font-bold text-[#F8FAFC] bg-transparent border-b-2 border-[#334155] pb-3 focus:outline-none focus:border-[#60A5FA] transition-colors placeholder:text-[#475569]"
               />
@@ -477,7 +498,7 @@ export function BookEditor() {
           <div className="md:col-span-1">
             <BookSidebar
               book={book}
-              onUpdate={setBook}
+              onUpdate={handleUpdateBook}
               onSave={handleSave}
               isSaving={isSaving}
             />

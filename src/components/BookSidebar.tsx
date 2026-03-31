@@ -1,7 +1,8 @@
 import { X, Star, RefreshCw } from 'lucide-react';
 import { ImageGallery } from './ImageGallery';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { generateSlug, isValidSlug } from '../utils/slugify';
+import { IsolatedTagInput } from './IsolatedInput';
 
 interface Book {
   _id?: string;
@@ -34,19 +35,24 @@ interface BookSidebarProps {
 const categories = ['technical', 'biography', 'spiritual', 'philosophy'];
 
 export function BookSidebar({ book, onUpdate, onSave, isSaving }: BookSidebarProps) {
-  const [takeawayInput, setTakeawayInput] = React.useState('');
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
 
-  // Auto-generate slug from title when title changes (only if slug wasn't manually edited)
-  useEffect(() => {
-    if (book.title && (!book.id || !slugManuallyEdited)) {
-      const autoSlug = generateSlug(book.title);
-      if (autoSlug && autoSlug !== book.id) {
-        onUpdate({ ...book, id: autoSlug });
-      }
-    }
-  }, [book.title, slugManuallyEdited, book.id, onUpdate]);
+  // Stable callback for adding takeaways
+  const handleAddTakeaway = useCallback((takeaway: string) => {
+    onUpdate({ ...book, takeaways: [...book.takeaways, takeaway] });
+  }, [book, onUpdate]);
+
+  // Auto-generate slug ONLY when: 1) Creating new item, 2) User clicks regenerate
+  // REMOVED auto-generation on title change - causes re-renders and scroll jumps!
+  // useEffect(() => {
+  //   if (book.title && (!book.id || !slugManuallyEdited)) {
+  //     const autoSlug = generateSlug(book.title);
+  //     if (autoSlug && autoSlug !== book.id) {
+  //       onUpdate({ ...book, id: autoSlug });
+  //     }
+  //   }
+  // }, [book.title, slugManuallyEdited, book.id]);
 
   const handleSlugChange = (newSlug: string) => {
     setSlugManuallyEdited(true);
@@ -76,13 +82,6 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving }: BookSidebarPro
 
   const toggleCard = (cardName: string) => {
     setCollapsed(prev => ({ ...prev, [cardName]: !prev[cardName] }));
-  };
-
-  const addTakeaway = () => {
-    if (!takeawayInput.trim()) return;
-    const newTakeaways = [...book.takeaways, takeawayInput.trim()];
-    onUpdate({ ...book, takeaways: newTakeaways });
-    setTakeawayInput('');
   };
 
   const removeTakeaway = (index: number) => {
@@ -197,21 +196,11 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving }: BookSidebarPro
               </div>
             ))}
           </div>
-          <div className="flex gap-2">
-            <input
-              value={takeawayInput}
-              onChange={e => setTakeawayInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTakeaway())}
-              placeholder="Add takeaway..."
-              className="flex-1 bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
-            />
-            <button
-              onClick={addTakeaway}
-              className="bg-[#334155] text-[#F8FAFC] px-3 py-2 rounded-lg text-sm hover:bg-[#475569] transition-colors"
-            >
-              Add
-            </button>
-          </div>
+          <IsolatedTagInput
+            onAddTag={handleAddTakeaway}
+            placeholder="Add takeaway..."
+            className="flex-1 bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+          />
         </div>
       </SidebarCard>
 
