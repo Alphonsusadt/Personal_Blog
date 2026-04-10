@@ -1,6 +1,6 @@
 import { X, Star, RefreshCw } from 'lucide-react';
 import { ImageGallery } from './ImageGallery';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { generateSlug, isValidSlug } from '../utils/slugify';
 import { IsolatedTagInput } from './IsolatedInput';
 
@@ -37,11 +37,15 @@ const categories = ['technical', 'biography', 'spiritual', 'philosophy'];
 export function BookSidebar({ book, onUpdate, onSave, isSaving }: BookSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+  
+  // Use ref to always have latest book without causing re-renders
+  const bookRef = useRef(book);
+  bookRef.current = book;
 
-  // Stable callback for adding takeaways
+  // Stable callback for adding takeaways - use ref
   const handleAddTakeaway = useCallback((takeaway: string) => {
-    onUpdate({ ...book, takeaways: [...book.takeaways, takeaway] });
-  }, [book, onUpdate]);
+    onUpdate({ ...bookRef.current, takeaways: [...bookRef.current.takeaways, takeaway] });
+  }, [onUpdate]);
 
   // Auto-generate slug ONLY when: 1) Creating new item, 2) User clicks regenerate
   // REMOVED auto-generation on title change - causes re-renders and scroll jumps!

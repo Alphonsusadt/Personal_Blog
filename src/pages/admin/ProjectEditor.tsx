@@ -10,6 +10,7 @@ import { hasBase64Images } from '../../utils/media';
 import { ArrowLeft, Check, Clock, Eye, EyeOff, Maximize2, HardDrive, AlertCircle } from 'lucide-react';
 import { renderMarkdown } from '../../utils/renderers';
 import { formatDraftTime } from '../../hooks/useLocalDraft';
+import { IsolatedContentEditor } from '../../components/IsolatedInput';
 
 interface Project {
   _id?: string;
@@ -119,56 +120,61 @@ export function ProjectEditor() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // Local storage autosave - FIXED: No status updates during typing
+  // Local storage autosave - 1s (FAST!)
   useEffect(() => {
     if (loading) return;
-    
     const timeout = setTimeout(() => {
       try {
-        const draftData = { data: project, timestamp: Date.now() };
-        localStorage.setItem(draftKey, JSON.stringify(draftData));
-        // REMOVED: setLocalDraftStatus calls - they cause re-renders!
-      } catch (e) {
-        console.error('Failed to save local draft:', e);
-      }
-    }, 2000); // Increased to 2s
-
+        localStorage.setItem(draftKey, JSON.stringify({ data: project, timestamp: Date.now() }));
+        setLocalDraftStatus('saved');
+        setTimeout(() => setLocalDraftStatus('idle'), 800);
+      } catch (e) { console.error('Local draft error:', e); }
+    }, 1000);
     return () => clearTimeout(timeout);
   }, [project, loading, draftKey]);
 
-  // Server autosave logic (5 seconds delay) - FIXED: Don't set 'saving' immediately
+  // Server autosave - 3s (FASTER!)
   useEffect(() => {
     if (loading || !project.title) return;
-
-    // Don't set 'saving' immediately - this causes re-render!
     clearTimeout(autoSaveTimeoutRef.current);
-
     autoSaveTimeoutRef.current = setTimeout(async () => {
-      setAutosaveStatus('saving'); // Only show 'saving' when actually saving
+      setAutosaveStatus('saving');
       try {
         if (project._id) {
           await api.put(`/api/projects/${project._id}`, project);
         } else if (project.id) {
-          // For new drafts, capture the _id from POST response
           const response = await api.post('/api/projects', project);
-          // Update state with the _id so subsequent autosaves use PUT
           setProject(prev => ({ ...prev, _id: response._id }));
-        } else {
-          // If no slug yet, don't try to save to server - only local autosave works
-          setAutosaveStatus('idle');
-          return;
-        }
+        } else { setAutosaveStatus('idle'); return; }
         setAutosaveStatus('saved');
-        setTimeout(() => setAutosaveStatus('idle'), 2000);
-      } catch (err) {
-        console.error('Autosave failed:', err);
-        setAutosaveStatus('idle');
-        // Don't alert for autosave failures - just silently fail and rely on local draft
-      }
-    }, 5000); // Increased to 5s
-
+        setTimeout(() => setAutosaveStatus('idle'), 1500);
+      } catch (err) { console.error('Autosave failed:', err); setAutosaveStatus('idle'); }
+    }, 3000);
     return () => clearTimeout(autoSaveTimeoutRef.current);
   }, [project, loading]);
+
+  // SAVE ON EXIT: Save to localStorage when user leaves the page
+  useEffect(() => {
+    const saveBeforeUnload = () => {
+      try {
+        const draftData = {
+          data: project,
+          timestamp: Date.now(),
+        };
+        localStorage.setItem(draftKey, JSON.stringify(draftData));
+        console.log('Draft saved before exit');
+      } catch (e) {
+        console.error('Failed to save draft before exit:', e);
+      }
+    };
+
+    window.addEventListener('beforeunload', saveBeforeUnload);
+    
+    return () => {
+      saveBeforeUnload();
+      window.removeEventListener('beforeunload', saveBeforeUnload);
+    };
+  }, [project, draftKey]);
 
   const restoreDraft = () => {
     try {
@@ -203,6 +209,11 @@ export function ProjectEditor() {
   // Stable update callback
   const handleUpdateProject = useCallback((updatedProject: Project) => {
     setProject(updatedProject);
+  }, []);
+
+  // Stable callback for content updates
+  const handleContentCommit = useCallback((content: string) => {
+    setProject(prev => ({ ...prev, content }));
   }, []);
 
   const insertMarkdown = (before: string, after: string = '') => {
@@ -346,24 +357,27 @@ export function ProjectEditor() {
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Local Draft Indicator */}
             {localDraftStatus === 'saved' && (
-              <div className="flex items-center gap-1 text-xs text-green-400">
+              <div className="flex items-center gap-1 text-xs text-green-400 bg-green-400/10 px-2 py-1 rounded">
                 <HardDrive className="w-3 h-3" />
-                <span className="hidden sm:inline">Local</span>
+                <span>Local ✓</span>
               </div>
             )}
 
+            {/* Server Autosave Indicator */}
             {autosaveStatus !== 'idle' && (
-              <div className="hidden sm:flex items-center gap-1 text-xs text-[#94A3B8]">
+              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${
+                autosaveStatus === 'saving' ? 'text-yellow-400 bg-yellow-400/10' : 'text-green-400 bg-green-400/10'
+              }`}>
                 {autosaveStatus === 'saving' && (
                   <>
                     <Clock className="w-3 h-3 animate-spin" />
-                    Saving...
+                    <span>Saving...</span>
                   </>
                 )}
                 {autosaveStatus === 'saved' && (
                   <>
-                    <Check className="w-3 h-3 text-green-400" />
-                    Server
+                    <Check className="w-3 h-3" />
+                    <span>Server ✓</span>
                   </>
                 )}
               </div>
@@ -457,10 +471,10 @@ export function ProjectEditor() {
                 {/* Editor */}
                 <div className="flex flex-col h-full">
                   <label className="text-xs text-[#94A3B8] font-medium mb-2">MARKDOWN</label>
-                  <textarea
-                    ref={textareaRef}
-                    value={project.content}
-                    onChange={e => setProject({ ...project, content: e.target.value })}
+                  <IsolatedContentEditor
+                    initialValue={project.content}
+                    onCommit={handleContentCommit}
+                    id={project._id || project.id}
                     placeholder="Project content... (Markdown, LaTeX $$...$$ supported)"
                     className="flex-1 min-h-[60vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
                   />
@@ -489,10 +503,10 @@ export function ProjectEditor() {
               </div>
             ) : (
               /* Full Editor (no preview) */
-              <textarea
-                ref={textareaRef}
-                value={project.content}
-                onChange={e => setProject({ ...project, content: e.target.value })}
+              <IsolatedContentEditor
+                initialValue={project.content}
+                onCommit={handleContentCommit}
+                id={project._id || project.id}
                 placeholder="Project content... (Markdown, LaTeX $$...$$ supported)"
                 className="w-full min-h-[70vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
               />

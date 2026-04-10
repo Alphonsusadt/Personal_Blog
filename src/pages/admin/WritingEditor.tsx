@@ -10,6 +10,7 @@ import { hasBase64Images } from '../../utils/media';
 import { ArrowLeft, Check, Clock, Eye, EyeOff, Maximize2, HardDrive, AlertCircle } from 'lucide-react';
 import { renderMarkdown } from '../../utils/renderers';
 import { formatDraftTime } from '../../hooks/useLocalDraft';
+import { IsolatedContentEditor } from '../../components/IsolatedInput';
 
 interface Writing {
   _id?: string;
@@ -128,55 +129,63 @@ export function WritingEditor() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // Local storage autosave (immediate backup) - FIXED: No status updates during typing
+  // Local storage autosave - 1s (FAST!)
   useEffect(() => {
     if (loading) return;
-    
     const timeout = setTimeout(() => {
       try {
-        const draftData = {
-          data: writing,
-          timestamp: Date.now(),
-        };
-        localStorage.setItem(draftKey, JSON.stringify(draftData));
-        // REMOVED: setLocalDraftStatus calls - they cause re-renders!
-      } catch (e) {
-        console.error('Failed to save local draft:', e);
-      }
-    }, 2000); // Increased to 2s
-
+        localStorage.setItem(draftKey, JSON.stringify({ data: writing, timestamp: Date.now() }));
+        setLocalDraftStatus('saved');
+        setTimeout(() => setLocalDraftStatus('idle'), 800);
+      } catch (e) { console.error('Local draft error:', e); }
+    }, 1000);
     return () => clearTimeout(timeout);
   }, [writing, loading, draftKey]);
 
-  // Server autosave logic (5 seconds delay) - FIXED: Don't set 'saving' immediately
+  // Server autosave - 3s (FASTER!)
   useEffect(() => {
     if (loading || !writing.title) return;
-
-    // Don't set 'saving' immediately - this causes re-render!
     clearTimeout(autoSaveTimeoutRef.current);
-
     autoSaveTimeoutRef.current = setTimeout(async () => {
-      setAutosaveStatus('saving'); // Only show 'saving' when actually saving
+      setAutosaveStatus('saving');
       try {
         if (writing._id) {
           await api.put(`/api/writings/${writing._id}`, writing);
         } else if (writing.id) {
           const response = await api.post('/api/writings', writing);
           setWriting(prev => ({ ...prev, _id: response._id }));
-        } else {
-          setAutosaveStatus('idle');
-          return;
-        }
+        } else { setAutosaveStatus('idle'); return; }
         setAutosaveStatus('saved');
-        setTimeout(() => setAutosaveStatus('idle'), 2000);
-      } catch (err) {
-        console.error('Autosave failed:', err);
-        setAutosaveStatus('idle');
-      }
-    }, 5000);
-
+        setTimeout(() => setAutosaveStatus('idle'), 1500);
+      } catch (err) { console.error('Autosave failed:', err); setAutosaveStatus('idle'); }
+    }, 3000);
     return () => clearTimeout(autoSaveTimeoutRef.current);
   }, [writing, loading]);
+
+  // SAVE ON EXIT: Save to localStorage when user leaves the page
+  useEffect(() => {
+    const saveBeforeUnload = () => {
+      try {
+        const draftData = {
+          data: writing,
+          timestamp: Date.now(),
+        };
+        localStorage.setItem(draftKey, JSON.stringify(draftData));
+        console.log('Draft saved before exit');
+      } catch (e) {
+        console.error('Failed to save draft before exit:', e);
+      }
+    };
+
+    // Save when tab/window is closed or refreshed
+    window.addEventListener('beforeunload', saveBeforeUnload);
+    
+    // Save when navigating away (React Router)
+    return () => {
+      saveBeforeUnload(); // Save on component unmount (navigation)
+      window.removeEventListener('beforeunload', saveBeforeUnload);
+    };
+  }, [writing, draftKey]);
 
   // Restore draft from localStorage
   const restoreDraft = () => {
@@ -214,6 +223,11 @@ export function WritingEditor() {
   // Stable update callback using useCallback
   const handleUpdateWriting = useCallback((updatedWriting: Writing) => {
     setWriting(updatedWriting);
+  }, []);
+
+  // Stable callback for content updates
+  const handleContentCommit = useCallback((content: string) => {
+    setWriting(prev => ({ ...prev, content }));
   }, []);
 
   const insertMarkdown = (before: string, after: string = '') => {
@@ -372,25 +386,27 @@ export function WritingEditor() {
 
             {/* Local Draft Indicator */}
             {localDraftStatus === 'saved' && (
-              <div className="flex items-center gap-1 text-xs text-green-400">
+              <div className="flex items-center gap-1 text-xs text-green-400 bg-green-400/10 px-2 py-1 rounded">
                 <HardDrive className="w-3 h-3" />
-                <span className="hidden sm:inline">Local saved</span>
+                <span>Local ✓</span>
               </div>
             )}
 
             {/* Server Autosave Indicator */}
             {autosaveStatus !== 'idle' && (
-              <div className="flex items-center gap-1 text-xs text-[#94A3B8]">
+              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${
+                autosaveStatus === 'saving' ? 'text-yellow-400 bg-yellow-400/10' : 'text-green-400 bg-green-400/10'
+              }`}>
                 {autosaveStatus === 'saving' && (
                   <>
                     <Clock className="w-3 h-3 animate-spin" />
-                    Saving...
+                    <span>Saving...</span>
                   </>
                 )}
                 {autosaveStatus === 'saved' && (
                   <>
-                    <Check className="w-3 h-3 text-green-400" />
-                    Server saved
+                    <Check className="w-3 h-3" />
+                    <span>Server ✓</span>
                   </>
                 )}
               </div>
@@ -495,10 +511,10 @@ export function WritingEditor() {
                 {/* Editor */}
                 <div className="flex flex-col h-full">
                   <label className="text-xs text-[#94A3B8] font-medium mb-2">MARKDOWN</label>
-                  <textarea
-                    ref={textareaRef}
-                    value={writing.content}
-                    onChange={e => setWriting({ ...writing, content: e.target.value })}
+                  <IsolatedContentEditor
+                    initialValue={writing.content}
+                    onCommit={handleContentCommit}
+                    id={writing._id || writing.id}
                     placeholder="Start writing... (Markdown, LaTeX $$...$$ supported)"
                     className="flex-1 min-h-[60vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
                   />
@@ -527,10 +543,10 @@ export function WritingEditor() {
               </div>
             ) : (
               /* Full Editor (no preview) */
-              <textarea
-                ref={textareaRef}
-                value={writing.content}
-                onChange={e => setWriting({ ...writing, content: e.target.value })}
+              <IsolatedContentEditor
+                initialValue={writing.content}
+                onCommit={handleContentCommit}
+                id={writing._id || writing.id}
                 placeholder="Start writing... (Markdown, LaTeX $$...$$ supported)"
                 className="w-full min-h-[70vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
               />
