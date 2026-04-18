@@ -5,9 +5,116 @@ import { ProjectCard } from '../components/ProjectCard';
 import { WritingCard } from '../components/WritingCard';
 import { BookCard } from '../components/BookCard';
 import { api } from '../lib/api';
+import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import type { Project } from '../data/projects';
 import type { Writing } from '../data/writings';
 import type { Book } from '../data/library';
+
+type LocalizedText = { en: string; id: string };
+
+interface HomeData {
+  heroName: LocalizedText;
+  heroLastName: LocalizedText;
+  heroSubtitle: LocalizedText;
+  heroTagline: LocalizedText;
+  socialLinks: { linkedin: string; github: string; email: string };
+  sections: {
+    recentProjects: { title: LocalizedText; subtitle: LocalizedText };
+    recentWritings: { title: LocalizedText; subtitle: LocalizedText };
+    featuredBooks: { title: LocalizedText; subtitle: LocalizedText };
+  };
+}
+
+const asLocalizedText = (value: unknown, fallback = ''): LocalizedText => {
+  if (typeof value === 'string') {
+    return { en: value, id: value };
+  }
+
+  if (value && typeof value === 'object') {
+    const parsed = value as Partial<LocalizedText>;
+    return {
+      en: typeof parsed.en === 'string' ? parsed.en : fallback,
+      id: typeof parsed.id === 'string' ? parsed.id : (typeof parsed.en === 'string' ? parsed.en : fallback),
+    };
+  }
+
+  return { en: fallback, id: fallback };
+};
+
+const normalizeHomeData = (raw: unknown): HomeData => {
+  const data = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const sections = (data.sections && typeof data.sections === 'object' ? data.sections : {}) as Record<string, unknown>;
+
+  const parseSection = (sectionKey: 'recentProjects' | 'recentWritings' | 'featuredBooks') => {
+    const section = (sections[sectionKey] && typeof sections[sectionKey] === 'object')
+      ? (sections[sectionKey] as Record<string, unknown>)
+      : {};
+
+    return {
+      title: asLocalizedText(section.title),
+      subtitle: asLocalizedText(section.subtitle),
+    };
+  };
+
+  const socialLinks = (data.socialLinks && typeof data.socialLinks === 'object')
+    ? (data.socialLinks as Record<string, unknown>)
+    : {};
+
+  return {
+    heroName: asLocalizedText(data.heroName, 'Alphonsus'),
+    heroLastName: asLocalizedText(data.heroLastName, 'Aditya'),
+    heroSubtitle: asLocalizedText(data.heroSubtitle, 'Biomedical Engineering Student'),
+    heroTagline: asLocalizedText(data.heroTagline, 'Exploring the intersection of Medical Signals, Faith, and Human Life'),
+    socialLinks: {
+      linkedin: typeof socialLinks.linkedin === 'string' ? socialLinks.linkedin : 'https://linkedin.com/in/alphonsusadt',
+      github: typeof socialLinks.github === 'string' ? socialLinks.github : 'https://github.com/alphonsusadt',
+      email: typeof socialLinks.email === 'string' ? socialLinks.email : 'alphonsus@example.com',
+    },
+    sections: {
+      recentProjects: parseSection('recentProjects'),
+      recentWritings: parseSection('recentWritings'),
+      featuredBooks: parseSection('featuredBooks'),
+    },
+  };
+};
+
+const defaultHomeData: HomeData = {
+  heroName: { en: 'Alphonsus', id: 'Alphonsus' },
+  heroLastName: { en: 'Aditya', id: 'Aditya' },
+  heroSubtitle: { en: 'Biomedical Engineering Student', id: 'Mahasiswa Teknik Biomedis' },
+  heroTagline: {
+    en: 'Exploring the intersection of Medical Signals, Faith, and Human Life',
+    id: 'Menjelajahi persimpangan Sinyal Medis, Iman, dan Kehidupan Manusia',
+  },
+  socialLinks: {
+    linkedin: 'https://linkedin.com/in/alphonsusadt',
+    github: 'https://github.com/alphonsusadt',
+    email: 'alphonsus@example.com',
+  },
+  sections: {
+    recentProjects: {
+      title: { en: 'Recent Engineering Projects', id: 'Proyek Teknik Terbaru' },
+      subtitle: {
+        en: 'Exploring the intersection of signal processing, medical devices, and data analysis',
+        id: 'Menjelajahi persimpangan pemrosesan sinyal, perangkat medis, dan analisis data',
+      },
+    },
+    recentWritings: {
+      title: { en: 'Recent Writings', id: 'Tulisan Terbaru' },
+      subtitle: {
+        en: 'Reflections on faith, engineering, and the human experience',
+        id: 'Refleksi tentang iman, teknik, dan pengalaman manusia',
+      },
+    },
+    featuredBooks: {
+      title: { en: 'From My Library', id: 'Dari Perpustakaan Saya' },
+      subtitle: {
+        en: 'Books that shape my thinking on technology, faith, and philosophy',
+        id: 'Buku yang membentuk pemikiran saya tentang teknologi, iman, dan filosofi',
+      },
+    },
+  },
+};
 
 /**
  * Generates EMG signal path with stochastic high-frequency noise pattern
@@ -143,12 +250,22 @@ export function Home() {
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
   const [recentWritings, setRecentWritings] = useState<Writing[]>([]);
   const [featuredBooks, setFeaturedBooks] = useState<Book[]>([]);
+  const [homeData, setHomeData] = useState<HomeData>(defaultHomeData);
+  const { language } = useSiteLanguage();
 
   // Generate signal paths once on mount for organic variation
   const emgPath = useMemo(() => generateEMGPath(24, 161, 52, 8), []);
   const ecgPath = useMemo(() => generateECGPath(24, 66, 52, 8), []);
 
   useEffect(() => {
+    api.getPublicHome()
+      .then((data) => {
+        if (data && Object.keys(data).length > 0) {
+          setHomeData(normalizeHomeData(data));
+        }
+      })
+      .catch(console.error);
+
     api.getPublicProjects().then((data: Project[]) => setRecentProjects(data.slice(0, 3))).catch(console.error);
     api.getPublicWritings().then((data: Writing[]) => setRecentWritings(data.slice(0, 3))).catch(console.error);
     api.getPublicBooks().then((data: Book[]) => setFeaturedBooks(data.slice(0, 3))).catch(console.error);
@@ -164,14 +281,14 @@ export function Home() {
             <div className="space-y-8">
               <div className="space-y-4">
                 <h1 className="text-5xl lg:text-6xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] leading-tight">
-                  Alphonsus
-                  <span className="block text-[#1E40AF] dark:text-[#60A5FA]">Aditya</span>
+                  {homeData.heroName[language]}
+                  <span className="block text-[#1E40AF] dark:text-[#60A5FA]">{homeData.heroLastName[language]}</span>
                 </h1>
                 <p className="text-xl text-[#6B7280] max-w-lg">
-                  Biomedical Engineering Student
+                  {homeData.heroSubtitle[language]}
                 </p>
                 <p className="text-lg text-[#6B7280] leading-relaxed">
-                  Exploring the intersection of Medical Signals, Faith, and Human Life
+                  {homeData.heroTagline[language]}
                 </p>
               </div>
 
@@ -196,21 +313,21 @@ export function Home() {
               {/* Social Links */}
               <div className="flex items-center space-x-6 pt-4">
                 <a
-                  href="https://linkedin.com/in/alphonsusadt"
+                  href={homeData.socialLinks.linkedin}
                   className="flex items-center space-x-2 text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors group"
                 >
                   <Linkedin className="w-5 h-5" />
                   <span className="text-sm font-medium">LinkedIn</span>
                 </a>
                 <a
-                  href="https://github.com/alphonsusadt"
+                  href={homeData.socialLinks.github}
                   className="flex items-center space-x-2 text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors group"
                 >
                   <Github className="w-5 h-5" />
                   <span className="text-sm font-medium">GitHub</span>
                 </a>
                 <a
-                  href="mailto:alphonsus@example.com"
+                  href={`mailto:${homeData.socialLinks.email}`}
                   className="flex items-center space-x-2 text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors group"
                 >
                   <Mail className="w-5 h-5" />
@@ -507,10 +624,10 @@ export function Home() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-4">
-              Recent Engineering Projects
+              {homeData.sections.recentProjects.title[language]}
             </h2>
             <p className="text-lg text-[#6B7280] max-w-2xl mx-auto">
-              Exploring the intersection of signal processing, medical devices, and data analysis
+              {homeData.sections.recentProjects.subtitle[language]}
             </p>
           </div>
 
@@ -537,10 +654,10 @@ export function Home() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-4">
-              Recent Writings
+              {homeData.sections.recentWritings.title[language]}
             </h2>
             <p className="text-lg text-[#6B7280] max-w-2xl mx-auto">
-              Reflections on faith, engineering, and the human experience
+              {homeData.sections.recentWritings.subtitle[language]}
             </p>
           </div>
 
@@ -567,10 +684,10 @@ export function Home() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-4">
-              From My Library
+              {homeData.sections.featuredBooks.title[language]}
             </h2>
             <p className="text-lg text-[#6B7280] max-w-2xl mx-auto">
-              Books that shape my thinking on technology, faith, and philosophy
+              {homeData.sections.featuredBooks.subtitle[language]}
             </p>
           </div>
 

@@ -1,5 +1,5 @@
 import { X, RefreshCw } from 'lucide-react';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { ImageGallery } from './ImageGallery';
 import { generateSlug, isValidSlug } from '../utils/slugify';
 import { IsolatedInput, IsolatedTextarea, IsolatedTagInput } from './IsolatedInput';
@@ -32,13 +32,11 @@ interface WritingSidebarProps {
   isSaving?: boolean;
   wordCount?: number;
   characterCount?: number;
-  onRemoveImage?: (markdown: string) => void;
 }
 
 const categories = ['reflections', 'stories', 'fiction'];
 
-export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, onRemoveImage }: WritingSidebarProps) {
-  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0 }: WritingSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   
   // Use ref to always have latest writing without causing re-renders
@@ -70,7 +68,6 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
   // }, [writing.title, slugManuallyEdited, writing.id]);
 
   const handleSlugChange = (newSlug: string) => {
-    setSlugManuallyEdited(true);
     onUpdate({ ...writing, id: newSlug });
   };
 
@@ -78,7 +75,6 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
     const autoSlug = generateSlug(writing.title);
     if (autoSlug) {
       onUpdate({ ...writing, id: autoSlug });
-      setSlugManuallyEdited(false);
     }
   };
 
@@ -181,7 +177,6 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
           onRemoveImage={(markdown) => {
             const newContent = writing.content.replace(markdown, '');
             onUpdate({ ...writing, content: newContent });
-            onRemoveImage?.(markdown);
           }}
         />
       )}

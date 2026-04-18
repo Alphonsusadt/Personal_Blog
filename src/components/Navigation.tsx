@@ -2,11 +2,17 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Sun, Moon, Github, Linkedin, Mail } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { useSiteLanguage } from '../hooks/useSiteLanguage';
 
 export function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const location = useLocation();
+  const { language, setLanguage } = useSiteLanguage();
+
+  const scrollPageToTop = () => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  };
 
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
@@ -48,10 +54,36 @@ export function Navigation() {
                   'nav-link',
                   location.pathname === item.path && 'text-[#1E40AF] dark:text-[#60A5FA] font-semibold'
                 )}
+                onClick={scrollPageToTop}
               >
                 {item.label}
               </Link>
             ))}
+
+            <div className="flex items-center rounded-lg border border-[#E5E7EB] dark:border-[#334155] overflow-hidden">
+              <button
+                onClick={() => setLanguage('en')}
+                className={cn(
+                  'px-2.5 py-1.5 text-xs font-semibold transition-colors',
+                  language === 'en'
+                    ? 'bg-[#1E40AF] text-white'
+                    : 'bg-transparent text-[#6B7280] hover:bg-[#E5E7EB] dark:hover:bg-[#334155]'
+                )}
+              >
+                EN
+              </button>
+              <button
+                onClick={() => setLanguage('id')}
+                className={cn(
+                  'px-2.5 py-1.5 text-xs font-semibold transition-colors',
+                  language === 'id'
+                    ? 'bg-[#1E40AF] text-white'
+                    : 'bg-transparent text-[#6B7280] hover:bg-[#E5E7EB] dark:hover:bg-[#334155]'
+                )}
+              >
+                ID
+              </button>
+            </div>
             
             {/* Dark Mode Toggle */}
             <button
@@ -98,6 +130,34 @@ export function Navigation() {
         {isMenuOpen && (
           <div className="md:hidden py-4 border-t border-[#E5E7EB] dark:border-[#334155]">
             <div className="flex flex-col space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-[#94A3B8]">Language</span>
+                <div className="flex items-center rounded-lg border border-[#334155] overflow-hidden">
+                  <button
+                    onClick={() => setLanguage('en')}
+                    className={cn(
+                      'px-2.5 py-1.5 text-xs font-semibold transition-colors',
+                      language === 'en'
+                        ? 'bg-[#1E40AF] text-white'
+                        : 'bg-transparent text-[#94A3B8]'
+                    )}
+                  >
+                    EN
+                  </button>
+                  <button
+                    onClick={() => setLanguage('id')}
+                    className={cn(
+                      'px-2.5 py-1.5 text-xs font-semibold transition-colors',
+                      language === 'id'
+                        ? 'bg-[#1E40AF] text-white'
+                        : 'bg-transparent text-[#94A3B8]'
+                    )}
+                  >
+                    ID
+                  </button>
+                </div>
+              </div>
+
               {navItems.map((item) => (
                 <Link
                   key={item.path}
@@ -106,7 +166,10 @@ export function Navigation() {
                     'nav-link py-2',
                     location.pathname === item.path && 'text-[#1E40AF] dark:text-[#60A5FA] font-semibold'
                   )}
-                  onClick={() => setIsMenuOpen(false)}
+                  onClick={() => {
+                    scrollPageToTop();
+                    setIsMenuOpen(false);
+                  }}
                 >
                   {item.label}
                 </Link>

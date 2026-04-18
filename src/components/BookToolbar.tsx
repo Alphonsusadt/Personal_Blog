@@ -5,9 +5,10 @@ interface BookToolbarProps {
   onInsert: (before: string, after?: string) => void;
   onInsertImage?: (imageMarkdown: string) => void;
   onOpenImageDialog?: () => void;
+  onOpenLinkDialog?: () => void;
 }
 
-export function BookToolbar({ textareaRef, onInsert, onOpenImageDialog }: BookToolbarProps) {
+export function BookToolbar({ textareaRef, onInsert, onOpenImageDialog, onOpenLinkDialog }: BookToolbarProps) {
   const buttons = [
     { icon: Bold, label: 'Bold', action: () => onInsert('**', '**') },
     { icon: Italic, label: 'Italic', action: () => onInsert('*', '*') },
@@ -15,7 +16,7 @@ export function BookToolbar({ textareaRef, onInsert, onOpenImageDialog }: BookTo
     { icon: Heading1, label: 'Heading', action: () => onInsert('## ') },
     { icon: Code, label: 'Code', action: () => onInsert('`', '`') },
     { icon: Quote, label: 'Quote', action: () => onInsert('> ') },
-    { icon: Link, label: 'Link', action: () => onInsert('[text](', ')') },
+    { icon: Link, label: 'Link', action: onOpenLinkDialog ? () => onOpenLinkDialog() : () => onInsert('[text](', ')') },
     { 
       icon: Image, 
       label: 'Image', 

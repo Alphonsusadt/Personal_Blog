@@ -1,6 +1,6 @@
 import { X, Github, FileText, ExternalLink, RefreshCw } from 'lucide-react';
 import { ImageGallery } from './ImageGallery';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { generateSlug, isValidSlug } from '../utils/slugify';
 import { IsolatedInput, IsolatedTextarea, IsolatedTagInput } from './IsolatedInput';
 
@@ -44,7 +44,6 @@ const devStatuses = [
 
 export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
-  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   
   // Use ref to always have latest project without causing re-renders  
   const projectRef = useRef(project);
@@ -83,7 +82,6 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectS
   // }, [project.title, slugManuallyEdited, project.id]);
 
   const handleSlugChange = (newSlug: string) => {
-    setSlugManuallyEdited(true);
     onUpdate({ ...project, id: newSlug });
   };
 
@@ -91,7 +89,6 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectS
     const autoSlug = generateSlug(project.title);
     if (autoSlug) {
       onUpdate({ ...project, id: autoSlug });
-      setSlugManuallyEdited(false);
     }
   };
 

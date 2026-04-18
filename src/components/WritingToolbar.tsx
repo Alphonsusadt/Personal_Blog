@@ -4,9 +4,10 @@ interface WritingToolbarProps {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   onInsert: (before: string, after?: string) => void;
   onOpenImageDialog?: () => void;
+  onOpenLinkDialog?: () => void;
 }
 
-export function WritingToolbar({ textareaRef, onInsert, onOpenImageDialog }: WritingToolbarProps) {
+export function WritingToolbar({ textareaRef, onInsert, onOpenImageDialog, onOpenLinkDialog }: WritingToolbarProps) {
   const buttons = [
     { icon: Bold, label: 'Bold', action: () => onInsert('**', '**') },
     { icon: Italic, label: 'Italic', action: () => onInsert('*', '*') },
@@ -14,7 +15,7 @@ export function WritingToolbar({ textareaRef, onInsert, onOpenImageDialog }: Wri
     { icon: Heading1, label: 'Heading', action: () => onInsert('## ') },
     { icon: Code, label: 'Code', action: () => onInsert('`', '`') },
     { icon: Quote, label: 'Quote', action: () => onInsert('> ') },
-    { icon: Link, label: 'Link', action: () => onInsert('[text](', ')') },
+    { icon: Link, label: 'Link', action: onOpenLinkDialog ? () => onOpenLinkDialog() : () => onInsert('[text](', ')') },
     {
       icon: Image,
       label: 'Image',

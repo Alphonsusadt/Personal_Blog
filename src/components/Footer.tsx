@@ -1,8 +1,30 @@
 import { Github, Linkedin, Mail, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { api } from '../lib/api';
+
+interface Settings {
+  footerBio?: string;
+  footerName?: string;
+  siteTitle?: string;
+}
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
+  const [settings, setSettings] = useState<Settings>({
+    footerBio: 'Biomedical Engineering student exploring the intersection of medical signals, faith, and human life. Bridging the precision of engineering with the mystery of spirituality.',
+    footerName: 'Alphonsus Aditya',
+  });
+
+  useEffect(() => {
+    api.getPublicSettings()
+      .then((data) => {
+        if (data && data.footerBio) {
+          setSettings(prev => ({ ...prev, ...data }));
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   return (
     <footer className="bg-white dark:bg-[#0F172A] border-t border-[#E5E7EB] dark:border-[#334155] mt-20">
@@ -11,12 +33,10 @@ export function Footer() {
           {/* About */}
           <div className="md:col-span-2">
             <h3 className="text-lg font-semibold mb-4 text-[#1A1A1A] dark:text-[#F8FAFC]">
-              Alphonsus Aditya
+              {settings.footerName || 'Alphonsus Aditya'}
             </h3>
             <p className="text-[#6B7280] mb-4 max-w-md">
-              Biomedical Engineering student exploring the intersection of medical signals, 
-              faith, and human life. Bridging the precision of engineering with the 
-              mystery of spirituality.
+              {settings.footerBio}
             </p>
             <div className="flex items-center space-x-4">
               <a 

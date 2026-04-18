@@ -1,6 +1,6 @@
 import { X, Star, RefreshCw } from 'lucide-react';
 import { ImageGallery } from './ImageGallery';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { generateSlug, isValidSlug } from '../utils/slugify';
 import { IsolatedTagInput } from './IsolatedInput';
 
@@ -36,7 +36,6 @@ const categories = ['technical', 'biography', 'spiritual', 'philosophy'];
 
 export function BookSidebar({ book, onUpdate, onSave, isSaving }: BookSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
-  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   
   // Use ref to always have latest book without causing re-renders
   const bookRef = useRef(book);
@@ -59,7 +58,6 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving }: BookSidebarPro
   // }, [book.title, slugManuallyEdited, book.id]);
 
   const handleSlugChange = (newSlug: string) => {
-    setSlugManuallyEdited(true);
     onUpdate({ ...book, id: newSlug });
   };
 
@@ -67,7 +65,6 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving }: BookSidebarPro
     const autoSlug = generateSlug(book.title);
     if (autoSlug) {
       onUpdate({ ...book, id: autoSlug });
-      setSlugManuallyEdited(false);
     }
   };
 

@@ -247,27 +247,78 @@ const books = [
 
 const about = {
   key: 'about',
-  title: 'About Alphonsus',
-  subtitle: 'Bridging the worlds of biomedical engineering and faith',
-  bio: "I'm a passionate biomedical engineering student with a deep interest in signal processing, medical devices, and the profound questions that arise when technology meets human life. My journey is guided by both scientific curiosity and spiritual reflection.",
+  title: { en: 'About Alphonsus', id: 'Tentang Alphonsus' },
+  subtitle: {
+    en: 'Bridging the worlds of biomedical engineering and faith',
+    id: 'Menjembatani dunia teknik biomedis dan iman'
+  },
+  bio: {
+    en: "I'm a passionate biomedical engineering student with a deep interest in signal processing, medical devices, and the profound questions that arise when technology meets human life. My journey is guided by both scientific curiosity and spiritual reflection.",
+    id: 'Saya adalah mahasiswa teknik biomedis yang bersemangat dan memiliki ketertarikan mendalam pada pemrosesan sinyal, perangkat medis, serta pertanyaan-pertanyaan besar ketika teknologi bertemu kehidupan manusia.'
+  },
   gpa: '3.9',
   projectsCount: '6+',
   story: {
-    whyBME: "My journey into biomedical engineering began with a simple question: How can we use technology to better understand and heal the human body? Growing up, I was fascinated by both the precision of mathematics and the mystery of life. Biomedical engineering became the perfect intersection of these passions.\n\nWhat draws me most to this field is the opportunity to work on problems that directly impact human health and wellbeing.",
-    faithAndEngineering: "Many people see science and faith as opposing forces, but I've found them to be complementary ways of understanding reality. My work in signal processing has actually deepened my sense of wonder at the complexity and beauty of creation.\n\nWhen I see the elegant mathematics underlying a cardiac signal or the intricate patterns in neural activity, I'm reminded that we're studying systems of profound complexity and purpose.",
-    currentFocus: "Currently, I'm focused on signal processing techniques for biomedical applications, particularly in cardiac and neural signal analysis. I'm also exploring how machine learning can be applied to medical diagnosis while maintaining the human element that's so crucial to healthcare."
+    whyBME: {
+      en: "My journey into biomedical engineering began with a simple question: How can we use technology to better understand and heal the human body? Growing up, I was fascinated by both the precision of mathematics and the mystery of life. Biomedical engineering became the perfect intersection of these passions.\n\nWhat draws me most to this field is the opportunity to work on problems that directly impact human health and wellbeing.",
+      id: 'Perjalanan saya ke teknik biomedis dimulai dari pertanyaan sederhana: bagaimana teknologi dapat membantu kita memahami dan menyembuhkan tubuh manusia dengan lebih baik?'
+    },
+    faithAndEngineering: {
+      en: "Many people see science and faith as opposing forces, but I've found them to be complementary ways of understanding reality. My work in signal processing has actually deepened my sense of wonder at the complexity and beauty of creation.\n\nWhen I see the elegant mathematics underlying a cardiac signal or the intricate patterns in neural activity, I'm reminded that we're studying systems of profound complexity and purpose.",
+      id: 'Bagi saya, sains dan iman bukan dua hal yang bertentangan. Keduanya saling melengkapi dalam memahami realitas.'
+    },
+    currentFocus: {
+      en: "Currently, I'm focused on signal processing techniques for biomedical applications, particularly in cardiac and neural signal analysis. I'm also exploring how machine learning can be applied to medical diagnosis while maintaining the human element that's so crucial to healthcare.",
+      id: 'Saat ini saya fokus pada teknik pemrosesan sinyal untuk aplikasi biomedis, khususnya analisis sinyal jantung dan saraf.'
+    }
   },
   skills: {
-    programming: ['Python', 'MATLAB', 'C++', 'JavaScript', 'R'],
-    specializations: ['Signal Processing', 'Medical Imaging', 'Machine Learning', 'Embedded Systems'],
-    academicInterests: ['Biomedical Ethics', 'Philosophy of Science', 'Theology & Technology'],
-    personalInterests: ['Reading', 'Contemplative Prayer', 'Hiking', 'Classical Music']
+    programming: {
+      en: ['Python', 'MATLAB', 'C++', 'JavaScript', 'R'],
+      id: ['Python', 'MATLAB', 'C++', 'JavaScript', 'R']
+    },
+    specializations: {
+      en: ['Signal Processing', 'Medical Imaging', 'Machine Learning', 'Embedded Systems'],
+      id: ['Pemrosesan Sinyal', 'Pencitraan Medis', 'Pembelajaran Mesin', 'Sistem Tertanam']
+    },
+    academicInterests: {
+      en: ['Biomedical Ethics', 'Philosophy of Science', 'Theology & Technology'],
+      id: ['Etika Biomedis', 'Filsafat Sains', 'Teologi & Teknologi']
+    },
+    personalInterests: {
+      en: ['Reading', 'Contemplative Prayer', 'Hiking', 'Classical Music'],
+      id: ['Membaca', 'Doa Kontemplatif', 'Mendaki', 'Musik Klasik']
+    }
   },
   education: [
-    { title: 'Bachelor of Science in Biomedical Engineering', institution: 'University of Technology', year: 'Expected 2025', description: 'Focus on signal processing and medical device design. Dean\'s List for 4 consecutive semesters.' },
-    { title: 'Research Assistant - Signal Processing Lab', institution: 'University of Technology', year: '2023 - Present', description: 'Developing algorithms for ECG signal analysis and noise reduction. Published one conference paper on digital filter design for medical applications.' }
+    {
+      title: { en: 'Bachelor of Science in Biomedical Engineering', id: 'Sarjana Sains Teknik Biomedis' },
+      institution: { en: 'University of Technology', id: 'Universitas Teknologi' },
+      year: 'Expected 2025',
+      description: {
+        en: 'Focus on signal processing and medical device design. Dean\'s List for 4 consecutive semesters.',
+        id: 'Fokus pada pemrosesan sinyal dan desain perangkat medis. Masuk Dean\'s List selama 4 semester berturut-turut.'
+      }
+    },
+    {
+      title: { en: 'Research Assistant - Signal Processing Lab', id: 'Asisten Riset - Laboratorium Pemrosesan Sinyal' },
+      institution: { en: 'University of Technology', id: 'Universitas Teknologi' },
+      year: '2023 - Present',
+      description: {
+        en: 'Developing algorithms for ECG signal analysis and noise reduction. Published one conference paper on digital filter design for medical applications.',
+        id: 'Mengembangkan algoritma untuk analisis sinyal ECG dan reduksi noise, termasuk publikasi makalah konferensi.'
+      }
+    }
   ],
-  quote: '"The more I study science, the more I believe in God. The more I understand signal processing, the more I marvel at the elegant design of biological systems. Engineering and faith are not in conflict—they are two different languages describing the same reality."',
+  quote: {
+    en: '"The more I study science, the more I believe in God. The more I understand signal processing, the more I marvel at the elegant design of biological systems. Engineering and faith are not in conflict—they are two different languages describing the same reality."',
+    id: '"Semakin saya mempelajari sains, semakin saya percaya kepada Tuhan. Rekayasa dan iman bukanlah hal yang bertentangan."'
+  },
+  contactHeading: { en: "Let's Connect", id: 'Mari Terhubung' },
+  contactMessage: {
+    en: "I am always open to discussing biomedical signals, faith, or potential collaborations. Whether you're working on a research project, have questions about signal processing, or just want to explore the intersection of technology and spirituality, I'd love to hear from you.",
+    id: 'Saya selalu terbuka untuk diskusi tentang sinyal biomedis, iman, atau peluang kolaborasi. Silakan hubungi saya.'
+  },
   socialLinks: {
     linkedin: 'https://linkedin.com/in/alphonsusadt',
     github: 'https://github.com/alphonsusadt',
@@ -277,10 +328,13 @@ const about = {
 
 const home = {
   key: 'home',
-  heroName: 'Alphonsus',
-  heroLastName: 'Aditya',
-  heroSubtitle: 'Biomedical Engineering Student',
-  heroTagline: 'Exploring the intersection of Medical Signals, Faith, and Human Life',
+  heroName: { en: 'Alphonsus', id: 'Alphonsus' },
+  heroLastName: { en: 'Aditya', id: 'Aditya' },
+  heroSubtitle: { en: 'Biomedical Engineering Student', id: 'Mahasiswa Teknik Biomedis' },
+  heroTagline: {
+    en: 'Exploring the intersection of Medical Signals, Faith, and Human Life',
+    id: 'Menjelajahi persimpangan Sinyal Medis, Iman, dan Kehidupan Manusia'
+  },
   ctaButtons: [
     { label: 'View Projects', link: '/engineering' },
     { label: 'Read Reflections', link: '/writings' }
@@ -291,9 +345,27 @@ const home = {
     email: 'alphonsus@example.com'
   },
   sections: {
-    recentProjects: { title: 'Recent Engineering Projects', subtitle: 'Exploring the intersection of signal processing, medical devices, and data analysis' },
-    recentWritings: { title: 'Recent Writings', subtitle: 'Reflections on faith, engineering, and the human experience' },
-    featuredBooks: { title: 'From My Library', subtitle: 'Books that shape my thinking on technology, faith, and philosophy' }
+    recentProjects: {
+      title: { en: 'Recent Engineering Projects', id: 'Proyek Teknik Terbaru' },
+      subtitle: {
+        en: 'Exploring the intersection of signal processing, medical devices, and data analysis',
+        id: 'Menjelajahi persimpangan pemrosesan sinyal, perangkat medis, dan analisis data'
+      }
+    },
+    recentWritings: {
+      title: { en: 'Recent Writings', id: 'Tulisan Terbaru' },
+      subtitle: {
+        en: 'Reflections on faith, engineering, and the human experience',
+        id: 'Refleksi tentang iman, teknik, dan pengalaman manusia'
+      }
+    },
+    featuredBooks: {
+      title: { en: 'From My Library', id: 'Dari Perpustakaan Saya' },
+      subtitle: {
+        en: 'Books that shape my thinking on technology, faith, and philosophy',
+        id: 'Buku yang membentuk pemikiran saya tentang teknologi, iman, dan filosofi'
+      }
+    }
   }
 };
 

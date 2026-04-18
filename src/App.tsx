@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Navigation } from './components/Navigation';
 import { Footer } from './components/Footer';
 import { Home } from './pages/Home';
@@ -24,9 +25,20 @@ import { AboutManager } from './pages/admin/AboutManager';
 import { HomeManager } from './pages/admin/HomeManager';
 import { SettingsManager } from './pages/admin/SettingsManager';
 
+function ScrollToTop() {
+  const location = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [location.pathname, location.search, location.hash]);
+
+  return null;
+}
+
 function PublicLayout() {
   return (
     <div className="flex min-h-screen flex-col">
+      <ScrollToTop />
       <Navigation />
       <main className="flex-1">
         <Routes>

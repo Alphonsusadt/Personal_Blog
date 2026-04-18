@@ -97,7 +97,7 @@ interface IsolatedContentEditorProps {
   placeholder?: string;
   className?: string;
   id?: string;
-  textareaRef?: React.RefObject<HTMLTextAreaElement>;
+  textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
 }
 
 export const IsolatedContentEditor = React.memo(function IsolatedContentEditor({
@@ -110,27 +110,20 @@ export const IsolatedContentEditor = React.memo(function IsolatedContentEditor({
 }: IsolatedContentEditorProps) {
   const internalRef = useRef<HTMLTextAreaElement>(null);
   const ref = textareaRef || internalRef;
-  const [value, setValue] = useState(initialValue);
+  const [value, setValue] = useState(initialValue || '');
   const lastIdRef = useRef(id);
-  const valueRef = useRef(value);
-  const commitTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  valueRef.current = value;
+  const commitTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const onCommitRef = useRef(onCommit);
+  onCommitRef.current = onCommit;
 
-  // Reset when ID changes (different item)
+  // Keep local value synced with parent updates, including toolbar insertions.
+  // Only reset when id changes (different item), not on every initialValue change
   useEffect(() => {
     if (id !== lastIdRef.current) {
-      setValue(initialValue);
       lastIdRef.current = id;
+      setValue(initialValue || '');
     }
   }, [id, initialValue]);
-
-  // Commit on unmount
-  useEffect(() => {
-    return () => {
-      clearTimeout(commitTimeoutRef.current);
-      onCommit(valueRef.current);
-    };
-  }, [onCommit]);
 
   // Debounced commit while typing (500ms) - for smooth autosave
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -141,16 +134,21 @@ export const IsolatedContentEditor = React.memo(function IsolatedContentEditor({
     // Debounce commit to parent
     clearTimeout(commitTimeoutRef.current);
     commitTimeoutRef.current = setTimeout(() => {
-      onCommit(newValue);
+      onCommitRef.current(newValue);
     }, 500);
-  }, [onCommit]);
+  }, []);
+
+  const handleBlur = useCallback(() => {
+    clearTimeout(commitTimeoutRef.current);
+    onCommitRef.current(value);
+  }, [value]);
 
   return (
     <textarea
-      ref={ref as React.RefObject<HTMLTextAreaElement>}
+      ref={ref}
       value={value}
       onChange={handleChange}
-      onBlur={() => { clearTimeout(commitTimeoutRef.current); onCommit(value); }}
+      onBlur={handleBlur}
       onKeyDown={e => e.stopPropagation()}
       placeholder={placeholder}
       className={className}

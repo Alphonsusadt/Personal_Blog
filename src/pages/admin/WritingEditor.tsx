@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { WritingToolbar } from '../../components/WritingToolbar';
 import { WritingSidebar } from '../../components/WritingSidebar';
 import { ImageUploadDialog } from '../../components/ImageUploadDialog';
+import { LinkInsertDialog } from '../../components/LinkInsertDialog';
 import { FullPagePreview } from '../../components/FullPagePreview';
 import { sanitizeMarkdown } from '../../lib/mediaUploader';
 import { hasBase64Images } from '../../utils/media';
@@ -59,12 +60,12 @@ export function WritingEditor() {
   const [isSaving, setIsSaving] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showFullPreview, setShowFullPreview] = useState(false);
   const [localDraftStatus, setLocalDraftStatus] = useState<'idle' | 'saved'>('idle');
   const [showDraftRecovery, setShowDraftRecovery] = useState(false);
   const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null);
-  const scrollPositionRef = useRef<number>(0);
 
   const draftKey = `writing_draft_${slug || 'new'}`;
 
@@ -240,13 +241,19 @@ export function WritingEditor() {
     const selected = text.substring(start, end);
 
     const newText = text.substring(0, start) + before + selected + after + text.substring(end);
-    setWriting({ ...writing, content: newText });
 
+    // Update textarea directly FIRST for instant feedback
+    textarea.value = newText;
+
+    // Then update state
+    setWriting(prev => ({ ...prev, content: newText }));
+
+    // Restore cursor position
     setTimeout(() => {
       textarea.focus();
       textarea.selectionStart = start + before.length;
       textarea.selectionEnd = start + before.length + selected.length;
-    });
+    }, 0);
   };
 
   const insertImageMarkdown = (imageMarkdown: string) => {
@@ -260,14 +267,45 @@ export function WritingEditor() {
     const end = textarea.selectionEnd;
     const text = textarea.value;
     const newText = `${text.substring(0, start)}${imageMarkdown}${text.substring(end)}`;
-    setWriting({ ...writing, content: newText });
+
+    // Update textarea directly FIRST for instant feedback
+    textarea.value = newText;
+
+    // Then update state
+    setWriting(prev => ({ ...prev, content: newText }));
 
     setTimeout(() => {
       textarea.focus();
       const cursorPos = start + imageMarkdown.length;
       textarea.selectionStart = cursorPos;
       textarea.selectionEnd = cursorPos;
-    });
+    }, 0);
+  };
+
+  const insertLinkMarkdown = (linkMarkdown: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      setWriting(prev => ({ ...prev, content: `${prev.content}${prev.content ? '\n' : ''}${linkMarkdown}` }));
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    const newText = `${text.substring(0, start)}${linkMarkdown}${text.substring(end)}`;
+
+    // Update textarea directly FIRST for instant feedback
+    textarea.value = newText;
+
+    // Then update state
+    setWriting(prev => ({ ...prev, content: newText }));
+
+    setTimeout(() => {
+      textarea.focus();
+      const cursorPos = start + linkMarkdown.length;
+      textarea.selectionStart = cursorPos;
+      textarea.selectionEnd = cursorPos;
+    }, 0);
   };
 
   const handleSave = async () => {
@@ -337,7 +375,8 @@ export function WritingEditor() {
       navigate('/admin/writings');
     } catch (err) {
       console.error('Save failed:', err);
-      alert(`Failed to save writing: ${err.message || err}`);
+      const message = err instanceof Error ? err.message : String(err);
+      alert(`Failed to save writing: ${message}`);
     } finally {
       setIsSaving(false);
     }
@@ -484,6 +523,7 @@ export function WritingEditor() {
                 textareaRef={textareaRef}
                 onInsert={insertMarkdown}
                 onOpenImageDialog={() => setImageDialogOpen(true)}
+                onOpenLinkDialog={() => setLinkDialogOpen(true)}
               />
 
               {/* Live Preview Toggle */}
@@ -515,6 +555,7 @@ export function WritingEditor() {
                     initialValue={writing.content}
                     onCommit={handleContentCommit}
                     id={writing._id || writing.id}
+                    textareaRef={textareaRef}
                     placeholder="Start writing... (Markdown, LaTeX $$...$$ supported)"
                     className="flex-1 min-h-[60vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
                   />
@@ -547,6 +588,7 @@ export function WritingEditor() {
                 initialValue={writing.content}
                 onCommit={handleContentCommit}
                 id={writing._id || writing.id}
+                textareaRef={textareaRef}
                 placeholder="Start writing... (Markdown, LaTeX $$...$$ supported)"
                 className="w-full min-h-[70vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
               />
@@ -563,7 +605,6 @@ export function WritingEditor() {
                 isSaving={isSaving}
                 wordCount={wordCount}
                 characterCount={characterCount}
-                onRemoveImage={() => {}}
               />
             </div>
           </div>
@@ -580,6 +621,12 @@ export function WritingEditor() {
             setWriting(prev => ({ ...prev, status: 'scheduled' }));
           }
         }}
+      />
+
+      <LinkInsertDialog
+        isOpen={linkDialogOpen}
+        onClose={() => setLinkDialogOpen(false)}
+        onInsert={insertLinkMarkdown}
       />
 
       {/* Full Page Preview Modal */}

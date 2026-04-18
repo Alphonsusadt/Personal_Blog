@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { BookToolbar } from '../../components/BookToolbar';
 import { BookSidebar } from '../../components/BookSidebar';
 import { ImageUploadDialog } from '../../components/ImageUploadDialog';
+import { LinkInsertDialog } from '../../components/LinkInsertDialog';
 import { FullPagePreview } from '../../components/FullPagePreview';
 import { sanitizeMarkdown } from '../../lib/mediaUploader';
 import { hasBase64Images } from '../../utils/media';
@@ -59,6 +60,7 @@ export function BookEditor() {
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showPreview, setShowPreview] = useState(false);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [showFullPreview, setShowFullPreview] = useState(false);
   const [localDraftStatus, setLocalDraftStatus] = useState<'idle' | 'saved'>('idle');
   const [showDraftRecovery, setShowDraftRecovery] = useState(false);
@@ -220,13 +222,19 @@ export function BookEditor() {
     const selected = text.substring(start, end);
 
     const newText = text.substring(0, start) + before + selected + after + text.substring(end);
-    setBook({ ...book, review: newText });
 
+    // Update textarea directly FIRST for instant feedback
+    textarea.value = newText;
+
+    // Then update state
+    setBook(prev => ({ ...prev, review: newText }));
+
+    // Restore cursor position
     setTimeout(() => {
       textarea.focus();
       textarea.selectionStart = start + before.length;
       textarea.selectionEnd = start + before.length + selected.length;
-    });
+    }, 0);
   };
 
   const insertImageMarkdown = (imageMarkdown: string) => {
@@ -240,14 +248,45 @@ export function BookEditor() {
     const end = textarea.selectionEnd;
     const text = textarea.value;
     const newText = `${text.substring(0, start)}${imageMarkdown}${text.substring(end)}`;
-    setBook({ ...book, review: newText });
+
+    // Update textarea directly FIRST for instant feedback
+    textarea.value = newText;
+
+    // Then update state
+    setBook(prev => ({ ...prev, review: newText }));
 
     setTimeout(() => {
       textarea.focus();
       const cursorPos = start + imageMarkdown.length;
       textarea.selectionStart = cursorPos;
       textarea.selectionEnd = cursorPos;
-    });
+    }, 0);
+  };
+
+  const insertLinkMarkdown = (linkMarkdown: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      setBook(prev => ({ ...prev, review: `${prev.review}${prev.review ? '\n' : ''}${linkMarkdown}` }));
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    const newText = `${text.substring(0, start)}${linkMarkdown}${text.substring(end)}`;
+
+    // Update textarea directly FIRST for instant feedback
+    textarea.value = newText;
+
+    // Then update state
+    setBook(prev => ({ ...prev, review: newText }));
+
+    setTimeout(() => {
+      textarea.focus();
+      const cursorPos = start + linkMarkdown.length;
+      textarea.selectionStart = cursorPos;
+      textarea.selectionEnd = cursorPos;
+    }, 0);
   };
 
   const handleSave = async () => {
@@ -444,6 +483,7 @@ export function BookEditor() {
                 onInsert={insertMarkdown}
                 onInsertImage={insertImageMarkdown}
                 onOpenImageDialog={() => setImageDialogOpen(true)}
+                onOpenLinkDialog={() => setLinkDialogOpen(true)}
               />
 
               {/* Live Preview Toggle */}
@@ -470,6 +510,7 @@ export function BookEditor() {
                     initialValue={book.review}
                     onCommit={handleReviewCommit}
                     id={book._id || book.id}
+                    textareaRef={textareaRef}
                     placeholder="Book review... (Markdown, LaTeX $$...$$ supported)"
                     className="flex-1 min-h-[60vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
                   />
@@ -502,6 +543,7 @@ export function BookEditor() {
                 initialValue={book.review}
                 onCommit={handleReviewCommit}
                 id={book._id || book.id}
+                textareaRef={textareaRef}
                 placeholder="Book review... (Markdown, LaTeX $$...$$ supported)"
                 className="w-full min-h-[70vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
               />
@@ -525,6 +567,12 @@ export function BookEditor() {
         isOpen={imageDialogOpen}
         onClose={() => setImageDialogOpen(false)}
         onInsert={insertImageMarkdown}
+      />
+
+      <LinkInsertDialog
+        isOpen={linkDialogOpen}
+        onClose={() => setLinkDialogOpen(false)}
+        onInsert={insertLinkMarkdown}
       />
 
       {/* Full Page Preview Modal */}
