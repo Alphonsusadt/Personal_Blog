@@ -85,7 +85,7 @@ export function WritingsManager() {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right"><div className="flex items-center justify-end gap-2">
-                    <button onClick={() => navigate(`/admin/writings/edit/${item.id}`)} className="p-2 text-[#94A3B8] hover:text-[#60A5FA] transition-colors"><Pencil className="w-4 h-4" /></button>
+                    <button onClick={() => navigate(`/admin/writings/edit/${item.id || item._id || ''}`)} className="p-2 text-[#94A3B8] hover:text-[#60A5FA] transition-colors"><Pencil className="w-4 h-4" /></button>
                     <button onClick={() => handleDelete(item._id!)} className="p-2 text-[#94A3B8] hover:text-red-400 transition-colors"><Trash2 className="w-4 h-4" /></button>
                   </div></td>
                 </tr>

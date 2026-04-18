@@ -46,7 +46,12 @@ export const IsolatedInput = React.memo(function IsolatedInput({
       ref={inputRef}
       type={type}
       value={value}
-      onChange={e => { e.stopPropagation(); setValue(e.target.value); }}
+      onChange={e => {
+        e.stopPropagation();
+        const nextValue = e.target.value;
+        setValue(nextValue);
+        onCommitRef.current(nextValue);
+      }}
       onBlur={() => onCommitRef.current(value)}
       onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); inputRef.current?.blur(); }}}
       placeholder={placeholder}
@@ -80,7 +85,12 @@ export const IsolatedTextarea = React.memo(function IsolatedTextarea({
   return (
     <textarea
       value={value}
-      onChange={e => { e.stopPropagation(); setValue(e.target.value); }}
+      onChange={e => {
+        e.stopPropagation();
+        const nextValue = e.target.value;
+        setValue(nextValue);
+        onCommitRef.current(nextValue);
+      }}
       onBlur={() => onCommitRef.current(value)}
       onKeyDown={e => e.stopPropagation()}
       placeholder={placeholder}
@@ -112,34 +122,36 @@ export const IsolatedContentEditor = React.memo(function IsolatedContentEditor({
   const ref = textareaRef || internalRef;
   const [value, setValue] = useState(initialValue || '');
   const lastIdRef = useRef(id);
-  const commitTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lastInitialValueRef = useRef(initialValue);
   const onCommitRef = useRef(onCommit);
   onCommitRef.current = onCommit;
 
   // Keep local value synced with parent updates, including toolbar insertions.
-  // Only reset when id changes (different item), not on every initialValue change
+  // Update when: 1) id changes (different item), 2) initialValue significantly changed (from toolbar)
   useEffect(() => {
     if (id !== lastIdRef.current) {
+      // Item changed - reset everything
       lastIdRef.current = id;
+      lastInitialValueRef.current = initialValue;
+      setValue(initialValue || '');
+    } else if (initialValue !== lastInitialValueRef.current) {
+      // Value changed from parent (toolbar insertion, etc)
+      // This keeps us in sync with programmatic updates
+      lastInitialValueRef.current = initialValue;
       setValue(initialValue || '');
     }
   }, [id, initialValue]);
 
-  // Debounced commit while typing (500ms) - for smooth autosave
+  // Commit immediately while typing to avoid losing fast edits on navigation
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     e.stopPropagation();
     const newValue = e.target.value;
     setValue(newValue);
-    
-    // Debounce commit to parent
-    clearTimeout(commitTimeoutRef.current);
-    commitTimeoutRef.current = setTimeout(() => {
-      onCommitRef.current(newValue);
-    }, 500);
+    lastInitialValueRef.current = newValue; // Track user edits
+    onCommitRef.current(newValue);
   }, []);
 
   const handleBlur = useCallback(() => {
-    clearTimeout(commitTimeoutRef.current);
     onCommitRef.current(value);
   }, [value]);
 
@@ -154,7 +166,7 @@ export const IsolatedContentEditor = React.memo(function IsolatedContentEditor({
       className={className}
     />
   );
-}, (prev, next) => prev.id === next.id);
+}, (prev, next) => prev.id === next.id && prev.initialValue === next.initialValue && prev.placeholder === next.placeholder && prev.className === next.className);
 
 // Tag input with completely isolated state
 interface IsolatedTagInputProps {

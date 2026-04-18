@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../lib/api';
-import { Save, Plus, X, CheckCircle, Upload, Image as ImageIcon } from 'lucide-react';
+import { Save, Plus, X, CheckCircle, Upload, Image as ImageIcon, Clock, AlertCircle } from 'lucide-react';
 import { ImageCropDialog } from '../../components/ImageCropDialog';
+import { useAdminAutosave } from '../../hooks/useAdminAutosave';
 
 type Language = 'en' | 'id';
 type LocalizedText = { en: string; id: string };
@@ -147,10 +148,47 @@ const normalizeAboutData = (raw: unknown): AboutData => {
   };
 };
 
+const hasMeaningfulAboutData = (value: AboutData): boolean => {
+  return Boolean(
+    value.title.en.trim() ||
+    value.title.id.trim() ||
+    value.subtitle.en.trim() ||
+    value.subtitle.id.trim() ||
+    value.bio.en.trim() ||
+    value.bio.id.trim() ||
+    value.profileImage.trim() ||
+    value.gpa.trim() ||
+    value.projectsCount.trim() ||
+    value.story.whyBME.en.trim() ||
+    value.story.whyBME.id.trim() ||
+    value.story.faithAndEngineering.en.trim() ||
+    value.story.faithAndEngineering.id.trim() ||
+    value.story.currentFocus.en.trim() ||
+    value.story.currentFocus.id.trim() ||
+    value.skills.programming.en.length ||
+    value.skills.programming.id.length ||
+    value.skills.specializations.en.length ||
+    value.skills.specializations.id.length ||
+    value.skills.academicInterests.en.length ||
+    value.skills.academicInterests.id.length ||
+    value.skills.personalInterests.en.length ||
+    value.skills.personalInterests.id.length ||
+    value.education.length ||
+    value.quote.en.trim() ||
+    value.quote.id.trim() ||
+    value.contactHeading.en.trim() ||
+    value.contactHeading.id.trim() ||
+    value.contactMessage.en.trim() ||
+    value.contactMessage.id.trim() ||
+    value.socialLinks.linkedin.trim() ||
+    value.socialLinks.github.trim() ||
+    value.socialLinks.email.trim()
+  );
+};
+
 export function AboutManager() {
   const [data, setData] = useState<AboutData>(defaultData);
   const [loading, setLoading] = useState(true);
-  const [saved, setSaved] = useState(false);
   const [lang, setLang] = useState<Language>('en');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState('');
@@ -162,6 +200,22 @@ export function AboutManager() {
   const photoObjectUrlRef = useRef<string | null>(null);
 
   const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+
+  const saveAboutToServer = useCallback(async (nextData: AboutData) => {
+    await api.put('/api/about', nextData);
+  }, []);
+
+  const {
+    status: autosaveStatus,
+    errorMessage: autosaveError,
+    saveNow,
+  } = useAdminAutosave<AboutData>({
+    storageKey: 'cms_admin_about',
+    data,
+    enabled: !loading,
+    saveToServer: saveAboutToServer,
+    hasMeaningfulData: hasMeaningfulAboutData,
+  });
 
   useEffect(() => {
     api
@@ -268,9 +322,7 @@ export function AboutManager() {
 
   const handleSave = async () => {
     try {
-      await api.put('/api/about', data);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      await saveNow();
     } catch (err) {
       console.error(err);
     }
@@ -379,10 +431,17 @@ export function AboutManager() {
             </button>
           </div>
           <button onClick={handleSave} className="flex items-center gap-2 bg-[#1E40AF] text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-[#1E3A8A]">
-            {saved ? <><CheckCircle className="w-4 h-4" /> Saved!</> : <><Save className="w-4 h-4" /> Save</>}
+            {autosaveStatus === 'saving' ? <><Clock className="w-4 h-4 animate-spin" /> Saving...</> : null}
+            {autosaveStatus === 'saved' ? <><CheckCircle className="w-4 h-4" /> Saved!</> : null}
+            {autosaveStatus === 'error' ? <><AlertCircle className="w-4 h-4" /> Retry Save</> : null}
+            {autosaveStatus === 'idle' ? <><Save className="w-4 h-4" /> Save</> : null}
           </button>
         </div>
       </div>
+
+      {autosaveError ? (
+        <p className="mb-4 text-sm text-red-400">Autosave error: {autosaveError}</p>
+      ) : null}
 
       <div className="space-y-8">
         <section className="bg-[#1E293B] border border-[#334155] rounded-xl p-6">

@@ -46,12 +46,63 @@ const emptyBook: Book = {
   status: 'draft',
 };
 
+function hasMeaningfulBookDraft(data: Book): boolean {
+  return Boolean(
+    data.title?.trim() ||
+    data.author?.trim() ||
+    data.cover?.trim() ||
+    data.review?.trim() ||
+    data.takeaways?.length ||
+    data.metaDescription?.trim() ||
+    data.ogImage?.trim() ||
+    data.keywords?.trim() ||
+    data.metaTitle?.trim()
+  );
+}
+
+function getWordCount(text: string): number {
+  const normalized = text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]+\]\([^)]*\)/g, ' ')
+    .replace(/[>#*_~\-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return normalized ? normalized.split(' ').length : 0;
+}
+
+function createAutosaveDraftId(title: string, content: string, prefix: string): string {
+  const source = title.trim() || content
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]+\]\([^)]*\)/g, ' ')
+    .replace(/[>#*_~\-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .slice(0, 8)
+    .join('-');
+
+  const slug = source
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  return slug || `${prefix}-draft-${Date.now()}`;
+}
+
 export function BookEditor() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
-  const titleUpdateTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const localDraftStatusTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const pendingCreateRef = useRef(false);
 
   const [book, setBook] = useState<Book>(emptyBook);
   const [localTitle, setLocalTitle] = useState(''); // Local state for smooth title typing
@@ -62,25 +113,49 @@ export function BookEditor() {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [showFullPreview, setShowFullPreview] = useState(false);
-  const [localDraftStatus, setLocalDraftStatus] = useState<'idle' | 'saved'>('idle');
+  const [localDraftStatus, setLocalDraftStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showDraftRecovery, setShowDraftRecovery] = useState(false);
   const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null);
 
   const draftKey = `book_draft_${slug || 'new'}`;
 
+  const persistDraftNow = useCallback((nextBook: Book) => {
+    try {
+      setLocalDraftStatus('saving');
+      localStorage.setItem(draftKey, JSON.stringify({ data: nextBook, timestamp: Date.now() }));
+      setLocalDraftStatus('saved');
+      clearTimeout(localDraftStatusTimeoutRef.current);
+      localDraftStatusTimeoutRef.current = setTimeout(() => setLocalDraftStatus('idle'), 900);
+    } catch (e) {
+      console.error('Local draft error:', e);
+    }
+  }, [draftKey]);
+
   // Sync localTitle when book changes from external source
   useEffect(() => {
     setLocalTitle(book.title);
-  }, [book.id]);
+  }, [book.title]);
 
-  // Debounced title update
+  // Title is persisted immediately so fast navigation cannot lose edits.
   const handleTitleChange = (value: string) => {
-    setLocalTitle(value); // Immediate local update
-    clearTimeout(titleUpdateTimeoutRef.current);
-    titleUpdateTimeoutRef.current = setTimeout(() => {
-      setBook(prev => ({ ...prev, title: value }));
-    }, 500);
+    setLocalTitle(value);
+    setBook(prev => {
+      const nextBook = { ...prev, title: value };
+      persistDraftNow(nextBook);
+      return nextBook;
+    });
   };
+
+  const plainContent = book.review
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')
+    .replace(/\[[^\]]+\]\([^)]+\)/g, ' ')
+    .replace(/[>#*_~\-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const wordCount = plainContent ? plainContent.split(' ').length : 0;
+  const characterCount = plainContent.length;
 
   // Check for local draft on mount
   useEffect(() => {
@@ -89,8 +164,8 @@ export function BookEditor() {
       if (savedDraft) {
         const parsed = JSON.parse(savedDraft);
         setDraftTimestamp(parsed.timestamp);
-        if (parsed.data.review && (Date.now() - parsed.timestamp) < 86400000) {
-          setShowDraftRecovery(true);
+        if (hasMeaningfulBookDraft(parsed.data) && (Date.now() - parsed.timestamp) < 86400000) {
+          setShowDraftRecovery(false);
         }
       }
     } catch (e) {
@@ -107,7 +182,7 @@ export function BookEditor() {
     api
       .get(`/api/books`)
       .then((books: Book[]) => {
-        const found = books.find(b => b.id === slug);
+        const found = books.find(b => b.id === slug || b._id === slug);
         if (found) {
           setBook(found);
         }
@@ -116,35 +191,42 @@ export function BookEditor() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // Local storage autosave - 1s (FAST!)
+  // Periodic backup write without touching indicator state.
   useEffect(() => {
     if (loading) return;
     const timeout = setTimeout(() => {
       try {
         localStorage.setItem(draftKey, JSON.stringify({ data: book, timestamp: Date.now() }));
-        setLocalDraftStatus('saved');
-        setTimeout(() => setLocalDraftStatus('idle'), 800);
       } catch (e) { console.error('Local draft error:', e); }
     }, 1000);
     return () => clearTimeout(timeout);
   }, [book, loading, draftKey]);
 
+  useEffect(() => {
+    return () => clearTimeout(localDraftStatusTimeoutRef.current);
+  }, []);
+
   // Server autosave - 3s (FASTER!)
   useEffect(() => {
-    if (loading || !book.title) return;
+    const canAutosaveToServer = Boolean(book.title.trim() || getWordCount(book.review) >= 50);
+
+    if (loading || !canAutosaveToServer) return;
     clearTimeout(autoSaveTimeoutRef.current);
     autoSaveTimeoutRef.current = setTimeout(async () => {
       setAutosaveStatus('saving');
       try {
         if (book._id) {
           await api.put(`/api/books/${book._id}`, book);
-        } else if (book.id) {
-          const response = await api.post('/api/books', book);
+        } else if (!pendingCreateRef.current) {
+          pendingCreateRef.current = true;
+          const draftId = book.id || createAutosaveDraftId(book.title, book.review, 'book');
+          const response = await api.post('/api/books', { ...book, id: draftId });
           setBook(prev => ({ ...prev, _id: response._id }));
+          pendingCreateRef.current = false;
         } else { setAutosaveStatus('idle'); return; }
         setAutosaveStatus('saved');
         setTimeout(() => setAutosaveStatus('idle'), 1500);
-      } catch (err) { console.error('Autosave failed:', err); setAutosaveStatus('idle'); }
+      } catch (err) { pendingCreateRef.current = false; console.error('Autosave failed:', err); setAutosaveStatus('idle'); }
     }, 3000);
     return () => clearTimeout(autoSaveTimeoutRef.current);
   }, [book, loading]);
@@ -204,13 +286,18 @@ export function BookEditor() {
 
   // Stable update callback
   const handleUpdateBook = useCallback((updatedBook: Book) => {
+    persistDraftNow(updatedBook);
     setBook(updatedBook);
-  }, []);
+  }, [persistDraftNow]);
 
   // Stable callback for review content updates
   const handleReviewCommit = useCallback((review: string) => {
-    setBook(prev => ({ ...prev, review }));
-  }, []);
+    setBook(prev => {
+      const nextBook = { ...prev, review };
+      persistDraftNow(nextBook);
+      return nextBook;
+    });
+  }, [persistDraftNow]);
 
   const insertMarkdown = (before: string, after: string = '') => {
     const textarea = textareaRef.current;
@@ -222,25 +309,27 @@ export function BookEditor() {
     const selected = text.substring(start, end);
 
     const newText = text.substring(0, start) + before + selected + after + text.substring(end);
+    setBook(prev => {
+      const nextBook = { ...prev, review: newText };
+      persistDraftNow(nextBook);
+      return nextBook;
+    });
 
-    // Update textarea directly FIRST for instant feedback
-    textarea.value = newText;
-
-    // Then update state
-    setBook(prev => ({ ...prev, review: newText }));
-
-    // Restore cursor position
     setTimeout(() => {
       textarea.focus();
       textarea.selectionStart = start + before.length;
       textarea.selectionEnd = start + before.length + selected.length;
-    }, 0);
+    });
   };
 
   const insertImageMarkdown = (imageMarkdown: string) => {
     const textarea = textareaRef.current;
     if (!textarea) {
-      setBook(prev => ({ ...prev, review: `${prev.review}\n${imageMarkdown}\n` }));
+      setBook(prev => {
+        const nextBook = { ...prev, review: `${prev.review}\n${imageMarkdown}\n` };
+        persistDraftNow(nextBook);
+        return nextBook;
+      });
       return;
     }
 
@@ -248,25 +337,28 @@ export function BookEditor() {
     const end = textarea.selectionEnd;
     const text = textarea.value;
     const newText = `${text.substring(0, start)}${imageMarkdown}${text.substring(end)}`;
-
-    // Update textarea directly FIRST for instant feedback
-    textarea.value = newText;
-
-    // Then update state
-    setBook(prev => ({ ...prev, review: newText }));
+    setBook(prev => {
+      const nextBook = { ...prev, review: newText };
+      persistDraftNow(nextBook);
+      return nextBook;
+    });
 
     setTimeout(() => {
       textarea.focus();
       const cursorPos = start + imageMarkdown.length;
       textarea.selectionStart = cursorPos;
       textarea.selectionEnd = cursorPos;
-    }, 0);
+    });
   };
 
   const insertLinkMarkdown = (linkMarkdown: string) => {
     const textarea = textareaRef.current;
     if (!textarea) {
-      setBook(prev => ({ ...prev, review: `${prev.review}${prev.review ? '\n' : ''}${linkMarkdown}` }));
+      setBook(prev => {
+        const nextBook = { ...prev, review: `${prev.review}${prev.review ? '\n' : ''}${linkMarkdown}` };
+        persistDraftNow(nextBook);
+        return nextBook;
+      });
       return;
     }
 
@@ -274,19 +366,18 @@ export function BookEditor() {
     const end = textarea.selectionEnd;
     const text = textarea.value;
     const newText = `${text.substring(0, start)}${linkMarkdown}${text.substring(end)}`;
-
-    // Update textarea directly FIRST for instant feedback
-    textarea.value = newText;
-
-    // Then update state
-    setBook(prev => ({ ...prev, review: newText }));
+    setBook(prev => {
+      const nextBook = { ...prev, review: newText };
+      persistDraftNow(nextBook);
+      return nextBook;
+    });
 
     setTimeout(() => {
       textarea.focus();
       const cursorPos = start + linkMarkdown.length;
       textarea.selectionStart = cursorPos;
       textarea.selectionEnd = cursorPos;
-    }, 0);
+    });
   };
 
   const handleSave = async () => {
@@ -382,11 +473,27 @@ export function BookEditor() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Word & Character Counter */}
+            <div className="hidden sm:flex items-center gap-4 text-xs text-[#94A3B8] border-r border-[#334155] pr-4">
+              <div>
+                <span className="font-medium text-[#F8FAFC]">{wordCount}</span>
+                <span className="ml-1">words</span>
+              </div>
+              <div>
+                <span className="font-medium text-[#F8FAFC]">{characterCount}</span>
+                <span className="ml-1">chars</span>
+              </div>
+            </div>
+
             {/* Local Draft Indicator */}
-            {localDraftStatus === 'saved' && (
-              <div className="flex items-center gap-1 text-xs text-green-400 bg-green-400/10 px-2 py-1 rounded">
-                <HardDrive className="w-3 h-3" />
-                <span>Local ✓</span>
+            {localDraftStatus !== 'idle' && (
+              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${
+                localDraftStatus === 'saving'
+                  ? 'text-yellow-400 bg-yellow-400/10'
+                  : 'text-green-400 bg-green-400/10'
+              }`}>
+                <HardDrive className={`w-3 h-3 ${localDraftStatus === 'saving' ? 'animate-pulse' : ''}`} />
+                <span>{localDraftStatus === 'saving' ? 'Local save...' : 'Local ✓'}</span>
               </div>
             )}
 
@@ -498,6 +605,11 @@ export function BookEditor() {
                 {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 <span className="hidden sm:inline">{showPreview ? 'Hide Preview' : 'Live Preview'}</span>
               </button>
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-[#94A3B8] px-1">
+              <span>Words: {wordCount}</span>
+              <span>Characters: {characterCount}</span>
             </div>
 
             {/* Content Area - Editor or Split View */}

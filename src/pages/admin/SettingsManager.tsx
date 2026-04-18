@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../lib/api';
-import { Save, CheckCircle, Key } from 'lucide-react';
+import { Save, CheckCircle, Key, Clock, AlertCircle } from 'lucide-react';
+import { useAdminAutosave } from '../../hooks/useAdminAutosave';
 
 interface SettingsData {
   siteTitle: string;
@@ -9,12 +10,36 @@ interface SettingsData {
   footerTagline: string;
 }
 
+const hasMeaningfulSettingsData = (value: SettingsData): boolean => {
+  return Boolean(
+    value.siteTitle.trim() ||
+    value.footerName.trim() ||
+    value.footerBio.trim() ||
+    value.footerTagline.trim()
+  );
+};
+
 export function SettingsManager() {
   const [data, setData] = useState<SettingsData>({ siteTitle: '', footerName: '', footerBio: '', footerTagline: '' });
   const [loading, setLoading] = useState(true);
-  const [saved, setSaved] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirm: '' });
   const [passwordMsg, setPasswordMsg] = useState('');
+
+  const saveSettingsToServer = useCallback(async (nextData: SettingsData) => {
+    await api.put('/api/settings', nextData);
+  }, []);
+
+  const {
+    status: autosaveStatus,
+    errorMessage: autosaveError,
+    saveNow,
+  } = useAdminAutosave<SettingsData>({
+    storageKey: 'cms_admin_settings',
+    data,
+    enabled: !loading,
+    saveToServer: saveSettingsToServer,
+    hasMeaningfulData: hasMeaningfulSettingsData,
+  });
 
   useEffect(() => {
     api.get('/api/settings').then(d => { if (d && d.siteTitle) setData(d); }).catch(console.error).finally(() => setLoading(false));
@@ -22,9 +47,7 @@ export function SettingsManager() {
 
   const handleSave = async () => {
     try {
-      await api.put('/api/settings', data);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      await saveNow();
     } catch (err) { console.error(err); }
   };
 
@@ -57,9 +80,16 @@ export function SettingsManager() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-[#F8FAFC]">Settings</h1>
         <button onClick={handleSave} className="flex items-center gap-2 bg-[#1E40AF] text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-[#1E3A8A]">
-          {saved ? <><CheckCircle className="w-4 h-4" /> Saved!</> : <><Save className="w-4 h-4" /> Save</>}
+          {autosaveStatus === 'saving' ? <><Clock className="w-4 h-4 animate-spin" /> Saving...</> : null}
+          {autosaveStatus === 'saved' ? <><CheckCircle className="w-4 h-4" /> Saved!</> : null}
+          {autosaveStatus === 'error' ? <><AlertCircle className="w-4 h-4" /> Retry Save</> : null}
+          {autosaveStatus === 'idle' ? <><Save className="w-4 h-4" /> Save</> : null}
         </button>
       </div>
+
+      {autosaveError ? (
+        <p className="mb-4 text-sm text-red-400">Autosave error: {autosaveError}</p>
+      ) : null}
 
       <div className="space-y-8">
         <section className="bg-[#1E293B] border border-[#334155] rounded-xl p-6">

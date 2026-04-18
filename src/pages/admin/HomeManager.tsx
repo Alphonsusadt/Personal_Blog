@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../lib/api';
-import { Save, CheckCircle } from 'lucide-react';
+import { Save, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { useAdminAutosave } from '../../hooks/useAdminAutosave';
 
 type Language = 'en' | 'id';
 type LocalizedText = { en: string; id: string };
@@ -86,11 +87,54 @@ const normalizeHomeData = (raw: unknown): HomeData => {
   };
 };
 
+const hasMeaningfulHomeData = (value: HomeData): boolean => {
+  return Boolean(
+    value.heroName.en.trim() ||
+    value.heroName.id.trim() ||
+    value.heroLastName.en.trim() ||
+    value.heroLastName.id.trim() ||
+    value.heroSubtitle.en.trim() ||
+    value.heroSubtitle.id.trim() ||
+    value.heroTagline.en.trim() ||
+    value.heroTagline.id.trim() ||
+    value.socialLinks.linkedin.trim() ||
+    value.socialLinks.github.trim() ||
+    value.socialLinks.email.trim() ||
+    value.sections.recentProjects.title.en.trim() ||
+    value.sections.recentProjects.title.id.trim() ||
+    value.sections.recentProjects.subtitle.en.trim() ||
+    value.sections.recentProjects.subtitle.id.trim() ||
+    value.sections.recentWritings.title.en.trim() ||
+    value.sections.recentWritings.title.id.trim() ||
+    value.sections.recentWritings.subtitle.en.trim() ||
+    value.sections.recentWritings.subtitle.id.trim() ||
+    value.sections.featuredBooks.title.en.trim() ||
+    value.sections.featuredBooks.title.id.trim() ||
+    value.sections.featuredBooks.subtitle.en.trim() ||
+    value.sections.featuredBooks.subtitle.id.trim()
+  );
+};
+
 export function HomeManager() {
   const [data, setData] = useState<HomeData>(defaultData);
   const [loading, setLoading] = useState(true);
-  const [saved, setSaved] = useState(false);
   const [lang, setLang] = useState<Language>('en');
+
+  const saveHomeToServer = useCallback(async (nextData: HomeData) => {
+    await api.put('/api/home', nextData);
+  }, []);
+
+  const {
+    status: autosaveStatus,
+    errorMessage: autosaveError,
+    saveNow,
+  } = useAdminAutosave<HomeData>({
+    storageKey: 'cms_admin_home',
+    data,
+    enabled: !loading,
+    saveToServer: saveHomeToServer,
+    hasMeaningfulData: hasMeaningfulHomeData,
+  });
 
   useEffect(() => {
     api
@@ -136,9 +180,7 @@ export function HomeManager() {
 
   const handleSave = async () => {
     try {
-      await api.put('/api/home', data);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      await saveNow();
     } catch (err) { console.error(err); }
   };
 
@@ -167,10 +209,17 @@ export function HomeManager() {
             </button>
           </div>
           <button onClick={handleSave} className="flex items-center gap-2 bg-[#1E40AF] text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-[#1E3A8A]">
-            {saved ? <><CheckCircle className="w-4 h-4" /> Saved!</> : <><Save className="w-4 h-4" /> Save</>}
+            {autosaveStatus === 'saving' ? <><Clock className="w-4 h-4 animate-spin" /> Saving...</> : null}
+            {autosaveStatus === 'saved' ? <><CheckCircle className="w-4 h-4" /> Saved!</> : null}
+            {autosaveStatus === 'error' ? <><AlertCircle className="w-4 h-4" /> Retry Save</> : null}
+            {autosaveStatus === 'idle' ? <><Save className="w-4 h-4" /> Save</> : null}
           </button>
         </div>
       </div>
+
+      {autosaveError ? (
+        <p className="mb-4 text-sm text-red-400">Autosave error: {autosaveError}</p>
+      ) : null}
 
       <div className="space-y-8">
         <section className="bg-[#1E293B] border border-[#334155] rounded-xl p-6">

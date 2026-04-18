@@ -52,12 +52,65 @@ const emptyProject: Project = {
   demoUrl: '',
 };
 
+function hasMeaningfulProjectDraft(data: Project): boolean {
+  return Boolean(
+    data.title?.trim() ||
+    data.description?.trim() ||
+    data.content?.trim() ||
+    data.tags?.length ||
+    data.githubUrl?.trim() ||
+    data.paperUrl?.trim() ||
+    data.demoUrl?.trim() ||
+    data.metaDescription?.trim() ||
+    data.ogImage?.trim() ||
+    data.keywords?.trim() ||
+    data.metaTitle?.trim()
+  );
+}
+
+function getWordCount(text: string): number {
+  const normalized = text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]+\]\([^)]*\)/g, ' ')
+    .replace(/[>#*_~\-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return normalized ? normalized.split(' ').length : 0;
+}
+
+function createAutosaveDraftId(title: string, content: string, prefix: string): string {
+  const source = title.trim() || content
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]+\]\([^)]*\)/g, ' ')
+    .replace(/[>#*_~\-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .slice(0, 8)
+    .join('-');
+
+  const slug = source
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  return slug || `${prefix}-draft-${Date.now()}`;
+}
+
 export function ProjectEditor() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
-  const titleUpdateTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const localDraftStatusTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const pendingCreateRef = useRef(false);
 
   const [project, setProject] = useState<Project>(emptyProject);
   const [localTitle, setLocalTitle] = useState(''); // Local state for smooth title typing
@@ -68,25 +121,49 @@ export function ProjectEditor() {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [showFullPreview, setShowFullPreview] = useState(false);
-  const [localDraftStatus, setLocalDraftStatus] = useState<'idle' | 'saved'>('idle');
+  const [localDraftStatus, setLocalDraftStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showDraftRecovery, setShowDraftRecovery] = useState(false);
   const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null);
 
   const draftKey = `project_draft_${slug || 'new'}`;
 
+  const persistDraftNow = useCallback((nextProject: Project) => {
+    try {
+      setLocalDraftStatus('saving');
+      localStorage.setItem(draftKey, JSON.stringify({ data: nextProject, timestamp: Date.now() }));
+      setLocalDraftStatus('saved');
+      clearTimeout(localDraftStatusTimeoutRef.current);
+      localDraftStatusTimeoutRef.current = setTimeout(() => setLocalDraftStatus('idle'), 900);
+    } catch (e) {
+      console.error('Local draft error:', e);
+    }
+  }, [draftKey]);
+
   // Sync localTitle when project changes from external source
   useEffect(() => {
     setLocalTitle(project.title);
-  }, [project.id]);
+  }, [project.title]);
 
-  // Debounced title update
+  // Title is persisted immediately so fast navigation cannot lose edits.
   const handleTitleChange = (value: string) => {
-    setLocalTitle(value); // Immediate local update
-    clearTimeout(titleUpdateTimeoutRef.current);
-    titleUpdateTimeoutRef.current = setTimeout(() => {
-      setProject(prev => ({ ...prev, title: value }));
-    }, 500);
+    setLocalTitle(value);
+    setProject(prev => {
+      const nextProject = { ...prev, title: value };
+      persistDraftNow(nextProject);
+      return nextProject;
+    });
   };
+
+  const plainContent = project.content
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')
+    .replace(/\[[^\]]+\]\([^)]+\)/g, ' ')
+    .replace(/[>#*_~\-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const wordCount = plainContent ? plainContent.split(' ').length : 0;
+  const characterCount = plainContent.length;
 
   // Check for local draft on mount
   useEffect(() => {
@@ -95,8 +172,8 @@ export function ProjectEditor() {
       if (savedDraft) {
         const parsed = JSON.parse(savedDraft);
         setDraftTimestamp(parsed.timestamp);
-        if (parsed.data.content && (Date.now() - parsed.timestamp) < 86400000) {
-          setShowDraftRecovery(true);
+        if (hasMeaningfulProjectDraft(parsed.data) && (Date.now() - parsed.timestamp) < 86400000) {
+          setShowDraftRecovery(false);
         }
       }
     } catch (e) {
@@ -113,7 +190,7 @@ export function ProjectEditor() {
     api
       .get(`/api/projects`)
       .then((projects: Project[]) => {
-        const found = projects.find(p => p.id === slug);
+        const found = projects.find(p => p.id === slug || p._id === slug);
         if (found) {
           setProject(found);
         }
@@ -122,35 +199,42 @@ export function ProjectEditor() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // Local storage autosave - 1s (FAST!)
+  // Periodic backup write without touching indicator state.
   useEffect(() => {
     if (loading) return;
     const timeout = setTimeout(() => {
       try {
         localStorage.setItem(draftKey, JSON.stringify({ data: project, timestamp: Date.now() }));
-        setLocalDraftStatus('saved');
-        setTimeout(() => setLocalDraftStatus('idle'), 800);
       } catch (e) { console.error('Local draft error:', e); }
     }, 1000);
     return () => clearTimeout(timeout);
   }, [project, loading, draftKey]);
 
+  useEffect(() => {
+    return () => clearTimeout(localDraftStatusTimeoutRef.current);
+  }, []);
+
   // Server autosave - 3s (FASTER!)
   useEffect(() => {
-    if (loading || !project.title) return;
+    const canAutosaveToServer = Boolean(project.title.trim() || getWordCount(project.content) >= 50);
+
+    if (loading || !canAutosaveToServer) return;
     clearTimeout(autoSaveTimeoutRef.current);
     autoSaveTimeoutRef.current = setTimeout(async () => {
       setAutosaveStatus('saving');
       try {
         if (project._id) {
           await api.put(`/api/projects/${project._id}`, project);
-        } else if (project.id) {
-          const response = await api.post('/api/projects', project);
+        } else if (!pendingCreateRef.current) {
+          pendingCreateRef.current = true;
+          const draftId = project.id || createAutosaveDraftId(project.title, project.content, 'project');
+          const response = await api.post('/api/projects', { ...project, id: draftId });
           setProject(prev => ({ ...prev, _id: response._id }));
+          pendingCreateRef.current = false;
         } else { setAutosaveStatus('idle'); return; }
         setAutosaveStatus('saved');
         setTimeout(() => setAutosaveStatus('idle'), 1500);
-      } catch (err) { console.error('Autosave failed:', err); setAutosaveStatus('idle'); }
+      } catch (err) { pendingCreateRef.current = false; console.error('Autosave failed:', err); setAutosaveStatus('idle'); }
     }, 3000);
     return () => clearTimeout(autoSaveTimeoutRef.current);
   }, [project, loading]);
@@ -210,13 +294,18 @@ export function ProjectEditor() {
 
   // Stable update callback
   const handleUpdateProject = useCallback((updatedProject: Project) => {
+    persistDraftNow(updatedProject);
     setProject(updatedProject);
-  }, []);
+  }, [persistDraftNow]);
 
   // Stable callback for content updates
   const handleContentCommit = useCallback((content: string) => {
-    setProject(prev => ({ ...prev, content }));
-  }, []);
+    setProject(prev => {
+      const nextProject = { ...prev, content };
+      persistDraftNow(nextProject);
+      return nextProject;
+    });
+  }, [persistDraftNow]);
 
   const insertMarkdown = (before: string, after: string = '') => {
     const textarea = textareaRef.current;
@@ -228,25 +317,27 @@ export function ProjectEditor() {
     const selected = text.substring(start, end);
 
     const newText = text.substring(0, start) + before + selected + after + text.substring(end);
+    setProject(prev => {
+      const nextProject = { ...prev, content: newText };
+      persistDraftNow(nextProject);
+      return nextProject;
+    });
 
-    // Update textarea directly FIRST for instant feedback
-    textarea.value = newText;
-
-    // Then update state
-    setProject(prev => ({ ...prev, content: newText }));
-
-    // Restore cursor position
     setTimeout(() => {
       textarea.focus();
       textarea.selectionStart = start + before.length;
       textarea.selectionEnd = start + before.length + selected.length;
-    }, 0);
+    });
   };
 
   const insertImageMarkdown = (imageMarkdown: string) => {
     const textarea = textareaRef.current;
     if (!textarea) {
-      setProject(prev => ({ ...prev, content: `${prev.content}\n${imageMarkdown}\n` }));
+      setProject(prev => {
+        const nextProject = { ...prev, content: `${prev.content}\n${imageMarkdown}\n` };
+        persistDraftNow(nextProject);
+        return nextProject;
+      });
       return;
     }
 
@@ -254,25 +345,28 @@ export function ProjectEditor() {
     const end = textarea.selectionEnd;
     const text = textarea.value;
     const newText = `${text.substring(0, start)}${imageMarkdown}${text.substring(end)}`;
-
-    // Update textarea directly FIRST for instant feedback
-    textarea.value = newText;
-
-    // Then update state
-    setProject(prev => ({ ...prev, content: newText }));
+    setProject(prev => {
+      const nextProject = { ...prev, content: newText };
+      persistDraftNow(nextProject);
+      return nextProject;
+    });
 
     setTimeout(() => {
       textarea.focus();
       const cursorPos = start + imageMarkdown.length;
       textarea.selectionStart = cursorPos;
       textarea.selectionEnd = cursorPos;
-    }, 0);
+    });
   };
 
   const insertLinkMarkdown = (linkMarkdown: string) => {
     const textarea = textareaRef.current;
     if (!textarea) {
-      setProject(prev => ({ ...prev, content: `${prev.content}${prev.content ? '\n' : ''}${linkMarkdown}` }));
+      setProject(prev => {
+        const nextProject = { ...prev, content: `${prev.content}${prev.content ? '\n' : ''}${linkMarkdown}` };
+        persistDraftNow(nextProject);
+        return nextProject;
+      });
       return;
     }
 
@@ -280,19 +374,18 @@ export function ProjectEditor() {
     const end = textarea.selectionEnd;
     const text = textarea.value;
     const newText = `${text.substring(0, start)}${linkMarkdown}${text.substring(end)}`;
-
-    // Update textarea directly FIRST for instant feedback
-    textarea.value = newText;
-
-    // Then update state
-    setProject(prev => ({ ...prev, content: newText }));
+    setProject(prev => {
+      const nextProject = { ...prev, content: newText };
+      persistDraftNow(nextProject);
+      return nextProject;
+    });
 
     setTimeout(() => {
       textarea.focus();
       const cursorPos = start + linkMarkdown.length;
       textarea.selectionStart = cursorPos;
       textarea.selectionEnd = cursorPos;
-    }, 0);
+    });
   };
 
   const handleSave = async (shouldPublish: boolean = false) => {
@@ -394,11 +487,27 @@ export function ProjectEditor() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Word & Character Counter */}
+            <div className="hidden sm:flex items-center gap-4 text-xs text-[#94A3B8] border-r border-[#334155] pr-4">
+              <div>
+                <span className="font-medium text-[#F8FAFC]">{wordCount}</span>
+                <span className="ml-1">words</span>
+              </div>
+              <div>
+                <span className="font-medium text-[#F8FAFC]">{characterCount}</span>
+                <span className="ml-1">chars</span>
+              </div>
+            </div>
+
             {/* Local Draft Indicator */}
-            {localDraftStatus === 'saved' && (
-              <div className="flex items-center gap-1 text-xs text-green-400 bg-green-400/10 px-2 py-1 rounded">
-                <HardDrive className="w-3 h-3" />
-                <span>Local ✓</span>
+            {localDraftStatus !== 'idle' && (
+              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${
+                localDraftStatus === 'saving'
+                  ? 'text-yellow-400 bg-yellow-400/10'
+                  : 'text-green-400 bg-green-400/10'
+              }`}>
+                <HardDrive className={`w-3 h-3 ${localDraftStatus === 'saving' ? 'animate-pulse' : ''}`} />
+                <span>{localDraftStatus === 'saving' ? 'Local save...' : 'Local ✓'}</span>
               </div>
             )}
 
@@ -503,6 +612,11 @@ export function ProjectEditor() {
                 {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 <span className="hidden sm:inline">{showPreview ? 'Hide Preview' : 'Live Preview'}</span>
               </button>
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-[#94A3B8] px-1">
+              <span>Words: {wordCount}</span>
+              <span>Characters: {characterCount}</span>
             </div>
 
             {/* Content Area - Editor or Split View */}

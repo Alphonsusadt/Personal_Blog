@@ -47,12 +47,62 @@ const emptyWriting: Writing = {
   publishAt: '',
 };
 
+function hasMeaningfulWritingDraft(data: Writing): boolean {
+  return Boolean(
+    data.title?.trim() ||
+    data.excerpt?.trim() ||
+    data.content?.trim() ||
+    data.tags?.length ||
+    data.metaDescription?.trim() ||
+    data.ogImage?.trim() ||
+    data.keywords?.trim() ||
+    data.metaTitle?.trim()
+  );
+}
+
+function getWordCount(text: string): number {
+  const normalized = text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]+\]\([^)]*\)/g, ' ')
+    .replace(/[>#*_~\-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return normalized ? normalized.split(' ').length : 0;
+}
+
+function createAutosaveDraftId(title: string, content: string, prefix: string): string {
+  const source = title.trim() || content
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]+\]\([^)]*\)/g, ' ')
+    .replace(/[>#*_~\-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .slice(0, 8)
+    .join('-');
+
+  const slug = source
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  return slug || `${prefix}-draft-${Date.now()}`;
+}
+
 export function WritingEditor() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
-  const titleUpdateTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const localDraftStatusTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const pendingCreateRef = useRef(false);
 
   const [writing, setWriting] = useState<Writing>(emptyWriting);
   const [localTitle, setLocalTitle] = useState(''); // Local state for smooth title typing
@@ -63,24 +113,37 @@ export function WritingEditor() {
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showFullPreview, setShowFullPreview] = useState(false);
-  const [localDraftStatus, setLocalDraftStatus] = useState<'idle' | 'saved'>('idle');
+  const [localDraftStatus, setLocalDraftStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showDraftRecovery, setShowDraftRecovery] = useState(false);
   const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null);
 
   const draftKey = `writing_draft_${slug || 'new'}`;
 
+  const persistDraftNow = useCallback((nextWriting: Writing) => {
+    try {
+      setLocalDraftStatus('saving');
+      localStorage.setItem(draftKey, JSON.stringify({ data: nextWriting, timestamp: Date.now() }));
+      setLocalDraftStatus('saved');
+      clearTimeout(localDraftStatusTimeoutRef.current);
+      localDraftStatusTimeoutRef.current = setTimeout(() => setLocalDraftStatus('idle'), 900);
+    } catch (e) {
+      console.error('Local draft error:', e);
+    }
+  }, [draftKey]);
+
   // Sync localTitle when writing changes from external source (load, restore)
   useEffect(() => {
     setLocalTitle(writing.title);
-  }, [writing.id]);
+  }, [writing.title]);
 
-  // Debounced title update - only update parent after user stops typing
+  // Title is persisted immediately so fast navigation cannot lose edits.
   const handleTitleChange = (value: string) => {
-    setLocalTitle(value); // Immediate local update (smooth typing!)
-    clearTimeout(titleUpdateTimeoutRef.current);
-    titleUpdateTimeoutRef.current = setTimeout(() => {
-      setWriting(prev => ({ ...prev, title: value }));
-    }, 500); // 500ms debounce
+    setLocalTitle(value);
+    setWriting(prev => {
+      const nextWriting = { ...prev, title: value };
+      persistDraftNow(nextWriting);
+      return nextWriting;
+    });
   };
 
   const plainContent = writing.content
@@ -101,9 +164,9 @@ export function WritingEditor() {
       if (savedDraft) {
         const parsed = JSON.parse(savedDraft);
         setDraftTimestamp(parsed.timestamp);
-        // Show recovery dialog only if there's content and it's newer than 5 minutes
-        if (parsed.data.content && (Date.now() - parsed.timestamp) < 86400000) { // 24 hours
-          setShowDraftRecovery(true);
+        // Keep draft metadata only; skip recovery popup to avoid interrupting fast editing flow.
+        if (hasMeaningfulWritingDraft(parsed.data) && (Date.now() - parsed.timestamp) < 86400000) { // 24 hours
+          setShowDraftRecovery(false);
         }
       }
     } catch (e) {
@@ -121,7 +184,7 @@ export function WritingEditor() {
     api
       .get(`/api/writings`)
       .then((writings: Writing[]) => {
-        const found = writings.find(w => w.id === slug);
+        const found = writings.find(w => w.id === slug || w._id === slug);
         if (found) {
           setWriting(found);
         }
@@ -130,35 +193,42 @@ export function WritingEditor() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // Local storage autosave - 1s (FAST!)
+  // Periodic backup write without touching indicator state.
   useEffect(() => {
     if (loading) return;
     const timeout = setTimeout(() => {
       try {
         localStorage.setItem(draftKey, JSON.stringify({ data: writing, timestamp: Date.now() }));
-        setLocalDraftStatus('saved');
-        setTimeout(() => setLocalDraftStatus('idle'), 800);
       } catch (e) { console.error('Local draft error:', e); }
     }, 1000);
     return () => clearTimeout(timeout);
   }, [writing, loading, draftKey]);
 
+  useEffect(() => {
+    return () => clearTimeout(localDraftStatusTimeoutRef.current);
+  }, []);
+
   // Server autosave - 3s (FASTER!)
   useEffect(() => {
-    if (loading || !writing.title) return;
+    const canAutosaveToServer = Boolean(writing.title.trim() || getWordCount(writing.content) >= 50);
+
+    if (loading || !canAutosaveToServer) return;
     clearTimeout(autoSaveTimeoutRef.current);
     autoSaveTimeoutRef.current = setTimeout(async () => {
       setAutosaveStatus('saving');
       try {
         if (writing._id) {
           await api.put(`/api/writings/${writing._id}`, writing);
-        } else if (writing.id) {
-          const response = await api.post('/api/writings', writing);
+        } else if (!pendingCreateRef.current) {
+          pendingCreateRef.current = true;
+          const draftId = writing.id || createAutosaveDraftId(writing.title, writing.content, 'writing');
+          const response = await api.post('/api/writings', { ...writing, id: draftId });
           setWriting(prev => ({ ...prev, _id: response._id }));
+          pendingCreateRef.current = false;
         } else { setAutosaveStatus('idle'); return; }
         setAutosaveStatus('saved');
         setTimeout(() => setAutosaveStatus('idle'), 1500);
-      } catch (err) { console.error('Autosave failed:', err); setAutosaveStatus('idle'); }
+      } catch (err) { pendingCreateRef.current = false; console.error('Autosave failed:', err); setAutosaveStatus('idle'); }
     }, 3000);
     return () => clearTimeout(autoSaveTimeoutRef.current);
   }, [writing, loading]);
@@ -223,13 +293,18 @@ export function WritingEditor() {
 
   // Stable update callback using useCallback
   const handleUpdateWriting = useCallback((updatedWriting: Writing) => {
+    persistDraftNow(updatedWriting);
     setWriting(updatedWriting);
-  }, []);
+  }, [persistDraftNow]);
 
   // Stable callback for content updates
   const handleContentCommit = useCallback((content: string) => {
-    setWriting(prev => ({ ...prev, content }));
-  }, []);
+    setWriting(prev => {
+      const nextWriting = { ...prev, content };
+      persistDraftNow(nextWriting);
+      return nextWriting;
+    });
+  }, [persistDraftNow]);
 
   const insertMarkdown = (before: string, after: string = '') => {
     const textarea = textareaRef.current;
@@ -246,7 +321,11 @@ export function WritingEditor() {
     textarea.value = newText;
 
     // Then update state
-    setWriting(prev => ({ ...prev, content: newText }));
+    setWriting(prev => {
+      const nextWriting = { ...prev, content: newText };
+      persistDraftNow(nextWriting);
+      return nextWriting;
+    });
 
     // Restore cursor position
     setTimeout(() => {
@@ -259,7 +338,11 @@ export function WritingEditor() {
   const insertImageMarkdown = (imageMarkdown: string) => {
     const textarea = textareaRef.current;
     if (!textarea) {
-      setWriting(prev => ({ ...prev, content: `${prev.content}\n${imageMarkdown}\n` }));
+      setWriting(prev => {
+        const nextWriting = { ...prev, content: `${prev.content}\n${imageMarkdown}\n` };
+        persistDraftNow(nextWriting);
+        return nextWriting;
+      });
       return;
     }
 
@@ -272,7 +355,11 @@ export function WritingEditor() {
     textarea.value = newText;
 
     // Then update state
-    setWriting(prev => ({ ...prev, content: newText }));
+    setWriting(prev => {
+      const nextWriting = { ...prev, content: newText };
+      persistDraftNow(nextWriting);
+      return nextWriting;
+    });
 
     setTimeout(() => {
       textarea.focus();
@@ -285,7 +372,11 @@ export function WritingEditor() {
   const insertLinkMarkdown = (linkMarkdown: string) => {
     const textarea = textareaRef.current;
     if (!textarea) {
-      setWriting(prev => ({ ...prev, content: `${prev.content}${prev.content ? '\n' : ''}${linkMarkdown}` }));
+      setWriting(prev => {
+        const nextWriting = { ...prev, content: `${prev.content}${prev.content ? '\n' : ''}${linkMarkdown}` };
+        persistDraftNow(nextWriting);
+        return nextWriting;
+      });
       return;
     }
 
@@ -298,7 +389,11 @@ export function WritingEditor() {
     textarea.value = newText;
 
     // Then update state
-    setWriting(prev => ({ ...prev, content: newText }));
+    setWriting(prev => {
+      const nextWriting = { ...prev, content: newText };
+      persistDraftNow(nextWriting);
+      return nextWriting;
+    });
 
     setTimeout(() => {
       textarea.focus();
@@ -424,10 +519,14 @@ export function WritingEditor() {
             </div>
 
             {/* Local Draft Indicator */}
-            {localDraftStatus === 'saved' && (
-              <div className="flex items-center gap-1 text-xs text-green-400 bg-green-400/10 px-2 py-1 rounded">
-                <HardDrive className="w-3 h-3" />
-                <span>Local ✓</span>
+            {localDraftStatus !== 'idle' && (
+              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${
+                localDraftStatus === 'saving'
+                  ? 'text-yellow-400 bg-yellow-400/10'
+                  : 'text-green-400 bg-green-400/10'
+              }`}>
+                <HardDrive className={`w-3 h-3 ${localDraftStatus === 'saving' ? 'animate-pulse' : ''}`} />
+                <span>{localDraftStatus === 'saving' ? 'Local save...' : 'Local ✓'}</span>
               </div>
             )}
 

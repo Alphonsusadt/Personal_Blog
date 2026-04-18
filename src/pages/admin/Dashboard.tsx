@@ -179,7 +179,7 @@ export function Dashboard() {
                 ) : (
                   recentWritings.map(writing => (
                     <div key={writing._id} className="border-b border-[#334155] last:border-0 pb-3 last:pb-0">
-                      <Link to={`/admin/writings/edit/${writing.id}`} className="block hover:text-purple-400 transition-colors group">
+                      <Link to={`/admin/writings/edit/${writing.id || writing._id || ''}`} className="block hover:text-purple-400 transition-colors group">
                         <h4 className="text-[#F8FAFC] font-medium text-sm line-clamp-1 group-hover:text-purple-300">{writing.title}</h4>
                         <p className="text-[#94A3B8] text-xs mt-1 line-clamp-2">{writing.excerpt}</p>
                         <div className="flex items-center justify-between mt-2">
@@ -224,7 +224,7 @@ export function Dashboard() {
                 ) : (
                   recentBooks.map(book => (
                     <div key={book._id} className="border-b border-[#334155] last:border-0 pb-3 last:pb-0">
-                      <Link to={`/admin/books/edit/${book.id}`} className="block hover:text-amber-400 transition-colors group">
+                      <Link to={`/admin/books/edit/${book.id || book._id || ''}`} className="block hover:text-amber-400 transition-colors group">
                         <h4 className="text-[#F8FAFC] font-medium text-sm line-clamp-1 group-hover:text-amber-300">{book.title}</h4>
                         <p className="text-[#94A3B8] text-xs mt-1">by {book.author}</p>
                         <div className="flex items-center justify-between mt-2">
@@ -273,7 +273,7 @@ export function Dashboard() {
                 ) : (
                   recentProjects.map(project => (
                     <div key={project._id} className="border-b border-[#334155] last:border-0 pb-3 last:pb-0">
-                      <Link to={`/admin/projects/edit/${project.id}`} className="block hover:text-blue-400 transition-colors group">
+                      <Link to={`/admin/projects/edit/${project.id || project._id || ''}`} className="block hover:text-blue-400 transition-colors group">
                         <h4 className="text-[#F8FAFC] font-medium text-sm line-clamp-1 group-hover:text-blue-300">{project.title}</h4>
                         <p className="text-[#94A3B8] text-xs mt-1 line-clamp-2">{project.description}</p>
                         <div className="flex items-center justify-between mt-2">
