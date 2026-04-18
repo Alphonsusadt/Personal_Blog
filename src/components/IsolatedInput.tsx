@@ -6,7 +6,7 @@ interface IsolatedInputProps {
   placeholder?: string;
   className?: string;
   type?: 'text' | 'url';
-  id?: string; // Used to detect when to reset
+  id?: string;
 }
 
 interface IsolatedTextareaProps {
@@ -18,7 +18,7 @@ interface IsolatedTextareaProps {
   id?: string;
 }
 
-// Completely isolated input - won't re-render when parent changes
+// Super smooth isolated input - instant commit on blur
 export const IsolatedInput = React.memo(function IsolatedInput({
   initialValue,
   onCommit,
@@ -30,8 +30,10 @@ export const IsolatedInput = React.memo(function IsolatedInput({
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState(initialValue);
   const lastIdRef = useRef(id);
+  const onCommitRef = useRef(onCommit);
+  onCommitRef.current = onCommit;
 
-  // Only reset when ID changes (different item loaded)
+  // Reset when ID changes
   useEffect(() => {
     if (id !== lastIdRef.current) {
       setValue(initialValue);
@@ -39,42 +41,21 @@ export const IsolatedInput = React.memo(function IsolatedInput({
     }
   }, [id, initialValue]);
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    e.stopPropagation();
-    setValue(e.target.value);
-  }, []);
-
-  const handleBlur = useCallback(() => {
-    onCommit(value);
-  }, [value, onCommit]);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    e.stopPropagation();
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      onCommit(value);
-      inputRef.current?.blur();
-    }
-  }, [value, onCommit]);
-
   return (
     <input
       ref={inputRef}
       type={type}
       value={value}
-      onChange={handleChange}
-      onBlur={handleBlur}
-      onKeyDown={handleKeyDown}
+      onChange={e => { e.stopPropagation(); setValue(e.target.value); }}
+      onBlur={() => onCommitRef.current(value)}
+      onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); inputRef.current?.blur(); }}}
       placeholder={placeholder}
       className={className}
     />
   );
-}, (prevProps, nextProps) => {
-  // Only re-render if ID changes (new item loaded)
-  return prevProps.id === nextProps.id;
-});
+}, (prev, next) => prev.id === next.id);
 
-// Completely isolated textarea
+// Super smooth isolated textarea
 export const IsolatedTextarea = React.memo(function IsolatedTextarea({
   initialValue,
   onCommit,
@@ -83,11 +64,12 @@ export const IsolatedTextarea = React.memo(function IsolatedTextarea({
   rows = 3,
   id
 }: IsolatedTextareaProps) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [value, setValue] = useState(initialValue);
   const lastIdRef = useRef(id);
+  const onCommitRef = useRef(onCommit);
+  onCommitRef.current = onCommit;
 
-  // Only reset when ID changes
+  // Reset when ID changes (different item)
   useEffect(() => {
     if (id !== lastIdRef.current) {
       setValue(initialValue);
@@ -95,35 +77,86 @@ export const IsolatedTextarea = React.memo(function IsolatedTextarea({
     }
   }, [id, initialValue]);
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    e.stopPropagation();
-    setValue(e.target.value);
-  }, []);
-
-  const handleBlur = useCallback(() => {
-    onCommit(value);
-  }, [value, onCommit]);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    e.stopPropagation();
-  }, []);
-
   return (
     <textarea
-      ref={textareaRef}
       value={value}
-      onChange={handleChange}
-      onBlur={handleBlur}
-      onKeyDown={handleKeyDown}
+      onChange={e => { e.stopPropagation(); setValue(e.target.value); }}
+      onBlur={() => onCommitRef.current(value)}
+      onKeyDown={e => e.stopPropagation()}
       placeholder={placeholder}
       className={className}
       rows={rows}
     />
   );
-}, (prevProps, nextProps) => {
-  // Only re-render if ID changes
-  return prevProps.id === nextProps.id;
-});
+}, (prev, next) => prev.id === next.id);
+
+// Isolated Content Editor - for main content with debounced commit
+interface IsolatedContentEditorProps {
+  initialValue: string;
+  onCommit: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+  id?: string;
+  textareaRef?: React.RefObject<HTMLTextAreaElement>;
+}
+
+export const IsolatedContentEditor = React.memo(function IsolatedContentEditor({
+  initialValue,
+  onCommit,
+  placeholder,
+  className,
+  id,
+  textareaRef
+}: IsolatedContentEditorProps) {
+  const internalRef = useRef<HTMLTextAreaElement>(null);
+  const ref = textareaRef || internalRef;
+  const [value, setValue] = useState(initialValue);
+  const lastIdRef = useRef(id);
+  const valueRef = useRef(value);
+  const commitTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  valueRef.current = value;
+
+  // Reset when ID changes (different item)
+  useEffect(() => {
+    if (id !== lastIdRef.current) {
+      setValue(initialValue);
+      lastIdRef.current = id;
+    }
+  }, [id, initialValue]);
+
+  // Commit on unmount
+  useEffect(() => {
+    return () => {
+      clearTimeout(commitTimeoutRef.current);
+      onCommit(valueRef.current);
+    };
+  }, [onCommit]);
+
+  // Debounced commit while typing (500ms) - for smooth autosave
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    e.stopPropagation();
+    const newValue = e.target.value;
+    setValue(newValue);
+    
+    // Debounce commit to parent
+    clearTimeout(commitTimeoutRef.current);
+    commitTimeoutRef.current = setTimeout(() => {
+      onCommit(newValue);
+    }, 500);
+  }, [onCommit]);
+
+  return (
+    <textarea
+      ref={ref as React.RefObject<HTMLTextAreaElement>}
+      value={value}
+      onChange={handleChange}
+      onBlur={() => { clearTimeout(commitTimeoutRef.current); onCommit(value); }}
+      onKeyDown={e => e.stopPropagation()}
+      placeholder={placeholder}
+      className={className}
+    />
+  );
+}, (prev, next) => prev.id === next.id);
 
 // Tag input with completely isolated state
 interface IsolatedTagInputProps {

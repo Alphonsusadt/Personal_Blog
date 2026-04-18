@@ -1,6 +1,6 @@
 import { X, Github, FileText, ExternalLink, RefreshCw } from 'lucide-react';
 import { ImageGallery } from './ImageGallery';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { generateSlug, isValidSlug } from '../utils/slugify';
 import { IsolatedInput, IsolatedTextarea, IsolatedTagInput } from './IsolatedInput';
 
@@ -45,27 +45,31 @@ const devStatuses = [
 export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+  
+  // Use ref to always have latest project without causing re-renders  
+  const projectRef = useRef(project);
+  projectRef.current = project;
 
-  // Stable callbacks using useCallback - won't cause re-renders
+  // Stable callbacks - use ref to get latest project
   const handleDescriptionCommit = useCallback((value: string) => {
-    onUpdate({ ...project, description: value });
-  }, [project, onUpdate]);
+    onUpdate({ ...projectRef.current, description: value });
+  }, [onUpdate]);
 
   const handleGithubUrlCommit = useCallback((value: string) => {
-    onUpdate({ ...project, githubUrl: value });
-  }, [project, onUpdate]);
+    onUpdate({ ...projectRef.current, githubUrl: value });
+  }, [onUpdate]);
 
   const handlePaperUrlCommit = useCallback((value: string) => {
-    onUpdate({ ...project, paperUrl: value });
-  }, [project, onUpdate]);
+    onUpdate({ ...projectRef.current, paperUrl: value });
+  }, [onUpdate]);
 
   const handleDemoUrlCommit = useCallback((value: string) => {
-    onUpdate({ ...project, demoUrl: value });
-  }, [project, onUpdate]);
+    onUpdate({ ...projectRef.current, demoUrl: value });
+  }, [onUpdate]);
 
   const handleAddTag = useCallback((tag: string) => {
-    onUpdate({ ...project, tags: [...project.tags, tag] });
-  }, [project, onUpdate]);
+    onUpdate({ ...projectRef.current, tags: [...projectRef.current.tags, tag] });
+  }, [onUpdate]);
 
   // Auto-generate slug ONLY when: 1) Creating new item, 2) User clicks regenerate
   // REMOVED auto-generation on title change - causes re-renders and scroll jumps!

@@ -1,5 +1,5 @@
 import { X, RefreshCw } from 'lucide-react';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ImageGallery } from './ImageGallery';
 import { generateSlug, isValidSlug } from '../utils/slugify';
 import { IsolatedInput, IsolatedTextarea, IsolatedTagInput } from './IsolatedInput';
@@ -40,19 +40,23 @@ const categories = ['reflections', 'stories', 'fiction'];
 export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, onRemoveImage }: WritingSidebarProps) {
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
+  
+  // Use ref to always have latest writing without causing re-renders
+  const writingRef = useRef(writing);
+  writingRef.current = writing;
 
-  // Stable callbacks for isolated inputs
+  // Stable callbacks - use ref to get latest writing
   const handleExcerptCommit = useCallback((value: string) => {
-    onUpdate({ ...writing, excerpt: value });
-  }, [writing, onUpdate]);
+    onUpdate({ ...writingRef.current, excerpt: value });
+  }, [onUpdate]);
 
   const handleReadTimeCommit = useCallback((value: string) => {
-    onUpdate({ ...writing, readTime: value });
-  }, [writing, onUpdate]);
+    onUpdate({ ...writingRef.current, readTime: value });
+  }, [onUpdate]);
 
   const handleAddTag = useCallback((tag: string) => {
-    onUpdate({ ...writing, tags: [...writing.tags, tag] });
-  }, [writing, onUpdate]);
+    onUpdate({ ...writingRef.current, tags: [...writingRef.current.tags, tag] });
+  }, [onUpdate]);
 
   // Auto-generate slug ONLY when: 1) Creating new item, 2) User clicks regenerate
   // REMOVED auto-generation on title change - causes re-renders and scroll jumps!
