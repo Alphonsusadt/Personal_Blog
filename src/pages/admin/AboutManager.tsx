@@ -16,6 +16,14 @@ interface EducationItem {
   description: LocalizedText;
 }
 
+interface EngineeringProjectItem {
+  id: string;
+  title: LocalizedText;
+  description: LocalizedText;
+  date: string;
+  image: string;
+}
+
 interface AboutData {
   title: LocalizedText;
   subtitle: LocalizedText;
@@ -31,6 +39,7 @@ interface AboutData {
     personalInterests: LocalizedStringArray;
   };
   education: EducationItem[];
+  engineeringProjects: EngineeringProjectItem[];
   quote: LocalizedText;
   contactHeading: LocalizedText;
   contactMessage: LocalizedText;
@@ -41,6 +50,44 @@ const emptyLocalizedText: LocalizedText = { en: '', id: '' };
 const emptyLocalizedArray: LocalizedStringArray = { en: [], id: [] };
 
 const createEducationId = () => `edu-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+const createEngineeringProjectId = () => `eng-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+const defaultEngineeringProjects: EngineeringProjectItem[] = [
+  {
+    id: 'eng-dummy-1',
+    title: {
+      en: 'Portable ECG + SpO2 Monitoring Prototype',
+      id: 'Prototipe Monitoring ECG + SpO2 Portabel',
+    },
+    description: {
+      en: 'Built a compact biomedical monitoring prototype that streams ECG and oxygen saturation data for remote assessment experiments.',
+      id: 'Membangun prototipe monitoring biomedis ringkas yang mengirim data ECG dan saturasi oksigen untuk eksperimen asesmen jarak jauh.',
+    },
+    date: '2025-08-14',
+    image: '',
+  },
+  {
+    id: 'eng-dummy-2',
+    title: {
+      en: 'EMG Gesture Classifier for Assistive Control',
+      id: 'Klasifikasi Gestur EMG untuk Kontrol Asistif',
+    },
+    description: {
+      en: 'Developed an EMG signal feature pipeline and gesture classifier to test intuitive assistive hand-control scenarios.',
+      id: 'Mengembangkan pipeline fitur sinyal EMG dan klasifikasi gestur untuk menguji skenario kontrol tangan asistif yang intuitif.',
+    },
+    date: '2026-01-20',
+    image: '',
+  },
+];
+
+const cloneEngineeringProjects = (items: EngineeringProjectItem[]): EngineeringProjectItem[] => (
+  items.map((item) => ({
+    ...item,
+    title: { ...item.title },
+    description: { ...item.description },
+  }))
+);
 
 const asLocalizedText = (value: unknown, fallback = ''): LocalizedText => {
   if (typeof value === 'string') {
@@ -93,6 +140,7 @@ const defaultData: AboutData = {
     personalInterests: { ...emptyLocalizedArray },
   },
   education: [],
+  engineeringProjects: cloneEngineeringProjects(defaultEngineeringProjects),
   quote: { ...emptyLocalizedText },
   contactHeading: { ...emptyLocalizedText },
   contactMessage: { ...emptyLocalizedText },
@@ -118,6 +166,20 @@ const normalizeAboutData = (raw: unknown): AboutData => {
     })
     : [];
 
+  const hasEngineeringProjectsField = Array.isArray(data.engineeringProjects);
+  const engineeringProjects = hasEngineeringProjectsField
+    ? (data.engineeringProjects as unknown[]).map((item) => {
+      const project = (item && typeof item === 'object') ? (item as Record<string, unknown>) : {};
+      return {
+        id: typeof project.id === 'string' ? project.id : createEngineeringProjectId(),
+        title: asLocalizedText(project.title),
+        description: asLocalizedText(project.description),
+        date: typeof project.date === 'string' ? project.date : '',
+        image: typeof project.image === 'string' ? project.image : '',
+      };
+    })
+    : cloneEngineeringProjects(defaultEngineeringProjects);
+
   return {
     title: asLocalizedText(data.title),
     subtitle: asLocalizedText(data.subtitle),
@@ -137,6 +199,7 @@ const normalizeAboutData = (raw: unknown): AboutData => {
       personalInterests: asLocalizedArray(skills.personalInterests),
     },
     education,
+    engineeringProjects,
     quote: asLocalizedText(data.quote),
     contactHeading: asLocalizedText(data.contactHeading),
     contactMessage: asLocalizedText(data.contactMessage),
@@ -174,6 +237,7 @@ const hasMeaningfulAboutData = (value: AboutData): boolean => {
     value.skills.personalInterests.en.length ||
     value.skills.personalInterests.id.length ||
     value.education.length ||
+    value.engineeringProjects.length ||
     value.quote.en.trim() ||
     value.quote.id.trim() ||
     value.contactHeading.en.trim() ||
@@ -197,7 +261,11 @@ export function AboutManager() {
   const [photoCropFileName, setPhotoCropFileName] = useState('');
   const [skillInputs, setSkillInputs] = useState({ programming: '', specializations: '', academicInterests: '', personalInterests: '' });
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const engineeringImageInputRef = useRef<HTMLInputElement>(null);
   const photoObjectUrlRef = useRef<string | null>(null);
+  const [activeEngineeringImageIndex, setActiveEngineeringImageIndex] = useState<number | null>(null);
+  const [uploadingEngineeringImage, setUploadingEngineeringImage] = useState(false);
+  const [engineeringImageError, setEngineeringImageError] = useState('');
 
   const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
@@ -373,6 +441,85 @@ export function AboutManager() {
         },
       ],
     }));
+  };
+
+  const addEngineeringProject = () => {
+    setData(prev => ({
+      ...prev,
+      engineeringProjects: [
+        ...prev.engineeringProjects,
+        {
+          id: createEngineeringProjectId(),
+          title: { ...emptyLocalizedText },
+          description: { ...emptyLocalizedText },
+          date: '',
+          image: '',
+        },
+      ],
+    }));
+  };
+
+  const updateEngineeringProject = (
+    index: number,
+    field: Exclude<keyof EngineeringProjectItem, 'id'>,
+    value: string,
+  ) => {
+    setData(prev => ({
+      ...prev,
+      engineeringProjects: prev.engineeringProjects.map((item, i) => {
+        if (i !== index) return item;
+        if (field === 'date' || field === 'image') {
+          return { ...item, [field]: value };
+        }
+
+        return {
+          ...item,
+          [field]: {
+            ...item[field],
+            [lang]: value,
+          },
+        };
+      }),
+    }));
+  };
+
+  const removeEngineeringProject = (index: number) => {
+    setData(prev => ({
+      ...prev,
+      engineeringProjects: prev.engineeringProjects.filter((_, idx) => idx !== index),
+    }));
+  };
+
+  const uploadEngineeringProjectImage = async (file: File, index: number) => {
+    try {
+      setUploadingEngineeringImage(true);
+      setEngineeringImageError('');
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('altText', data.engineeringProjects[index]?.title[lang] || 'Engineering project image');
+
+      const response = await fetch(`${apiBaseUrl}/api/media/upload`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('cms_token') || ''}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.message || 'Upload gagal');
+      }
+
+      const result = await response.json();
+      updateEngineeringProject(index, 'image', result.imageUrl);
+    } catch (err) {
+      setEngineeringImageError(err instanceof Error ? err.message : 'Upload gagal');
+    } finally {
+      setUploadingEngineeringImage(false);
+      setActiveEngineeringImageIndex(null);
+    }
   };
 
   const updateEducation = (
@@ -556,6 +703,96 @@ export function AboutManager() {
               </div>
             ))}
           </div>
+        </section>
+
+        <section className="bg-[#1E293B] border border-[#334155] rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-[#F8FAFC]">Engineering Project Timeline</h2>
+            <button onClick={addEngineeringProject} className="flex items-center gap-1 text-[#60A5FA] text-sm hover:underline"><Plus className="w-4 h-4" /> Add</button>
+          </div>
+
+          {engineeringImageError ? <p className="mb-3 text-xs text-red-400">{engineeringImageError}</p> : null}
+
+          <div className="space-y-4">
+            {data.engineeringProjects.map((item, i) => (
+              <div key={item.id} className="bg-[#0F172A] rounded-lg p-4 relative">
+                <button onClick={() => removeEngineeringProject(i)} className="absolute top-2 right-2 text-[#94A3B8] hover:text-red-400"><X className="w-4 h-4" /></button>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                  <input
+                    value={item.title[lang]}
+                    onChange={e => updateEngineeringProject(i, 'title', e.target.value)}
+                    placeholder={`Project title (${lang.toUpperCase()})`}
+                    className={inputCls}
+                  />
+                  <input
+                    type="date"
+                    value={item.date}
+                    onChange={e => updateEngineeringProject(i, 'date', e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+
+                <textarea
+                  value={item.description[lang]}
+                  onChange={e => updateEngineeringProject(i, 'description', e.target.value)}
+                  placeholder={`Project description (${lang.toUpperCase()})`}
+                  rows={3}
+                  className={`${inputCls} mb-3`}
+                />
+
+                <div className="space-y-2">
+                  <input
+                    value={item.image}
+                    onChange={e => updateEngineeringProject(i, 'image', e.target.value)}
+                    placeholder="Image URL (optional)"
+                    className={inputCls}
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveEngineeringImageIndex(i);
+                        engineeringImageInputRef.current?.click();
+                      }}
+                      disabled={uploadingEngineeringImage}
+                      className="flex items-center gap-2 rounded-lg bg-[#334155] px-3 py-2 text-sm text-[#F8FAFC] hover:bg-[#475569] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Upload className="h-4 w-4" />
+                      {uploadingEngineeringImage && activeEngineeringImageIndex === i ? 'Uploading...' : 'Upload Image'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateEngineeringProject(i, 'image', '')}
+                      className="rounded-lg border border-[#334155] px-3 py-2 text-sm text-[#94A3B8] hover:text-[#F8FAFC]"
+                    >
+                      Clear
+                    </button>
+                  </div>
+
+                  {item.image ? (
+                    <div className="rounded-lg border border-dashed border-[#334155] bg-[#111827] p-2 w-full max-w-xs">
+                      <img src={item.image} alt={`Engineering project ${i + 1}`} className="h-28 w-full rounded object-cover" />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <input
+            ref={engineeringImageInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={e => {
+              const file = e.target.files?.[0];
+              if (file && activeEngineeringImageIndex !== null) {
+                void uploadEngineeringProjectImage(file, activeEngineeringImageIndex);
+              }
+              e.currentTarget.value = '';
+            }}
+          />
         </section>
 
         <section className="bg-[#1E293B] border border-[#334155] rounded-xl p-6">
