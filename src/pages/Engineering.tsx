@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Search, Code, Activity, Database, X } from 'lucide-react';
 import { ProjectCard } from '../components/ProjectCard';
 import { api } from '../lib/api';
+import { useNavigate } from 'react-router-dom';
 
 interface Project {
   id: string;
@@ -18,6 +19,7 @@ interface Project {
 }
 
 export function Engineering() {
+  const navigate = useNavigate();
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -25,14 +27,34 @@ export function Engineering() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
-    api.getPublicProjects()
-      .then((projects: Project[]) => {
-        setAllProjects(projects);
+
+    api.getPublicSettings()
+      .then((settings: any) => {
+        const enabled = settings?.sections?.projects?.enabled !== false;
+        if (!enabled) {
+          navigate('/', { replace: true });
+          return;
+        }
+        return api.getPublicProjects().then((projects: Project[]) => {
+          if (!cancelled) setAllProjects(projects);
+        });
       })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+      .catch(() => {
+        // If settings fail, fall back to attempting to load projects
+        return api.getPublicProjects().then((projects: Project[]) => {
+          if (!cancelled) setAllProjects(projects);
+        }).catch(console.error);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
 
   const categories = [
     { value: 'all', label: 'All Projects', icon: Code },

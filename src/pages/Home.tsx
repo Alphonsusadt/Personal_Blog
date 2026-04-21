@@ -25,6 +25,14 @@ interface HomeData {
   };
 }
 
+interface PublicSettings {
+  sections?: {
+    writings?: { enabled?: boolean };
+    projects?: { enabled?: boolean };
+    books?: { enabled?: boolean };
+  };
+}
+
 const asLocalizedText = (value: unknown, fallback = ''): LocalizedText => {
   if (typeof value === 'string') {
     return { en: value, id: value };
@@ -251,6 +259,11 @@ export function Home() {
   const [recentWritings, setRecentWritings] = useState<Writing[]>([]);
   const [featuredBooks, setFeaturedBooks] = useState<Book[]>([]);
   const [homeData, setHomeData] = useState<HomeData>(defaultHomeData);
+  const [sectionVisibility, setSectionVisibility] = useState({
+    writings: true,
+    projects: true,
+    books: true,
+  });
   const { language } = useSiteLanguage();
 
   // Generate signal paths once on mount for organic variation
@@ -269,6 +282,14 @@ export function Home() {
     api.getPublicProjects().then((data: Project[]) => setRecentProjects(data.slice(0, 3))).catch(console.error);
     api.getPublicWritings().then((data: Writing[]) => setRecentWritings(data.slice(0, 3))).catch(console.error);
     api.getPublicBooks().then((data: Book[]) => setFeaturedBooks(data.slice(0, 3))).catch(console.error);
+
+    api.getPublicSettings().then((settings: PublicSettings) => {
+      setSectionVisibility({
+        writings: settings.sections?.writings?.enabled !== false,
+        projects: settings.sections?.projects?.enabled !== false,
+        books: settings.sections?.books?.enabled !== false,
+      });
+    }).catch(console.error);
   }, []);
 
   return (
@@ -620,6 +641,7 @@ export function Home() {
       </section>
 
       {/* Recent Projects Section */}
+      {sectionVisibility.projects ? (
       <section className="py-16 bg-white dark:bg-[#0F172A]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -648,8 +670,10 @@ export function Home() {
           </div>
         </div>
       </section>
+      ) : null}
 
       {/* Recent Writings Section */}
+      {sectionVisibility.writings ? (
       <section className="py-16">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -678,8 +702,10 @@ export function Home() {
           </div>
         </div>
       </section>
+      ) : null}
 
       {/* Featured Books Section */}
+      {sectionVisibility.books ? (
       <section className="py-16 bg-white dark:bg-[#0F172A]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -708,6 +734,7 @@ export function Home() {
           </div>
         </div>
       </section>
+      ) : null}
     </div>
   );
 }

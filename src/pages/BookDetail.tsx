@@ -122,12 +122,41 @@ export function BookDetail() {
       setLoading(false);
       return;
     }
+    let cancelled = false;
     setLoading(true);
-    api.get(`/api/books/public/${id}`, false)
-      .then((data: BookType) => setBook(data))
-      .catch(() => setBook(null))
-      .finally(() => setLoading(false));
-  }, [id]);
+
+    api.getPublicSettings()
+      .then((settings: any) => {
+        const enabled = settings?.sections?.books?.enabled !== false;
+        if (!enabled) {
+          navigate('/', { replace: true });
+          return;
+        }
+        return api.get(`/api/books/public/${id}`, false)
+          .then((data: BookType) => {
+            if (!cancelled) setBook(data);
+          })
+          .catch(() => {
+            if (!cancelled) setBook(null);
+          });
+      })
+      .catch(() => {
+        return api.get(`/api/books/public/${id}`, false)
+          .then((data: BookType) => {
+            if (!cancelled) setBook(data);
+          })
+          .catch(() => {
+            if (!cancelled) setBook(null);
+          });
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, navigate]);
 
   if (loading) {
     return (

@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Search, Book, User, Sparkles } from 'lucide-react';
 import { BookCard } from '../components/BookCard';
 import { api } from '../lib/api';
+import { useNavigate } from 'react-router-dom';
 
 interface Book {
   id: string;
@@ -19,20 +20,40 @@ interface Book {
 }
 
 export function Library() {
+  const navigate = useNavigate();
   const [allBooks, setAllBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
-    api.getPublicBooks()
-      .then((books: Book[]) => {
-        setAllBooks(books);
+
+    api.getPublicSettings()
+      .then((settings: any) => {
+        const enabled = settings?.sections?.books?.enabled !== false;
+        if (!enabled) {
+          navigate('/', { replace: true });
+          return;
+        }
+        return api.getPublicBooks().then((books: Book[]) => {
+          if (!cancelled) setAllBooks(books);
+        });
       })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+      .catch(() => {
+        return api.getPublicBooks().then((books: Book[]) => {
+          if (!cancelled) setAllBooks(books);
+        }).catch(console.error);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
 
   const categories = [
     { value: 'all', label: 'All Books', icon: Book },

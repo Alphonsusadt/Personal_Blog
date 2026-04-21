@@ -1,5 +1,8 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
+let publicSettingsCache: unknown | null = null;
+let publicSettingsPromise: Promise<unknown> | null = null;
+
 export const api = {
   getToken() {
     return localStorage.getItem('cms_token');
@@ -77,5 +80,20 @@ export const api = {
   async getPublicBooks() { return this.get('/api/books/public', false); },
   async getPublicAbout() { return this.get('/api/about/public', false); },
   async getPublicHome() { return this.get('/api/home/public', false); },
-  async getPublicSettings() { return this.get('/api/settings/public', false); },
+  async getPublicSettings(opts?: { force?: boolean }) {
+    if (opts?.force) {
+      publicSettingsCache = null;
+      publicSettingsPromise = null;
+    }
+    if (publicSettingsCache) return publicSettingsCache;
+    if (!publicSettingsPromise) {
+      publicSettingsPromise = this.get('/api/settings/public', false).then((data) => {
+        publicSettingsCache = data;
+        return data;
+      }).finally(() => {
+        publicSettingsPromise = null;
+      });
+    }
+    return publicSettingsPromise;
+  },
 };

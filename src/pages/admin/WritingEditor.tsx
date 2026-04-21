@@ -12,6 +12,7 @@ import { ArrowLeft, Check, Clock, Eye, EyeOff, Maximize2, HardDrive, AlertCircle
 import { renderMarkdown } from '../../utils/renderers';
 import { formatDraftTime } from '../../hooks/useLocalDraft';
 import { IsolatedContentEditor } from '../../components/IsolatedInput';
+import { AutoFixButton } from '../../components/AutoFixButton';
 
 interface Writing {
   _id?: string;
@@ -108,6 +109,7 @@ export function WritingEditor() {
   const [localTitle, setLocalTitle] = useState(''); // Local state for smooth title typing
   const [loading, setLoading] = useState(!!slug);
   const [isSaving, setIsSaving] = useState(false);
+  const [writingsSectionEnabled, setWritingsSectionEnabled] = useState(true);
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
@@ -116,6 +118,16 @@ export function WritingEditor() {
   const [localDraftStatus, setLocalDraftStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showDraftRecovery, setShowDraftRecovery] = useState(false);
   const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null);
+
+  useEffect(() => {
+    api.get('/api/settings')
+      .then((settings: any) => {
+        setWritingsSectionEnabled(settings?.sections?.writings?.enabled !== false);
+      })
+      .catch(() => {
+        setWritingsSectionEnabled(true);
+      });
+  }, []);
 
   const draftKey = `writing_draft_${slug || 'new'}`;
 
@@ -301,6 +313,15 @@ export function WritingEditor() {
   const handleContentCommit = useCallback((content: string) => {
     setWriting(prev => {
       const nextWriting = { ...prev, content };
+      persistDraftNow(nextWriting);
+      return nextWriting;
+    });
+  }, [persistDraftNow]);
+
+  const handleAutoFixContent = useCallback((nextContent: string) => {
+    setWriting(prev => {
+      if (prev.content === nextContent) return prev;
+      const nextWriting = { ...prev, content: nextContent };
       persistDraftNow(nextWriting);
       return nextWriting;
     });
@@ -590,11 +611,11 @@ export function WritingEditor() {
             >
               {isSaving
                 ? 'Saving...'
-                : writing.status === 'scheduled'
-                  ? 'Schedule'
-                  : writing.status === 'published'
-                    ? 'Update'
-                    : 'Save Draft'}
+                : writing.status === 'published'
+                  ? 'Update'
+                  : writingsSectionEnabled
+                    ? (writing.status === 'scheduled' ? 'Schedule' : 'Save Draft')
+                    : 'Save'}
             </button>
           </div>
         </div>
@@ -625,18 +646,25 @@ export function WritingEditor() {
                 onOpenLinkDialog={() => setLinkDialogOpen(true)}
               />
 
-              {/* Live Preview Toggle */}
-              <button
-                onClick={() => setShowPreview(!showPreview)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  showPreview
-                    ? 'bg-[#1E40AF] text-white'
-                    : 'bg-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC] border border-[#334155]'
-                }`}
-              >
-                {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                <span className="hidden sm:inline">{showPreview ? 'Hide Preview' : 'Live Preview'}</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <AutoFixButton
+                  text={writing.content}
+                  onApply={handleAutoFixContent}
+                />
+
+                {/* Live Preview Toggle */}
+                <button
+                  onClick={() => setShowPreview(!showPreview)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    showPreview
+                      ? 'bg-[#1E40AF] text-white'
+                      : 'bg-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC] border border-[#334155]'
+                  }`}
+                >
+                  {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  <span className="hidden sm:inline">{showPreview ? 'Hide Preview' : 'Live Preview'}</span>
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center justify-between text-xs text-[#94A3B8] px-1">
@@ -704,6 +732,7 @@ export function WritingEditor() {
                 isSaving={isSaving}
                 wordCount={wordCount}
                 characterCount={characterCount}
+                sectionEnabled={writingsSectionEnabled}
               />
             </div>
           </div>
@@ -716,6 +745,7 @@ export function WritingEditor() {
         onClose={() => setImageDialogOpen(false)}
         onInsert={insertImageMarkdown}
         onScheduleChange={(scheduled) => {
+          if (!writingsSectionEnabled) return;
           if (scheduled && writing.status !== 'scheduled') {
             setWriting(prev => ({ ...prev, status: 'scheduled' }));
           }

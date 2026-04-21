@@ -16,15 +16,35 @@ export function Footer() {
     footerName: 'Alphonsus Aditya',
   });
 
+  const [sections, setSections] = useState({
+    writings: true,
+    projects: true,
+    books: true,
+  });
+
   useEffect(() => {
     api.getPublicSettings()
       .then((data) => {
         if (data && data.footerBio) {
           setSettings(prev => ({ ...prev, ...data }));
         }
+
+        setSections({
+          writings: data?.sections?.writings?.enabled !== false,
+          projects: data?.sections?.projects?.enabled !== false,
+          books: data?.sections?.books?.enabled !== false,
+        });
       })
       .catch(console.error);
   }, []);
+
+  const quickLinks = [
+    { to: '/', label: 'Home' },
+    { to: '/engineering', label: 'Engineering', enabled: sections.projects },
+    { to: '/writings', label: 'Writings', enabled: sections.writings },
+    { to: '/library', label: 'Library', enabled: sections.books },
+    { to: '/about', label: 'About' },
+  ].filter((l) => l.enabled !== false);
 
   return (
     <footer className="bg-white dark:bg-[#0F172A] border-t border-[#E5E7EB] dark:border-[#334155] mt-20">
@@ -69,31 +89,16 @@ export function Footer() {
               Quick Links
             </h4>
             <ul className="space-y-2">
-              <li>
-                <Link to="/" className="text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors text-sm">
-                  Home
-                </Link>
-              </li>
-              <li>
-                <Link to="/engineering" className="text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors text-sm">
-                  Engineering
-                </Link>
-              </li>
-              <li>
-                <Link to="/writings" className="text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors text-sm">
-                  Writings
-                </Link>
-              </li>
-              <li>
-                <Link to="/library" className="text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors text-sm">
-                  Library
-                </Link>
-              </li>
-              <li>
-                <Link to="/about" className="text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors text-sm">
-                  About
-                </Link>
-              </li>
+              {quickLinks.map((link) => (
+                <li key={link.to}>
+                  <Link
+                    to={link.to}
+                    className="text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors text-sm"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 

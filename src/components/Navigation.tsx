@@ -1,14 +1,35 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Sun, Moon, Github, Linkedin, Mail } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
+import { api } from '../lib/api';
 
 export function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [sections, setSections] = useState({
+    writings: true,
+    projects: true,
+    books: true,
+  });
   const location = useLocation();
   const { language, setLanguage } = useSiteLanguage();
+
+  useEffect(() => {
+    api.getPublicSettings()
+      .then((settings: any) => {
+        setSections({
+          writings: settings?.sections?.writings?.enabled !== false,
+          projects: settings?.sections?.projects?.enabled !== false,
+          books: settings?.sections?.books?.enabled !== false,
+        });
+      })
+      .catch(() => {
+        // If settings fail to load, default to showing all nav items.
+        setSections({ writings: true, projects: true, books: true });
+      });
+  }, []);
 
   const scrollPageToTop = () => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -19,13 +40,16 @@ export function Navigation() {
     document.documentElement.classList.toggle('dark');
   };
 
-  const navItems = [
-    { path: '/', label: 'Home' },
-    { path: '/engineering', label: 'Engineering' },
-    { path: '/writings', label: 'Writings' },
-    { path: '/library', label: 'Library' },
-    { path: '/about', label: 'About' }
-  ];
+  const navItems = useMemo(() => {
+    const items = [
+      { path: '/', label: 'Home' },
+      { path: '/engineering', label: 'Engineering', enabled: sections.projects },
+      { path: '/writings', label: 'Writings', enabled: sections.writings },
+      { path: '/library', label: 'Library', enabled: sections.books },
+      { path: '/about', label: 'About' },
+    ];
+    return items.filter((item) => item.enabled !== false);
+  }, [sections.books, sections.projects, sections.writings]);
 
   return (
     <header className="sticky top-0 z-50 bg-white/80 dark:bg-[#0F172A]/80 backdrop-blur-sm border-b border-[#E5E7EB] dark:border-[#334155]">

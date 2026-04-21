@@ -1,25 +1,45 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 
+function withSectionDefaults(doc = {}) {
+  const sections = doc.sections && typeof doc.sections === 'object' ? doc.sections : {};
+  return {
+    ...doc,
+    sections: {
+      ...sections,
+      writings: {
+        enabled: sections.writings?.enabled !== false,
+      },
+      projects: {
+        enabled: sections.projects?.enabled !== false,
+      },
+      books: {
+        enabled: sections.books?.enabled !== false,
+      },
+    },
+  };
+}
+
 export default function settingsRoutes(db) {
   const router = Router();
   const col = db.collection('settings');
 
   router.get('/public', async (_req, res) => {
     const doc = await col.findOne({ key: 'settings' });
-    res.json(doc || {});
+    res.json(withSectionDefaults(doc || {}));
   });
 
   router.get('/', authMiddleware, async (_req, res) => {
     const doc = await col.findOne({ key: 'settings' });
-    res.json(doc || {});
+    res.json(withSectionDefaults(doc || {}));
   });
 
   router.put('/', authMiddleware, async (req, res) => {
     const { _id, ...data } = req.body;
-    data.key = 'settings';
-    data.updatedAt = new Date();
-    await col.updateOne({ key: 'settings' }, { $set: data }, { upsert: true });
+    const normalized = withSectionDefaults(data);
+    normalized.key = 'settings';
+    normalized.updatedAt = new Date();
+    await col.updateOne({ key: 'settings' }, { $set: normalized }, { upsert: true });
     res.json({ message: 'Updated' });
   });
 

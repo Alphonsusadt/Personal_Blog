@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Search, BookOpen, Edit3, PenTool } from 'lucide-react';
 import { WritingCard } from '../components/WritingCard';
 import { api } from '../lib/api';
+import { useNavigate } from 'react-router-dom';
 
 interface Writing {
   id: string;
@@ -16,20 +17,40 @@ interface Writing {
 }
 
 export function Writings() {
+  const navigate = useNavigate();
   const [allWritings, setAllWritings] = useState<Writing[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
-    api.getPublicWritings()
-      .then((writings: Writing[]) => {
-        setAllWritings(writings);
+
+    api.getPublicSettings()
+      .then((settings: any) => {
+        const enabled = settings?.sections?.writings?.enabled !== false;
+        if (!enabled) {
+          navigate('/', { replace: true });
+          return;
+        }
+        return api.getPublicWritings().then((writings: Writing[]) => {
+          if (!cancelled) setAllWritings(writings);
+        });
       })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+      .catch(() => {
+        return api.getPublicWritings().then((writings: Writing[]) => {
+          if (!cancelled) setAllWritings(writings);
+        }).catch(console.error);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
 
   const categories = [
     { value: 'all', label: 'All Writings', icon: BookOpen },

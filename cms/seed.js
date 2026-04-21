@@ -381,7 +381,12 @@ const settings = {
     { path: '/writings', label: 'Writings' },
     { path: '/library', label: 'Library' },
     { path: '/about', label: 'About' }
-  ]
+  ],
+  sections: {
+    writings: { enabled: true },
+    projects: { enabled: true },
+    books: { enabled: true }
+  }
 };
 
 async function seed() {
@@ -401,16 +406,16 @@ async function seed() {
   ]);
   console.log('Cleared existing data');
 
-  // Insert data (ensure all items have status: 'published')
-  const publishedProjects = projects.map(p => ({ ...p, status: 'published' }));
+  // Insert data (ensure all items have status: 'published' and visible: true)
+  const publishedProjects = projects.map(p => ({ ...p, status: 'published', visible: true }));
   await db.collection('projects').insertMany(publishedProjects);
   console.log(`Inserted ${projects.length} projects`);
 
-  const publishedWritings = writings.map(w => ({ ...w, status: 'published' }));
+  const publishedWritings = writings.map(w => ({ ...w, status: 'published', visible: true }));
   await db.collection('writings').insertMany(publishedWritings);
   console.log(`Inserted ${writings.length} writings`);
 
-  const publishedBooks = books.map(b => ({ ...b, status: 'published' }));
+  const publishedBooks = books.map(b => ({ ...b, status: 'published', visible: true }));
   await db.collection('books').insertMany(publishedBooks);
   console.log(`Inserted ${books.length} books`);
 

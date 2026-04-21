@@ -30,11 +30,12 @@ interface BookSidebarProps {
   onUpdate: (book: Book) => void;
   onSave: () => Promise<void>;
   isSaving?: boolean;
+  sectionEnabled?: boolean;
 }
 
 const categories = ['technical', 'biography', 'spiritual', 'philosophy'];
 
-export function BookSidebar({ book, onUpdate, onSave, isSaving }: BookSidebarProps) {
+export function BookSidebar({ book, onUpdate, onSave, isSaving, sectionEnabled = true }: BookSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   
   // Use ref to always have latest book without causing re-renders
@@ -107,6 +108,7 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving }: BookSidebarPro
         <div className="space-y-3">
           <select
             value={book.status || 'draft'}
+            disabled={!sectionEnabled}
             onChange={e => {
               const newStatus = e.target.value as 'draft' | 'published' | 'scheduled';
               const updates: Partial<Book> = { status: newStatus };
@@ -118,12 +120,18 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving }: BookSidebarPro
               }
               onUpdate({ ...book, ...updates });
             }}
-            className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+            className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value="draft">📝 Draft</option>
             <option value="published">✅ Published</option>
             <option value="scheduled">⏰ Scheduled</option>
           </select>
+
+          {!sectionEnabled ? (
+            <p className="text-[11px] text-[#94A3B8]">
+              Library section dimatikan di Settings. Publish/Schedule dinonaktifkan (kamu masih bisa simpan).
+            </p>
+          ) : null}
 
           {/* Datetime picker untuk scheduled */}
           {book.status === 'scheduled' && (
@@ -132,8 +140,9 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving }: BookSidebarPro
               <input
                 type="datetime-local"
                 value={toDateTimeLocal(book.publishAt)}
+                disabled={!sectionEnabled}
                 onChange={e => onUpdate({ ...book, publishAt: fromDateTimeLocal(e.target.value) })}
-                className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+                className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <p className="text-[11px] text-[#94A3B8] mt-1">
                 Akan otomatis tampil saat waktunya tiba.

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
-import { Plus, Pencil, Trash2, Clock, Calendar } from 'lucide-react';
+import { Plus, Pencil, Trash2, Clock, Calendar, Eye, EyeOff } from 'lucide-react';
 
 interface Project {
   _id?: string;
@@ -12,6 +12,7 @@ interface Project {
   category: string;
   content: string;
   status?: 'draft' | 'published' | 'scheduled';
+  visible?: boolean;
   publishAt?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -38,6 +39,15 @@ export function ProjectsManager() {
   const handleDelete = async (id: string) => {
     if (!confirm('Hapus project ini?')) return;
     await api.del(`/api/projects/${id}`);
+    load();
+  };
+
+  const handleToggleVisibility = async (item: Project) => {
+    if (!item._id) return;
+    await api.put(`/api/projects/${item._id}`, {
+      ...item,
+      visible: item.visible === false,
+    });
     load();
   };
 
@@ -94,6 +104,9 @@ export function ProjectsManager() {
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => navigate(`/admin/projects/edit/${item.id || item._id || ''}`)} className="p-2 text-[#94A3B8] hover:text-[#60A5FA] transition-colors"><Pencil className="w-4 h-4" /></button>
+                      <button onClick={() => handleToggleVisibility(item)} className="p-2 text-[#94A3B8] hover:text-emerald-400 transition-colors" title={item.visible === false ? 'Show on public site' : 'Hide from public site'}>
+                        {item.visible === false ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
                       <button onClick={() => handleDelete(item._id!)} className="p-2 text-[#94A3B8] hover:text-red-400 transition-colors"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </td>

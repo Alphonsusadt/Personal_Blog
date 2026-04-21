@@ -12,6 +12,7 @@ import { ArrowLeft, Check, Clock, Eye, EyeOff, Maximize2, HardDrive, AlertCircle
 import { renderMarkdown } from '../../utils/renderers';
 import { formatDraftTime } from '../../hooks/useLocalDraft';
 import { IsolatedContentEditor } from '../../components/IsolatedInput';
+import { AutoFixButton } from '../../components/AutoFixButton';
 
 interface Project {
   _id?: string;
@@ -116,6 +117,7 @@ export function ProjectEditor() {
   const [localTitle, setLocalTitle] = useState(''); // Local state for smooth title typing
   const [loading, setLoading] = useState(!!slug);
   const [isSaving, setIsSaving] = useState(false);
+  const [projectsSectionEnabled, setProjectsSectionEnabled] = useState(true);
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showPreview, setShowPreview] = useState(false);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
@@ -124,6 +126,17 @@ export function ProjectEditor() {
   const [localDraftStatus, setLocalDraftStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showDraftRecovery, setShowDraftRecovery] = useState(false);
   const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null);
+
+  useEffect(() => {
+    api.get('/api/settings')
+      .then((settings: any) => {
+        setProjectsSectionEnabled(settings?.sections?.projects?.enabled !== false);
+      })
+      .catch(() => {
+        // If settings fail, default to enabled so admin isn't blocked.
+        setProjectsSectionEnabled(true);
+      });
+  }, []);
 
   const draftKey = `project_draft_${slug || 'new'}`;
 
@@ -302,6 +315,15 @@ export function ProjectEditor() {
   const handleContentCommit = useCallback((content: string) => {
     setProject(prev => {
       const nextProject = { ...prev, content };
+      persistDraftNow(nextProject);
+      return nextProject;
+    });
+  }, [persistDraftNow]);
+
+  const handleAutoFixContent = useCallback((nextContent: string) => {
+    setProject(prev => {
+      if (prev.content === nextContent) return prev;
+      const nextProject = { ...prev, content: nextContent };
       persistDraftNow(nextProject);
       return nextProject;
     });
@@ -564,11 +586,20 @@ export function ProjectEditor() {
             )}
 
             <button
-              onClick={() => handleSave(project.status !== 'published')}
+              onClick={() => {
+                const shouldPublish = projectsSectionEnabled && project.status !== 'published';
+                handleSave(shouldPublish);
+              }}
               disabled={isSaving || !project.title}
               className="px-3 sm:px-4 py-2 bg-[#1E40AF] text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-[#1E3A8A] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isSaving ? 'Saving...' : project.status === 'published' ? 'Update' : 'Publish'}
+              {isSaving
+                ? 'Saving...'
+                : project.status === 'published'
+                  ? 'Update'
+                  : projectsSectionEnabled
+                    ? 'Publish'
+                    : 'Save'}
             </button>
           </div>
         </div>
@@ -600,18 +631,25 @@ export function ProjectEditor() {
                 onOpenLinkDialog={() => setLinkDialogOpen(true)}
               />
 
-              {/* Live Preview Toggle */}
-              <button
-                onClick={() => setShowPreview(!showPreview)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  showPreview
-                    ? 'bg-[#1E40AF] text-white'
-                    : 'bg-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC] border border-[#334155]'
-                }`}
-              >
-                {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                <span className="hidden sm:inline">{showPreview ? 'Hide Preview' : 'Live Preview'}</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <AutoFixButton
+                  text={project.content}
+                  onApply={handleAutoFixContent}
+                />
+
+                {/* Live Preview Toggle */}
+                <button
+                  onClick={() => setShowPreview(!showPreview)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    showPreview
+                      ? 'bg-[#1E40AF] text-white'
+                      : 'bg-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC] border border-[#334155]'
+                  }`}
+                >
+                  {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  <span className="hidden sm:inline">{showPreview ? 'Hide Preview' : 'Live Preview'}</span>
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center justify-between text-xs text-[#94A3B8] px-1">
@@ -677,6 +715,7 @@ export function ProjectEditor() {
                 onUpdate={handleUpdateProject}
                 onSave={handleSave}
                 isSaving={isSaving}
+                sectionEnabled={projectsSectionEnabled}
               />
             </div>
           </div>

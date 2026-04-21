@@ -198,12 +198,41 @@ export function ProjectDetail() {
       setLoading(false);
       return;
     }
+    let cancelled = false;
     setLoading(true);
-    api.get(`/api/projects/public/${id}`, false)
-      .then((data: Project) => setProject(data))
-      .catch(() => setProject(null))
-      .finally(() => setLoading(false));
-  }, [id]);
+    api.getPublicSettings()
+      .then((settings: any) => {
+        const enabled = settings?.sections?.projects?.enabled !== false;
+        if (!enabled) {
+          navigate('/', { replace: true });
+          return;
+        }
+        return api.get(`/api/projects/public/${id}`, false)
+          .then((data: Project) => {
+            if (!cancelled) setProject(data);
+          })
+          .catch(() => {
+            if (!cancelled) setProject(null);
+          });
+      })
+      .catch(() => {
+        // If settings fail, fall back to attempting to fetch
+        return api.get(`/api/projects/public/${id}`, false)
+          .then((data: Project) => {
+            if (!cancelled) setProject(data);
+          })
+          .catch(() => {
+            if (!cancelled) setProject(null);
+          });
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, navigate]);
 
   const contentParts = useMemo(() => {
     if (!project) return [];

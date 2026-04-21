@@ -33,6 +33,7 @@ interface ProjectSidebarProps {
   onUpdate: (project: Project) => void;
   onSave: (shouldPublish?: boolean) => Promise<void>;
   isSaving?: boolean;
+  sectionEnabled?: boolean;
 }
 
 const categories = ['signal-processing', 'control', 'data-analysis'];
@@ -42,7 +43,7 @@ const devStatuses = [
   { value: 'completed', label: 'Completed', color: 'bg-green-500' },
 ];
 
-export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectSidebarProps) {
+export function ProjectSidebar({ project, onUpdate, onSave, isSaving, sectionEnabled = true }: ProjectSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   
   // Use ref to always have latest project without causing re-renders  
@@ -133,6 +134,7 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectS
         <div className="space-y-3">
           <select
             value={project.status || 'draft'}
+            disabled={!sectionEnabled}
             onChange={e => {
               const newStatus = e.target.value as 'draft' | 'published' | 'scheduled';
               const updates: Partial<Project> = { status: newStatus };
@@ -144,12 +146,18 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectS
               }
               onUpdate({ ...project, ...updates });
             }}
-            className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+            className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value="draft">📝 Draft</option>
             <option value="published">✅ Published</option>
             <option value="scheduled">⏰ Scheduled</option>
           </select>
+
+          {!sectionEnabled ? (
+            <p className="text-[11px] text-[#94A3B8]">
+              Projects section dimatikan di Settings. Publish/Schedule dinonaktifkan (kamu masih bisa simpan).
+            </p>
+          ) : null}
 
           {/* Datetime picker untuk scheduled */}
           {project.status === 'scheduled' && (
@@ -158,8 +166,9 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving }: ProjectS
               <input
                 type="datetime-local"
                 value={toDateTimeLocal(project.publishAt)}
+                disabled={!sectionEnabled}
                 onChange={e => onUpdate({ ...project, publishAt: fromDateTimeLocal(e.target.value) })}
-                className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+                className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <p className="text-[11px] text-[#94A3B8] mt-1">
                 Akan otomatis tampil saat waktunya tiba.

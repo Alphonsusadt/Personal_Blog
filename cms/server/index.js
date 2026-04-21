@@ -21,6 +21,11 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
 const DB_NAME = 'alphonsus-portfolio';
 const PORT = process.env.CMS_PORT || 5000;
 
+const parseSectionFlag = (value, fallback = true) => {
+  if (value === undefined) return fallback;
+  return String(value).toLowerCase() !== 'false';
+};
+
 async function start() {
   const client = new MongoClient(MONGODB_URI);
   await client.connect();
@@ -40,6 +45,37 @@ async function start() {
     const hashed = await bcrypt.hash(adminPassword, 10);
     await users.insertOne({ username: adminUsername, password: hashed, createdAt: new Date() });
     console.log(`Default admin user created (username: ${adminUsername})`);
+  }
+
+  const sectionDefaults = {
+    writings: { enabled: parseSectionFlag(process.env.SHOW_WRITINGS, true) },
+    projects: { enabled: parseSectionFlag(process.env.SHOW_PROJECTS, true) },
+    books: { enabled: parseSectionFlag(process.env.SHOW_BOOKS, true) },
+  };
+
+  const settingsCol = db.collection('settings');
+  const settingsDoc = await settingsCol.findOne({ key: 'settings' });
+  const settingsSections = settingsDoc?.sections || {};
+  const shouldPatchSections = (
+    settingsSections.writings?.enabled === undefined ||
+    settingsSections.projects?.enabled === undefined ||
+    settingsSections.books?.enabled === undefined
+  );
+
+  if (shouldPatchSections) {
+    await settingsCol.updateOne(
+      { key: 'settings' },
+      {
+        $set: {
+          key: 'settings',
+          'sections.writings.enabled': settingsSections.writings?.enabled ?? sectionDefaults.writings.enabled,
+          'sections.projects.enabled': settingsSections.projects?.enabled ?? sectionDefaults.projects.enabled,
+          'sections.books.enabled': settingsSections.books?.enabled ?? sectionDefaults.books.enabled,
+          updatedAt: new Date(),
+        },
+      },
+      { upsert: true }
+    );
   }
 
   const app = express();

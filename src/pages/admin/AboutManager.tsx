@@ -3,6 +3,7 @@ import { api } from '../../lib/api';
 import { Save, Plus, X, CheckCircle, Upload, Image as ImageIcon, Clock, AlertCircle } from 'lucide-react';
 import { ImageCropDialog } from '../../components/ImageCropDialog';
 import { useAdminAutosave } from '../../hooks/useAdminAutosave';
+import { AutoFixButton } from '../../components/AutoFixButton';
 
 type Language = 'en' | 'id';
 type LocalizedText = { en: string; id: string };
@@ -657,7 +658,13 @@ export function AboutManager() {
             </div>
             <div><label className={labelCls}>Title ({lang.toUpperCase()})</label><input value={data.title[lang]} onChange={e => updateLocalizedField('title', e.target.value)} className={inputCls} /></div>
             <div><label className={labelCls}>Subtitle ({lang.toUpperCase()})</label><input value={data.subtitle[lang]} onChange={e => updateLocalizedField('subtitle', e.target.value)} className={inputCls} /></div>
-            <div><label className={labelCls}>Bio ({lang.toUpperCase()})</label><textarea value={data.bio[lang]} onChange={e => updateLocalizedField('bio', e.target.value)} rows={3} className={inputCls} /></div>
+            <div>
+              <label className={labelCls}>Bio ({lang.toUpperCase()})</label>
+              <textarea value={data.bio[lang]} onChange={e => updateLocalizedField('bio', e.target.value)} rows={3} className={inputCls} />
+              <div className="mt-2 flex justify-end">
+                <AutoFixButton text={data.bio[lang]} onApply={(nextText) => updateLocalizedField('bio', nextText)} />
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div><label className={labelCls}>GPA</label><input value={data.gpa} onChange={e => setData({ ...data, gpa: e.target.value })} className={inputCls} /></div>
               <div><label className={labelCls}>Projects Count</label><input value={data.projectsCount} onChange={e => setData({ ...data, projectsCount: e.target.value })} className={inputCls} /></div>
@@ -668,9 +675,27 @@ export function AboutManager() {
         <section className="bg-[#1E293B] border border-[#334155] rounded-xl p-6">
           <h2 className="text-lg font-semibold text-[#F8FAFC] mb-4">My Story</h2>
           <div className="space-y-4">
-            <div><label className={labelCls}>Why Biomedical Engineering? ({lang.toUpperCase()})</label><textarea value={data.story.whyBME[lang]} onChange={e => updateStoryField('whyBME', e.target.value)} rows={4} className={inputCls} /></div>
-            <div><label className={labelCls}>Faith and Engineering ({lang.toUpperCase()})</label><textarea value={data.story.faithAndEngineering[lang]} onChange={e => updateStoryField('faithAndEngineering', e.target.value)} rows={4} className={inputCls} /></div>
-            <div><label className={labelCls}>Current Focus ({lang.toUpperCase()})</label><textarea value={data.story.currentFocus[lang]} onChange={e => updateStoryField('currentFocus', e.target.value)} rows={3} className={inputCls} /></div>
+            <div>
+              <label className={labelCls}>Why Biomedical Engineering? ({lang.toUpperCase()})</label>
+              <textarea value={data.story.whyBME[lang]} onChange={e => updateStoryField('whyBME', e.target.value)} rows={4} className={inputCls} />
+              <div className="mt-2 flex justify-end">
+                <AutoFixButton text={data.story.whyBME[lang]} onApply={(nextText) => updateStoryField('whyBME', nextText)} />
+              </div>
+            </div>
+            <div>
+              <label className={labelCls}>Faith and Engineering ({lang.toUpperCase()})</label>
+              <textarea value={data.story.faithAndEngineering[lang]} onChange={e => updateStoryField('faithAndEngineering', e.target.value)} rows={4} className={inputCls} />
+              <div className="mt-2 flex justify-end">
+                <AutoFixButton text={data.story.faithAndEngineering[lang]} onApply={(nextText) => updateStoryField('faithAndEngineering', nextText)} />
+              </div>
+            </div>
+            <div>
+              <label className={labelCls}>Current Focus ({lang.toUpperCase()})</label>
+              <textarea value={data.story.currentFocus[lang]} onChange={e => updateStoryField('currentFocus', e.target.value)} rows={3} className={inputCls} />
+              <div className="mt-2 flex justify-end">
+                <AutoFixButton text={data.story.currentFocus[lang]} onApply={(nextText) => updateStoryField('currentFocus', nextText)} />
+              </div>
+            </div>
           </div>
         </section>
 
@@ -700,6 +725,9 @@ export function AboutManager() {
                 </div>
                 <input value={edu.year} onChange={e => updateEducation(i, 'year', e.target.value)} placeholder="Year" className={`${inputCls} mb-3`} />
                 <textarea value={edu.description[lang]} onChange={e => updateEducation(i, 'description', e.target.value)} placeholder={`Description (${lang.toUpperCase()})`} rows={2} className={inputCls} />
+                <div className="mt-2 flex justify-end">
+                  <AutoFixButton text={edu.description[lang]} onApply={(nextText) => updateEducation(i, 'description', nextText)} />
+                </div>
               </div>
             ))}
           </div>
@@ -740,6 +768,10 @@ export function AboutManager() {
                   rows={3}
                   className={`${inputCls} mb-3`}
                 />
+
+                <div className="mb-3 flex justify-end">
+                  <AutoFixButton text={item.description[lang]} onApply={(nextText) => updateEngineeringProject(i, 'description', nextText)} />
+                </div>
 
                 <div className="space-y-2">
                   <input
@@ -798,7 +830,13 @@ export function AboutManager() {
         <section className="bg-[#1E293B] border border-[#334155] rounded-xl p-6">
           <h2 className="text-lg font-semibold text-[#F8FAFC] mb-4">Quote & Social Links</h2>
           <div className="space-y-4">
-            <div><label className={labelCls}>Philosophy Quote ({lang.toUpperCase()})</label><textarea value={data.quote[lang]} onChange={e => updateLocalizedField('quote', e.target.value)} rows={3} className={inputCls} /></div>
+            <div>
+              <label className={labelCls}>Philosophy Quote ({lang.toUpperCase()})</label>
+              <textarea value={data.quote[lang]} onChange={e => updateLocalizedField('quote', e.target.value)} rows={3} className={inputCls} />
+              <div className="mt-2 flex justify-end">
+                <AutoFixButton text={data.quote[lang]} onApply={(nextText) => updateLocalizedField('quote', nextText)} />
+              </div>
+            </div>
             <div><label className={labelCls}>LinkedIn URL</label><input value={data.socialLinks.linkedin} onChange={e => setData({ ...data, socialLinks: { ...data.socialLinks, linkedin: e.target.value } })} className={inputCls} /></div>
             <div><label className={labelCls}>GitHub URL</label><input value={data.socialLinks.github} onChange={e => setData({ ...data, socialLinks: { ...data.socialLinks, github: e.target.value } })} className={inputCls} /></div>
             <div><label className={labelCls}>Email</label><input value={data.socialLinks.email} onChange={e => setData({ ...data, socialLinks: { ...data.socialLinks, email: e.target.value } })} className={inputCls} /></div>
@@ -809,7 +847,13 @@ export function AboutManager() {
           <h2 className="text-lg font-semibold text-[#F8FAFC] mb-4">Let's Connect Section</h2>
           <div className="space-y-4">
             <div><label className={labelCls}>Contact Heading ({lang.toUpperCase()})</label><input value={data.contactHeading[lang]} onChange={e => updateLocalizedField('contactHeading', e.target.value)} className={inputCls} /></div>
-            <div><label className={labelCls}>Contact Message ({lang.toUpperCase()})</label><textarea value={data.contactMessage[lang]} onChange={e => updateLocalizedField('contactMessage', e.target.value)} rows={4} className={inputCls} /></div>
+            <div>
+              <label className={labelCls}>Contact Message ({lang.toUpperCase()})</label>
+              <textarea value={data.contactMessage[lang]} onChange={e => updateLocalizedField('contactMessage', e.target.value)} rows={4} className={inputCls} />
+              <div className="mt-2 flex justify-end">
+                <AutoFixButton text={data.contactMessage[lang]} onApply={(nextText) => updateLocalizedField('contactMessage', nextText)} />
+              </div>
+            </div>
           </div>
         </section>
       </div>

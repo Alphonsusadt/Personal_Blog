@@ -199,16 +199,41 @@ export function WritingDetail() {
       setLoading(false);
       return;
     }
+    let cancelled = false;
     setLoading(true);
-    api.get(`/api/writings/public/${id}`, false)
-      .then((writing: Writing) => {
-        setWriting(writing);
+
+    api.getPublicSettings()
+      .then((settings: any) => {
+        const enabled = settings?.sections?.writings?.enabled !== false;
+        if (!enabled) {
+          navigate('/', { replace: true });
+          return;
+        }
+        return api.get(`/api/writings/public/${id}`, false)
+          .then((data: Writing) => {
+            if (!cancelled) setWriting(data);
+          })
+          .catch(() => {
+            if (!cancelled) setWriting(null);
+          });
       })
       .catch(() => {
-        setWriting(null);
+        return api.get(`/api/writings/public/${id}`, false)
+          .then((data: Writing) => {
+            if (!cancelled) setWriting(data);
+          })
+          .catch(() => {
+            if (!cancelled) setWriting(null);
+          });
       })
-      .finally(() => setLoading(false));
-  }, [id]);
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, navigate]);
 
   const contentParts = useMemo(() => {
     if (!writing) return [];

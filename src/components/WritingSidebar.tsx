@@ -32,11 +32,12 @@ interface WritingSidebarProps {
   isSaving?: boolean;
   wordCount?: number;
   characterCount?: number;
+  sectionEnabled?: boolean;
 }
 
 const categories = ['reflections', 'stories', 'fiction'];
 
-export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0 }: WritingSidebarProps) {
+export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, sectionEnabled = true }: WritingSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   
   // Use ref to always have latest writing without causing re-renders
@@ -117,6 +118,7 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
         <div className="space-y-3">
           <select
             value={writing.status || 'draft'}
+            disabled={!sectionEnabled}
             onChange={e => {
               const nextStatus = e.target.value as 'draft' | 'published' | 'scheduled';
               onUpdate({
@@ -125,20 +127,27 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
                 publishAt: nextStatus === 'scheduled' ? writing.publishAt || new Date().toISOString() : '',
               });
             }}
-            className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+            className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value="draft">Draft</option>
             <option value="published">Published</option>
             <option value="scheduled">Scheduled</option>
           </select>
+
+          {!sectionEnabled ? (
+            <p className="text-[11px] text-[#94A3B8]">
+              Writings section dimatikan di Settings. Publish/Schedule dinonaktifkan (kamu masih bisa simpan).
+            </p>
+          ) : null}
           {writing.status === 'scheduled' && (
             <div>
               <label className="block text-xs text-[#94A3B8] mb-1">Publish At</label>
               <input
                 type="datetime-local"
                 value={toDateTimeLocal(writing.publishAt)}
+                disabled={!sectionEnabled}
                 onChange={e => onUpdate({ ...writing, publishAt: fromDateTimeLocal(e.target.value) })}
-                className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+                className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <p className="text-[11px] text-[#94A3B8] mt-1">Akan otomatis tampil saat waktunya tiba.</p>
             </div>
