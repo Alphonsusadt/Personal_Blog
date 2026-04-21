@@ -3,6 +3,7 @@ import React, { useCallback, useRef } from 'react';
 import { ImageGallery } from './ImageGallery';
 import { generateSlug, isValidSlug } from '../utils/slugify';
 import { IsolatedInput, IsolatedTextarea, IsolatedTagInput } from './IsolatedInput';
+import { useAutoFixLanguage } from '../hooks/useAutoFixLanguage';
 
 interface Writing {
   _id?: string;
@@ -39,6 +40,7 @@ const categories = ['reflections', 'stories', 'fiction'];
 
 export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, sectionEnabled = true }: WritingSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
+  const { language: autoFixLanguage, setLanguage: setAutoFixLanguage } = useAutoFixLanguage();
   
   // Use ref to always have latest writing without causing re-renders
   const writingRef = useRef(writing);
@@ -162,6 +164,22 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
                   : 'Masih draft'}
             </span>
           </div>
+        </div>
+      </SidebarCard>
+
+      {/* Auto Fix */}
+      <SidebarCard title="Auto Fix" cardKey="autoFix">
+        <div className="space-y-2">
+          <label className="block text-xs text-[#94A3B8]">Language</label>
+          <select
+            value={autoFixLanguage}
+            onChange={(e) => setAutoFixLanguage(e.target.value === 'id' ? 'id' : 'en')}
+            className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+          >
+            <option value="id">Indonesia (ID)</option>
+            <option value="en">English (EN)</option>
+          </select>
+          <p className="text-[11px] text-[#94A3B8]">Dipakai oleh tombol Auto Fix untuk tulisan.</p>
         </div>
       </SidebarCard>
 

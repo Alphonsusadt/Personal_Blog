@@ -14,6 +14,9 @@ cms/.env.production
 dist/
 build/
 
+# TypeScript incremental build artifacts
+*.tsbuildinfo
+
 # Logs
 *.log
 npm-debug.log*
