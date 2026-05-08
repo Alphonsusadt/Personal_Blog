@@ -108,6 +108,8 @@ interface IsolatedContentEditorProps {
   className?: string;
   id?: string;
   textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
+  spellCheck?: boolean;
+  lang?: string;
 }
 
 export const IsolatedContentEditor = React.memo(function IsolatedContentEditor({
@@ -116,7 +118,9 @@ export const IsolatedContentEditor = React.memo(function IsolatedContentEditor({
   placeholder,
   className,
   id,
-  textareaRef
+  textareaRef,
+  spellCheck,
+  lang,
 }: IsolatedContentEditorProps) {
   const internalRef = useRef<HTMLTextAreaElement>(null);
   const ref = textareaRef || internalRef;
@@ -164,9 +168,18 @@ export const IsolatedContentEditor = React.memo(function IsolatedContentEditor({
       onKeyDown={e => e.stopPropagation()}
       placeholder={placeholder}
       className={className}
+      spellCheck={spellCheck}
+      lang={lang}
     />
   );
-}, (prev, next) => prev.id === next.id && prev.initialValue === next.initialValue && prev.placeholder === next.placeholder && prev.className === next.className);
+}, (prev, next) => (
+  prev.id === next.id &&
+  prev.initialValue === next.initialValue &&
+  prev.placeholder === next.placeholder &&
+  prev.className === next.className &&
+  prev.spellCheck === next.spellCheck &&
+  prev.lang === next.lang
+));
 
 // Tag input with completely isolated state
 interface IsolatedTagInputProps {

@@ -1,7 +1,18 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
-let publicSettingsCache: unknown | null = null;
-let publicSettingsPromise: Promise<unknown> | null = null;
+export interface PublicSettings {
+  footerBio?: string;
+  footerName?: string;
+  siteTitle?: string;
+  sections?: {
+    writings?: { enabled?: boolean };
+    projects?: { enabled?: boolean };
+    books?: { enabled?: boolean };
+  };
+}
+
+let publicSettingsCache: PublicSettings | null = null;
+let publicSettingsPromise: Promise<PublicSettings> | null = null;
 
 export const api = {
   getToken() {
@@ -88,8 +99,8 @@ export const api = {
     if (publicSettingsCache) return publicSettingsCache;
     if (!publicSettingsPromise) {
       publicSettingsPromise = this.get('/api/settings/public', false).then((data) => {
-        publicSettingsCache = data;
-        return data;
+        publicSettingsCache = data as PublicSettings;
+        return publicSettingsCache;
       }).finally(() => {
         publicSettingsPromise = null;
       });

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { autoFixText, detectTextLanguage } from '../utils/textAutoFix';
+import { autoFixText, detectTextLanguage, type AutoFixLanguageOption } from '../utils/textAutoFix';
 
 interface AutoFixButtonProps {
   text: string;
@@ -7,6 +7,7 @@ interface AutoFixButtonProps {
   disabled?: boolean;
   className?: string;
   label?: string;
+  language?: AutoFixLanguageOption;
 }
 
 export function AutoFixButton({
@@ -15,9 +16,10 @@ export function AutoFixButton({
   disabled = false,
   className,
   label = 'Auto Fix',
+  language = 'auto',
 }: AutoFixButtonProps) {
-  const resultPreview = useMemo(() => autoFixText(text), [text]);
   const detectedLanguage = useMemo(() => detectTextLanguage(text), [text]);
+  const resultPreview = useMemo(() => autoFixText(text, { language }), [text, language]);
   const [status, setStatus] = useState('');
 
   useEffect(() => {
@@ -46,7 +48,7 @@ export function AutoFixButton({
         type="button"
         onClick={handleAutoFix}
         disabled={disabled || !text.trim()}
-        title={`Detect language + fix common typos (${detectedLanguage})`}
+        title={`Fix common typos (${language === 'auto' ? `auto:${detectedLanguage}` : language})`}
         className={
           className ||
           'px-3 py-2 rounded-lg text-sm font-medium border border-[#334155] bg-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
@@ -59,7 +61,7 @@ export function AutoFixButton({
           resultPreview.changes.length > 0 ? 'text-emerald-400' : 'text-slate-400'
         }`}
       >
-        {status || `Detected ${detectedLanguage.toUpperCase()} · ${resultPreview.changes.length} fix${resultPreview.changes.length === 1 ? '' : 'es'}`}
+        {status || `Lang ${language === 'auto' ? detectedLanguage.toUpperCase() : language.toUpperCase()} · ${resultPreview.changes.length} fix${resultPreview.changes.length === 1 ? '' : 'es'}`}
       </span>
     </div>
   );
