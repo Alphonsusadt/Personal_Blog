@@ -79,22 +79,6 @@ export default function projectsRoutes(db) {
     if (data.publishAt) {
       data.publishAt = new Date(data.publishAt);
     }
-    const result = await col.updateOne(
-      { _id: new ObjectId(req.params.id) },
-      { $set: data }
-    );
-    if (result.matchedCount === 0) return res.status(404).json({ error: 'Not found' });
-    res.json({ message: 'Updated' });
-  });
-
-  router.delete('/:id', authMiddleware, async (req, res) => {
-    const result = await col.deleteOne({ _id: new ObjectId(req.params.id) });
-    if (result.deletedCount === 0) return res.status(404).json({ error: 'Not found' });
-    res.json({ message: 'Deleted' });
-  });
-
-  return router;
-}
 
     const enabled = await isSectionEnabled(db, 'projects');
     const targetId = new ObjectId(req.params.id);
@@ -140,3 +124,14 @@ export default function projectsRoutes(db) {
       { $set: data }
     );
     if (result.matchedCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json({ message: 'Updated' });
+  });
+
+  router.delete('/:id', authMiddleware, async (req, res) => {
+    const result = await col.deleteOne({ _id: new ObjectId(req.params.id) });
+    if (result.deletedCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json({ message: 'Deleted' });
+  });
+
+  return router;
+}

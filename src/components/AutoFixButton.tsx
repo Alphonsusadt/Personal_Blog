@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { autoFixText, detectTextLanguage, type AutoFixLanguageOption } from '../utils/textAutoFix';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { detectTextLanguage, type AutoFixLanguageOption, type TextFixResult } from '../utils/textAutoFix';
+import { API_BASE } from '../lib/api';
 
 interface AutoFixButtonProps {
   text: string;
@@ -10,6 +11,8 @@ interface AutoFixButtonProps {
   language?: AutoFixLanguageOption;
 }
 
+const EMPTY_RESULT: TextFixResult = { text: '', language: 'unknown', changes: [] };
+
 export function AutoFixButton({
   text,
   onApply,
@@ -19,7 +22,53 @@ export function AutoFixButton({
   language = 'auto',
 }: AutoFixButtonProps) {
   const detectedLanguage = useMemo(() => detectTextLanguage(text), [text]);
-  const resultPreview = useMemo(() => autoFixText(text, { language }), [text, language]);
+  const [debouncedResult, setDebouncedResult] = useState<TextFixResult>(EMPTY_RESULT);
+  const [apiFailed, setApiFailed] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const textRef = useRef(text);
+  textRef.current = text;
+
+  const targetLanguage = language === 'auto' ? detectedLanguage : language;
+
+  // Debounced computation of autoFixText to avoid blocking UI on every keystroke
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const controller = new AbortController();
+    timerRef.current = setTimeout(() => {
+      void (async () => {
+        try {
+          const response = await fetch(`${API_BASE}/api/auto-fix-text`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: textRef.current, language: targetLanguage }),
+            signal: controller.signal,
+          });
+
+          if (!response.ok) {
+            throw new Error(`Auto-fix request failed with ${response.status}`);
+          }
+
+          const data = await response.json();
+          setApiFailed(false);
+          setDebouncedResult({
+            text: data.fixed ?? textRef.current,
+            language: targetLanguage,
+            changes: Array.isArray(data.changes) ? data.changes : [],
+          });
+        } catch {
+          setApiFailed(true);
+          // Keep previous result instead of resetting to EMPTY_RESULT with text:''
+          // This prevents accidentally wiping content on click
+        }
+      })();
+    }, 300);
+    return () => {
+      controller.abort();
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [text, detectedLanguage, targetLanguage]);
+
+  const resultPreview = debouncedResult;
   const [status, setStatus] = useState('');
 
   useEffect(() => {
@@ -29,6 +78,12 @@ export function AutoFixButton({
   }, [status]);
 
   const handleAutoFix = () => {
+    // GUARD: Never apply empty text - prevents content wipe on API failure
+    if (!resultPreview.text || resultPreview.text === '') {
+      setStatus('Auto-fix unavailable (API error)');
+      return;
+    }
+
     if (resultPreview.text !== text) {
       onApply(resultPreview.text);
       setStatus(`Applied ${resultPreview.changes.length} fix${resultPreview.changes.length === 1 ? '' : 'es'}`);
@@ -61,7 +116,9 @@ export function AutoFixButton({
           resultPreview.changes.length > 0 ? 'text-emerald-400' : 'text-slate-400'
         }`}
       >
-        {status || `Lang ${language === 'auto' ? detectedLanguage.toUpperCase() : language.toUpperCase()} · ${resultPreview.changes.length} fix${resultPreview.changes.length === 1 ? '' : 'es'}`}
+        {status || (apiFailed
+          ? 'API unavailable'
+          : `Lang ${language === 'auto' ? detectedLanguage.toUpperCase() : language.toUpperCase()} · ${resultPreview.changes.length} fix${resultPreview.changes.length === 1 ? '' : 'es'}`)}
       </span>
     </div>
   );

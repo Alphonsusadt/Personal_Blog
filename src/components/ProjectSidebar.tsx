@@ -3,6 +3,7 @@ import { ImageGallery } from './ImageGallery';
 import React, { useCallback, useRef } from 'react';
 import { generateSlug, isValidSlug } from '../utils/slugify';
 import { IsolatedInput, IsolatedTextarea, IsolatedTagInput } from './IsolatedInput';
+import { useAutoFixLanguage } from '../hooks/useAutoFixLanguage';
 
 interface Project {
   _id?: string;
@@ -33,6 +34,8 @@ interface ProjectSidebarProps {
   onUpdate: (project: Project) => void;
   onSave: (shouldPublish?: boolean) => Promise<void>;
   isSaving?: boolean;
+  wordCount?: number;
+  characterCount?: number;
   sectionEnabled?: boolean;
 }
 
@@ -43,8 +46,36 @@ const devStatuses = [
   { value: 'completed', label: 'Completed', color: 'bg-green-500' },
 ];
 
-export function ProjectSidebar({ project, onUpdate, onSave, isSaving, sectionEnabled = true }: ProjectSidebarProps) {
+function SidebarCard({
+  title,
+  cardKey,
+  collapsed,
+  onToggle,
+  children,
+}: {
+  title: string;
+  cardKey: string;
+  collapsed: Record<string, boolean>;
+  onToggle: (key: string) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-[#1E293B] border border-[#334155] rounded-lg p-4">
+      <h3
+        className="font-medium text-sm text-[#F8FAFC] mb-3 cursor-pointer flex items-center justify-between"
+        onClick={() => onToggle(cardKey)}
+      >
+        {title}
+        <span className="text-[#94A3B8]">{collapsed[cardKey] ? '▶' : '▼'}</span>
+      </h3>
+      {!collapsed[cardKey] && <div>{children}</div>}
+    </div>
+  );
+}
+
+export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, sectionEnabled = true }: ProjectSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
+  const { language, setLanguage } = useAutoFixLanguage();
   
   // Use ref to always have latest project without causing re-renders  
   const projectRef = useRef(project);
@@ -69,6 +100,22 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, sectionEna
 
   const handleAddTag = useCallback((tag: string) => {
     onUpdate({ ...projectRef.current, tags: [...projectRef.current.tags, tag] });
+  }, [onUpdate]);
+
+  const handleMetaTitleCommit = useCallback((value: string) => {
+    onUpdate({ ...projectRef.current, metaTitle: value });
+  }, [onUpdate]);
+
+  const handleMetaDescriptionCommit = useCallback((value: string) => {
+    onUpdate({ ...projectRef.current, metaDescription: value });
+  }, [onUpdate]);
+
+  const handleKeywordsCommit = useCallback((value: string) => {
+    onUpdate({ ...projectRef.current, keywords: value });
+  }, [onUpdate]);
+
+  const handleOgImageCommit = useCallback((value: string) => {
+    onUpdate({ ...projectRef.current, ogImage: value });
   }, [onUpdate]);
 
   // Auto-generate slug ONLY when: 1) Creating new item, 2) User clicks regenerate
@@ -114,23 +161,44 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, sectionEna
     setCollapsed(prev => ({ ...prev, [cardName]: !prev[cardName] }));
   };
 
-  const SidebarCard = ({ title, cardKey, children }: { title: string; cardKey: string; children: React.ReactNode }) => (
-    <div className="bg-[#1E293B] border border-[#334155] rounded-lg p-4">
-      <h3 className="font-medium text-sm text-[#F8FAFC] mb-3 cursor-pointer flex items-center justify-between"
-          onClick={() => toggleCard(cardKey)}>
-        {title}
-        <span className="text-[#94A3B8]">{collapsed[cardKey] ? '▶' : '▼'}</span>
-      </h3>
-      {!collapsed[cardKey] && <div>{children}</div>}
-    </div>
-  );
+
 
   const currentDevStatus = devStatuses.find(s => s.value === project.devStatus) || devStatuses[0];
 
   return (
     <aside className="space-y-4">
+      {/* Auto Fix Language */}
+      <SidebarCard title="Auto Fix" cardKey="autofix" collapsed={collapsed} onToggle={toggleCard}>
+        <div className="space-y-2">
+          <label className="block text-xs text-[#94A3B8]">Language</label>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value as 'id' | 'en')}
+            className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+          >
+            <option value="id">Indonesia</option>
+            <option value="en">English</option>
+          </select>
+          <p className="text-[11px] text-[#94A3B8]">Mempengaruhi Auto Fix + spellcheck di editor.</p>
+        </div>
+      </SidebarCard>
+
+      {/* Project Stats */}
+      <SidebarCard title="Content Stats" cardKey="stats" collapsed={collapsed} onToggle={toggleCard}>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-[#0F172A] border border-[#334155] rounded-lg p-3">
+            <p className="text-[11px] text-[#94A3B8]">Words</p>
+            <p className="text-lg font-semibold text-[#F8FAFC]">{wordCount}</p>
+          </div>
+          <div className="bg-[#0F172A] border border-[#334155] rounded-lg p-3">
+            <p className="text-[11px] text-[#94A3B8]">Characters</p>
+            <p className="text-lg font-semibold text-[#F8FAFC]">{characterCount}</p>
+          </div>
+        </div>
+      </SidebarCard>
+
       {/* Publication Status Card */}
-      <SidebarCard title="Publication Status" cardKey="status">
+      <SidebarCard title="Publication Status" cardKey="status" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-3">
           <select
             value={project.status || 'draft'}
@@ -192,7 +260,7 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, sectionEna
       </SidebarCard>
 
       {/* Development Status Card */}
-      <SidebarCard title="Development Status" cardKey="devStatus">
+      <SidebarCard title="Development Status" cardKey="devStatus" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-3">
           <select
             value={project.devStatus || 'planning'}
@@ -211,7 +279,7 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, sectionEna
       </SidebarCard>
 
       {/* Short Description Card (like Excerpt) */}
-      <SidebarCard title="Short Description" cardKey="description">
+      <SidebarCard title="Short Description" cardKey="description" collapsed={collapsed} onToggle={toggleCard}>
         <IsolatedTextarea
           id={project.id}
           initialValue={project.description}
@@ -224,7 +292,7 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, sectionEna
       </SidebarCard>
 
       {/* Project Links Card */}
-      <SidebarCard title="Project Links" cardKey="links">
+      <SidebarCard title="Project Links" cardKey="links" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-3">
           <div>
             <label className="flex items-center gap-2 text-xs text-[#94A3B8] mb-1">
@@ -272,7 +340,7 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, sectionEna
       </SidebarCard>
 
       {/* Category Card */}
-      <SidebarCard title="Category" cardKey="category">
+      <SidebarCard title="Category" cardKey="category" collapsed={collapsed} onToggle={toggleCard}>
         <select
           value={project.category}
           onChange={e => onUpdate({ ...project, category: e.target.value })}
@@ -285,7 +353,7 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, sectionEna
       </SidebarCard>
 
       {/* Tech Stack & Tags Card */}
-      <SidebarCard title="Tech Stack & Tags" cardKey="tags">
+      <SidebarCard title="Tech Stack & Tags" cardKey="tags" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2 mb-3">
             {project.tags.map((tag, i) => (
@@ -307,7 +375,7 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, sectionEna
       </SidebarCard>
 
       {/* Date Card */}
-      <SidebarCard title="Project Date" cardKey="date">
+      <SidebarCard title="Project Date" cardKey="date" collapsed={collapsed} onToggle={toggleCard}>
         <div>
           <label className="block text-xs text-[#94A3B8] mb-1">Start/Completion Date</label>
           <input
@@ -320,7 +388,7 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, sectionEna
       </SidebarCard>
 
       {/* ID/Slug Card */}
-      <SidebarCard title="ID/Slug" cardKey="slug">
+      <SidebarCard title="ID/Slug" cardKey="slug" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-2">
           <div className="flex gap-2">
             <input
@@ -350,15 +418,15 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, sectionEna
       </SidebarCard>
 
       {/* SEO Card */}
-      <SidebarCard title="SEO" cardKey="seo">
+      <SidebarCard title="SEO" cardKey="seo" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-3">
           {/* Meta Title */}
           <div>
             <label className="block text-xs text-[#94A3B8] mb-1">Meta Title</label>
-            <input
-              type="text"
-              value={project.metaTitle || project.title}
-              onChange={e => onUpdate({ ...project, metaTitle: e.target.value })}
+            <IsolatedInput
+              id={project.id + '-meta-title'}
+              initialValue={project.metaTitle || project.title}
+              onCommit={handleMetaTitleCommit}
               placeholder="Auto-filled from title"
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />
@@ -368,9 +436,10 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, sectionEna
           {/* Meta Description */}
           <div>
             <label className="block text-xs text-[#94A3B8] mb-1">Meta Description</label>
-            <textarea
-              value={project.metaDescription || project.description}
-              onChange={e => onUpdate({ ...project, metaDescription: e.target.value })}
+            <IsolatedTextarea
+              id={project.id + '-meta-desc'}
+              initialValue={project.metaDescription || project.description}
+              onCommit={handleMetaDescriptionCommit}
               placeholder="Auto-filled from description"
               rows={3}
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] resize-none"
@@ -381,10 +450,10 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, sectionEna
           {/* Keywords */}
           <div>
             <label className="block text-xs text-[#94A3B8] mb-1">Keywords</label>
-            <input
-              type="text"
-              value={project.keywords || project.tags.join(', ')}
-              onChange={e => onUpdate({ ...project, keywords: e.target.value })}
+            <IsolatedInput
+              id={project.id + '-keywords'}
+              initialValue={project.keywords || project.tags.join(', ')}
+              onCommit={handleKeywordsCommit}
               placeholder="Auto-filled from tags"
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />
@@ -393,10 +462,10 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, sectionEna
           {/* OG Image */}
           <div>
             <label className="block text-xs text-[#94A3B8] mb-1">OG Image URL</label>
-            <input
-              type="text"
-              value={project.ogImage || ''}
-              onChange={e => onUpdate({ ...project, ogImage: e.target.value })}
+            <IsolatedInput
+              id={project.id + '-og-image'}
+              initialValue={project.ogImage || ''}
+              onCommit={handleOgImageCommit}
               placeholder="https://example.com/image.jpg"
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />
@@ -406,7 +475,7 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, sectionEna
       </SidebarCard>
 
       {/* Image Gallery Card */}
-      <SidebarCard title="Images" cardKey="images">
+      <SidebarCard title="Images" cardKey="images" collapsed={collapsed} onToggle={toggleCard}>
         <ImageGallery
           content={project.content}
           onRemoveImage={(markdown) => {

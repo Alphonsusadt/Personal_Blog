@@ -15,13 +15,45 @@ async function fetchPublic<T>(path: string, fallback: T[]): Promise<T[]> {
   }
 }
 
+// Simple in-memory cache to avoid refetching on back navigation
+type CacheEntry<T> = { data: T[]; ts: number };
+const CACHE_TTL = 60 * 1000; // 60 seconds
+const cache: Record<string, CacheEntry<unknown>> = {};
+
+function getCached<T>(key: string): T[] | null {
+  const e = cache[key] as CacheEntry<T> | undefined;
+  if (!e) return null;
+  if (Date.now() - e.ts > CACHE_TTL) return null;
+  return e.data;
+}
+
+function setCached<T>(key: string, data: T[]) {
+  cache[key] = { data, ts: Date.now() };
+}
+
 export function useProjects() {
   const [data, setData] = useState<Project[]>(staticProjects);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchPublic<Project>('/api/projects/public', staticProjects)
-      .then(setData)
+    const key = '/api/projects/public';
+    const cached = getCached<Project>(key);
+    if (cached) {
+      setData(cached);
+      setLoading(false);
+      // refresh in background
+      fetchPublic<Project>(key, cached).then((fresh) => {
+        setCached<Project>(key, fresh);
+        setData(fresh);
+      }).catch(() => {});
+      return;
+    }
+
+    fetchPublic<Project>(key, staticProjects)
+      .then((res) => {
+        setCached<Project>(key, res);
+        setData(res);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -33,8 +65,23 @@ export function useWritings() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchPublic<Writing>('/api/writings/public', staticWritings)
-      .then(setData)
+    const key = '/api/writings/public';
+    const cached = getCached<Writing>(key);
+    if (cached) {
+      setData(cached);
+      setLoading(false);
+      fetchPublic<Writing>(key, cached).then((fresh) => {
+        setCached<Writing>(key, fresh);
+        setData(fresh);
+      }).catch(() => {});
+      return;
+    }
+
+    fetchPublic<Writing>(key, staticWritings)
+      .then((res) => {
+        setCached<Writing>(key, res);
+        setData(res);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -46,8 +93,23 @@ export function useBooks() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchPublic<Book>('/api/books/public', staticBooks)
-      .then(setData)
+    const key = '/api/books/public';
+    const cached = getCached<Book>(key);
+    if (cached) {
+      setData(cached);
+      setLoading(false);
+      fetchPublic<Book>(key, cached).then((fresh) => {
+        setCached<Book>(key, fresh);
+        setData(fresh);
+      }).catch(() => {});
+      return;
+    }
+
+    fetchPublic<Book>(key, staticBooks)
+      .then((res) => {
+        setCached<Book>(key, res);
+        setData(res);
+      })
       .finally(() => setLoading(false));
   }, []);
 

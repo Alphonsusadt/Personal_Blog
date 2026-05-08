@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../../lib/api';
+import { api, getRuntimeCache, setRuntimeCache } from '../../lib/api';
 import { Plus, Pencil, Trash2, Clock, Calendar, Eye, EyeOff } from 'lucide-react';
 
 interface Book {
@@ -30,8 +30,31 @@ export function BooksManager() {
   const navigate = useNavigate();
   const [items, setItems] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
+  const cacheKey = 'admin:books:list';
 
-  const load = () => { setLoading(true); api.get('/api/books').then(setItems).catch(console.error).finally(() => setLoading(false)); };
+  const load = () => {
+    const cached = getRuntimeCache<Book[]>(cacheKey);
+    if (cached) {
+      setItems(cached);
+      setLoading(false);
+      api.get('/api/books')
+        .then((fresh) => {
+          setRuntimeCache(cacheKey, fresh);
+          setItems(fresh);
+        })
+        .catch(console.error);
+      return;
+    }
+
+    setLoading(true);
+    api.get('/api/books')
+      .then((fresh) => {
+        setRuntimeCache(cacheKey, fresh);
+        setItems(fresh);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  };
   useEffect(() => { load(); }, []);
 
   const handleDelete = async (id: string) => {

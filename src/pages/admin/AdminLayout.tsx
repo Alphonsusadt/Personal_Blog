@@ -21,7 +21,16 @@ export function AdminLayout() {
   const location = useLocation();
 
   useEffect(() => {
-    if (!api.isLoggedIn()) navigate('/admin/login');
+    if (!api.isLoggedIn()) {
+      navigate('/admin/login', { replace: true });
+      return;
+    }
+    // Verify token is still valid by making a lightweight API call
+    api.get('/api/stats').catch(() => {
+      // Token expired or invalid - redirect to login
+      api.logout();
+      navigate('/admin/login', { replace: true, state: { expired: true } });
+    });
   }, [navigate]);
 
   const handleLogout = () => {

@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import compression from 'compression';
 import cors from 'cors';
 import { MongoClient } from 'mongodb';
 import bcrypt from 'bcryptjs';
@@ -13,6 +14,9 @@ import aboutRoutes from './routes/about.js';
 import homeRoutes from './routes/home.js';
 import settingsRoutes from './routes/settings.js';
 import mediaRoutes from './routes/media.js';
+import fs from 'fs/promises';
+import spellCheckRoutes from './routes/spellCheck.js';
+import { initQueue } from './utils/autosaveQueue.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,6 +35,9 @@ async function start() {
   await client.connect();
   console.log('Connected to MongoDB');
   const db = client.db(DB_NAME);
+
+  // Start the background worker thread for RAM-Queue Autosaves
+  initQueue(MONGODB_URI, DB_NAME);
 
   // Ensure default admin user exists (credentials from environment variables)
   const adminUsername = process.env.ADMIN_USERNAME;
@@ -80,6 +87,22 @@ async function start() {
 
   const app = express();
 
+  // Enable gzip/deflate compression for responses
+  app.use(compression());
+
+  // Log slow requests to help identify CMS bottlenecks
+  const slowRequestThresholdMs = Number(process.env.CMS_SLOW_REQUEST_MS || 300);
+  app.use((req, res, next) => {
+    const startedAt = Date.now();
+    res.on('finish', () => {
+      const durationMs = Date.now() - startedAt;
+      if (durationMs >= slowRequestThresholdMs) {
+        console.log(`[slow] ${req.method} ${req.originalUrl} ${res.statusCode} ${durationMs}ms`);
+      }
+    });
+    next();
+  });
+
   // CORS configuration - allow frontend origin
   app.use(cors({
     origin: ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'],
@@ -89,8 +112,13 @@ async function start() {
 
   // Serve uploaded files statically (fixed for Windows compatibility)
   const uploadsPath = path.join(__dirname, '../public/uploads');
+  await fs.mkdir(uploadsPath, { recursive: true });
   console.log(`Serving uploads from: ${uploadsPath}`);
-  app.use('/uploads', express.static(uploadsPath));
+  app.use('/uploads', express.static(uploadsPath, {
+    maxAge: '30d',
+    immutable: true,
+    etag: true,
+  }));
 
   // Routes
   app.use('/api/auth', authRoutes(db));
@@ -102,6 +130,9 @@ async function start() {
   app.use('/api/settings', settingsRoutes(db));
   app.use('/api/media', mediaRoutes(db));
 
+  // Spell-check routes (using hunspell-id dictionary)
+  app.use('/api', spellCheckRoutes);
+
   // Stats endpoint for dashboard
   app.get('/api/stats', async (_req, res) => {
     const [projects, writings, books] = await Promise.all([
@@ -111,6 +142,28 @@ async function start() {
     ]);
     res.json({ projects, writings, books });
   });
+
+  // Create indexes for fast lookups
+  await Promise.all([
+    db.collection('projects').createIndex({ id: 1 }, { sparse: true }),
+    db.collection('projects').createIndex({ status: 1, visible: 1 }),
+    db.collection('projects').createIndex({ updatedAt: -1 }),
+    db.collection('writings').createIndex({ id: 1 }, { sparse: true }),
+    db.collection('writings').createIndex({ status: 1, visible: 1 }),
+    db.collection('writings').createIndex({ updatedAt: -1 }),
+    db.collection('books').createIndex({ id: 1 }, { sparse: true }),
+    db.collection('books').createIndex({ status: 1, visible: 1 }),
+    db.collection('books').createIndex({ updatedAt: -1 }),
+    db.collection('media').createIndex({ hash: 1 }),
+    db.collection('media').createIndex({ uploadedAt: -1 }),
+    db.collection('settings').createIndex({ key: 1 }, { unique: true }),
+  ]);
+  console.log('Database indexes created');
+
+  // Pre-warm settings cache
+  const { setCachedSettings } = await import('./utils/settingsCache.js');
+  const initialSettings = await db.collection('settings').findOne({ key: 'settings' });
+  setCachedSettings(initialSettings);
 
   app.listen(PORT, () => {
     console.log(`CMS API server running on http://localhost:${PORT}`);

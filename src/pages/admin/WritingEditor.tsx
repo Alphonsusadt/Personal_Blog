@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api } from '../../lib/api';
+import { api, getRuntimeCache, setRuntimeCache } from '../../lib/api';
 import { WritingToolbar } from '../../components/WritingToolbar';
 import { WritingSidebar } from '../../components/WritingSidebar';
 import { ImageUploadDialog } from '../../components/ImageUploadDialog';
@@ -8,7 +8,7 @@ import { LinkInsertDialog } from '../../components/LinkInsertDialog';
 import { FullPagePreview } from '../../components/FullPagePreview';
 import { sanitizeMarkdown } from '../../lib/mediaUploader';
 import { hasBase64Images } from '../../utils/media';
-import { ArrowLeft, Check, Clock, Eye, EyeOff, Maximize2, HardDrive, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Check, Clock, Maximize2, HardDrive, AlertCircle, RefreshCw, EyeOff, Eye } from 'lucide-react';
 import { renderMarkdown } from '../../utils/renderers';
 import { formatDraftTime } from '../../hooks/useLocalDraft';
 import { IsolatedContentEditor } from '../../components/IsolatedInput';
@@ -16,6 +16,7 @@ import { AutoFixButton } from '../../components/AutoFixButton';
 import { useAutoFixLanguage } from '../../hooks/useAutoFixLanguage';
 import { getAutoFixSuggestionsForWord } from '../../utils/textAutoFix';
 import { getSpellSuggestions } from '../../utils/spellSuggester';
+import { useAdminAutosave } from '../../hooks/useAdminAutosave';
 
 interface Writing {
   _id?: string;
@@ -64,18 +65,7 @@ function hasMeaningfulWritingDraft(data: Writing): boolean {
   );
 }
 
-function getWordCount(text: string): number {
-  const normalized = text
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/`[^`]*`/g, ' ')
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
-    .replace(/\[[^\]]+\]\([^)]*\)/g, ' ')
-    .replace(/[>#*_~\-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
 
-  return normalized ? normalized.split(' ').length : 0;
-}
 
 function createAutosaveDraftId(title: string, content: string, prefix: string): string {
   const source = title.trim() || content
@@ -104,28 +94,24 @@ export function WritingEditor() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
-  const localDraftStatusTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const pendingCreateRef = useRef(false);
 
   const [writing, setWriting] = useState<Writing>(emptyWriting);
-  const [localTitle, setLocalTitle] = useState(''); // Local state for smooth title typing
+  const [localTitle, setLocalTitle] = useState('');
   const [loading, setLoading] = useState(!!slug);
   const [isSaving, setIsSaving] = useState(false);
   const [writingsSectionEnabled, setWritingsSectionEnabled] = useState(true);
-  const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showFullPreview, setShowFullPreview] = useState(false);
-  const [localDraftStatus, setLocalDraftStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showDraftRecovery, setShowDraftRecovery] = useState(false);
-  const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null);
 
   const { language: autoFixLanguage } = useAutoFixLanguage();
 
   const [caretWord, setCaretWord] = useState<{ word: string; start: number; end: number } | null>(null);
   const [caretSuggestions, setCaretSuggestions] = useState<string[]>([]);
+  const caretSuggestionRequestRef = useRef(0);
 
   const getWordAt = useCallback((text: string, index: number): { word: string; start: number; end: number } | null => {
     if (!text) return null;
@@ -180,20 +166,28 @@ export function WritingEditor() {
       return;
     }
 
-    const fromAutoFix = getAutoFixSuggestionsForWord(range.word, autoFixLanguage);
-    const fromDict = getSpellSuggestions(range.word, autoFixLanguage);
+    const requestId = caretSuggestionRequestRef.current + 1;
+    caretSuggestionRequestRef.current = requestId;
 
     const normalized = range.word.toLowerCase();
-    const merged = Array.from(new Set([...fromAutoFix, ...fromDict]))
-      .filter((s) => s.toLowerCase() !== normalized)
-      .slice(0, 6);
 
-    setCaretWord(range);
-    setCaretSuggestions(merged);
+    void (async () => {
+      const fromAutoFix = getAutoFixSuggestionsForWord(range.word, autoFixLanguage);
+      const fromDict = await getSpellSuggestions(range.word, autoFixLanguage);
+
+      if (caretSuggestionRequestRef.current !== requestId) return;
+
+      const merged = Array.from(new Set([...fromAutoFix, ...fromDict]))
+        .filter((s) => s.toLowerCase() !== normalized)
+        .slice(0, 6);
+
+      setCaretWord(range);
+      setCaretSuggestions(merged);
+    })();
   }, [autoFixLanguage, getWordAt, isRangeProtected]);
 
   useEffect(() => {
-    api.get('/api/settings')
+    api.getAdminSettings()
       .then((settings: any) => {
         setWritingsSectionEnabled(settings?.sections?.writings?.enabled !== false);
       })
@@ -204,31 +198,40 @@ export function WritingEditor() {
 
   const draftKey = `writing_draft_${slug || 'new'}`;
 
-  const persistDraftNow = useCallback((nextWriting: Writing) => {
-    try {
-      setLocalDraftStatus('saving');
-      localStorage.setItem(draftKey, JSON.stringify({ data: nextWriting, timestamp: Date.now() }));
-      setLocalDraftStatus('saved');
-      clearTimeout(localDraftStatusTimeoutRef.current);
-      localDraftStatusTimeoutRef.current = setTimeout(() => setLocalDraftStatus('idle'), 900);
-    } catch (e) {
-      console.error('Local draft error:', e);
-    }
-  }, [draftKey]);
+  // ── useAdminAutosave: all 6 principles in one hook ────────────────────────
+  const autosave = useAdminAutosave<Writing>({
+    storageKey: draftKey,
+    data: writing,
+    enabled: !loading,
+    hasMeaningfulData: hasMeaningfulWritingDraft,
+    saveToServer: async (snapshot) => {
+      if (snapshot._id) {
+        // ATOMIC WRITE via PATCH — only sends changed fields
+        await api.patch(`/api/writings/${snapshot._id}`, snapshot);
+      } else if (!pendingCreateRef.current) {
+        pendingCreateRef.current = true;
+        const draftId = snapshot.id || createAutosaveDraftId(snapshot.title, snapshot.content, 'writing');
+        const response = await api.post('/api/writings', { ...snapshot, id: draftId });
+        setWriting(prev => ({ ...prev, _id: response._id }));
+        pendingCreateRef.current = false;
+      }
+    },
+    localDebounceMs: 800,
+    serverDebounceMs: 3000,
+    periodicIntervalMs: 30_000,
+    resetStatusMs: 1500,
+    maxRetries: 3,
+  });
+
 
   // Sync localTitle when writing changes from external source (load, restore)
   useEffect(() => {
     setLocalTitle(writing.title);
   }, [writing.title]);
 
-  // Title is persisted immediately so fast navigation cannot lose edits.
   const handleTitleChange = (value: string) => {
     setLocalTitle(value);
-    setWriting(prev => {
-      const nextWriting = { ...prev, title: value };
-      persistDraftNow(nextWriting);
-      return nextWriting;
-    });
+    setWriting(prev => ({ ...prev, title: value }));
   };
 
   const plainContent = writing.content
@@ -244,19 +247,11 @@ export function WritingEditor() {
 
   // Check for local draft on mount
   useEffect(() => {
-    try {
-      const savedDraft = localStorage.getItem(draftKey);
-      if (savedDraft) {
-        const parsed = JSON.parse(savedDraft);
-        setDraftTimestamp(parsed.timestamp);
-        // Keep draft metadata only; skip recovery popup to avoid interrupting fast editing flow.
-        if (hasMeaningfulWritingDraft(parsed.data) && (Date.now() - parsed.timestamp) < 86400000) { // 24 hours
-          setShowDraftRecovery(false);
-        }
-      }
-    } catch (e) {
-      console.error('Failed to check draft:', e);
+    const draft = autosave.readDraft();
+    if (draft && hasMeaningfulWritingDraft(draft.data) && (Date.now() - draft.timestamp) < 86_400_000) {
+      setShowDraftRecovery(true);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey]);
 
   // Track caret changes for suggestions.
@@ -283,146 +278,85 @@ export function WritingEditor() {
     };
   }, [updateCaretSuggestions, writing._id, writing.id]);
 
-  // Load writing if editing existing one
+  // Load writing if editing existing one — use single-item endpoint with fallback
   useEffect(() => {
     if (!slug || slug === 'new') {
       setLoading(false);
       return;
     }
+    const cacheKey = `admin:writings:item:${slug}`;
+    const cached = getRuntimeCache<Writing>(cacheKey);
+    if (cached) {
+      setWriting(cached);
+      setLoading(false);
+      api
+        .get(`/api/writings/admin/${encodeURIComponent(slug)}`)
+        .then((data: Writing) => {
+          setRuntimeCache(cacheKey, data);
+          setWriting(data);
+        })
+        .catch(() => {
+          api.get('/api/writings').then((writings: Writing[]) => {
+            const found = writings.find(w => w.id === slug || w._id === slug);
+            if (found) {
+              setRuntimeCache(cacheKey, found);
+              setWriting(found);
+            }
+          }).catch(console.error);
+        });
+      return;
+    }
     setLoading(true);
     api
-      .get(`/api/writings`)
-      .then((writings: Writing[]) => {
-        const found = writings.find(w => w.id === slug || w._id === slug);
-        if (found) {
-          setWriting(found);
-        }
+      .get(`/api/writings/admin/${encodeURIComponent(slug)}`)
+      .then((data: Writing) => {
+        setRuntimeCache(cacheKey, data);
+        setWriting(data);
       })
-      .catch(console.error)
+      .catch(() => {
+        // Fallback: load all and search client-side
+        api.get('/api/writings').then((writings: Writing[]) => {
+          const found = writings.find(w => w.id === slug || w._id === slug);
+          if (found) {
+            setRuntimeCache(cacheKey, found);
+            setWriting(found);
+          }
+        }).catch(console.error);
+      })
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // Periodic backup write without touching indicator state.
-  useEffect(() => {
-    if (loading) return;
-    const timeout = setTimeout(() => {
-      try {
-        localStorage.setItem(draftKey, JSON.stringify({ data: writing, timestamp: Date.now() }));
-      } catch (e) { console.error('Local draft error:', e); }
-    }, 1000);
-    return () => clearTimeout(timeout);
-  }, [writing, loading, draftKey]);
 
-  useEffect(() => {
-    return () => clearTimeout(localDraftStatusTimeoutRef.current);
-  }, []);
-
-  // Server autosave - 3s (FASTER!)
-  useEffect(() => {
-    const canAutosaveToServer = Boolean(writing.title.trim() || getWordCount(writing.content) >= 50);
-
-    if (loading || !canAutosaveToServer) return;
-    clearTimeout(autoSaveTimeoutRef.current);
-    autoSaveTimeoutRef.current = setTimeout(async () => {
-      setAutosaveStatus('saving');
-      try {
-        if (writing._id) {
-          await api.put(`/api/writings/${writing._id}`, writing);
-        } else if (!pendingCreateRef.current) {
-          pendingCreateRef.current = true;
-          const draftId = writing.id || createAutosaveDraftId(writing.title, writing.content, 'writing');
-          const response = await api.post('/api/writings', { ...writing, id: draftId });
-          setWriting(prev => ({ ...prev, _id: response._id }));
-          pendingCreateRef.current = false;
-        } else { setAutosaveStatus('idle'); return; }
-        setAutosaveStatus('saved');
-        setTimeout(() => setAutosaveStatus('idle'), 1500);
-      } catch (err) { pendingCreateRef.current = false; console.error('Autosave failed:', err); setAutosaveStatus('idle'); }
-    }, 3000);
-    return () => clearTimeout(autoSaveTimeoutRef.current);
-  }, [writing, loading]);
-
-  // SAVE ON EXIT: Save to localStorage when user leaves the page
-  useEffect(() => {
-    const saveBeforeUnload = () => {
-      try {
-        const draftData = {
-          data: writing,
-          timestamp: Date.now(),
-        };
-        localStorage.setItem(draftKey, JSON.stringify(draftData));
-        console.log('Draft saved before exit');
-      } catch (e) {
-        console.error('Failed to save draft before exit:', e);
-      }
-    };
-
-    // Save when tab/window is closed or refreshed
-    window.addEventListener('beforeunload', saveBeforeUnload);
-    
-    // Save when navigating away (React Router)
-    return () => {
-      saveBeforeUnload(); // Save on component unmount (navigation)
-      window.removeEventListener('beforeunload', saveBeforeUnload);
-    };
-  }, [writing, draftKey]);
 
   // Restore draft from localStorage
   const restoreDraft = () => {
-    try {
-      const savedDraft = localStorage.getItem(draftKey);
-      if (savedDraft) {
-        const parsed = JSON.parse(savedDraft);
-        setWriting(parsed.data);
-      }
-    } catch (e) {
-      console.error('Failed to restore draft:', e);
-    }
+    const draft = autosave.readDraft();
+    if (draft) setWriting(draft.data);
     setShowDraftRecovery(false);
   };
 
   // Discard draft
   const discardDraft = () => {
-    try {
-      localStorage.removeItem(draftKey);
-    } catch (e) {
-      console.error('Failed to discard draft:', e);
-    }
+    autosave.clearDraft();
     setShowDraftRecovery(false);
   };
 
-  // Clear draft after successful publish
-  const clearLocalDraft = () => {
-    try {
-      localStorage.removeItem(draftKey);
-    } catch (e) {
-      console.error('Failed to clear draft:', e);
-    }
-  };
-
-  // Stable update callback using useCallback
+  // Stable update callback
   const handleUpdateWriting = useCallback((updatedWriting: Writing) => {
-    persistDraftNow(updatedWriting);
     setWriting(updatedWriting);
-  }, [persistDraftNow]);
+  }, []);
 
   // Stable callback for content updates
   const handleContentCommit = useCallback((content: string) => {
-    setWriting(prev => {
-      const nextWriting = { ...prev, content };
-      persistDraftNow(nextWriting);
-      return nextWriting;
-    });
-  }, [persistDraftNow]);
+    setWriting(prev => ({ ...prev, content }));
+  }, []);
 
   const handleAutoFixContent = useCallback((nextContent: string) => {
     setWriting(prev => {
       if (prev.content === nextContent) return prev;
-      const nextWriting = { ...prev, content: nextContent };
-      persistDraftNow(nextWriting);
-      return nextWriting;
+      return { ...prev, content: nextContent };
     });
-  }, [persistDraftNow]);
+  }, []);
 
   const applyCaretSuggestion = useCallback((replacement: string) => {
     const textarea = textareaRef.current;
@@ -460,11 +394,7 @@ export function WritingEditor() {
     textarea.value = newText;
 
     // Then update state
-    setWriting(prev => {
-      const nextWriting = { ...prev, content: newText };
-      persistDraftNow(nextWriting);
-      return nextWriting;
-    });
+    setWriting(prev => ({ ...prev, content: newText }));
 
     // Restore cursor position
     setTimeout(() => {
@@ -477,11 +407,7 @@ export function WritingEditor() {
   const insertImageMarkdown = (imageMarkdown: string) => {
     const textarea = textareaRef.current;
     if (!textarea) {
-      setWriting(prev => {
-        const nextWriting = { ...prev, content: `${prev.content}\n${imageMarkdown}\n` };
-        persistDraftNow(nextWriting);
-        return nextWriting;
-      });
+      setWriting(prev => ({ ...prev, content: `${prev.content}\n${imageMarkdown}\n` }));
       return;
     }
 
@@ -494,11 +420,7 @@ export function WritingEditor() {
     textarea.value = newText;
 
     // Then update state
-    setWriting(prev => {
-      const nextWriting = { ...prev, content: newText };
-      persistDraftNow(nextWriting);
-      return nextWriting;
-    });
+    setWriting(prev => ({ ...prev, content: newText }));
 
     setTimeout(() => {
       textarea.focus();
@@ -511,11 +433,7 @@ export function WritingEditor() {
   const insertLinkMarkdown = (linkMarkdown: string) => {
     const textarea = textareaRef.current;
     if (!textarea) {
-      setWriting(prev => {
-        const nextWriting = { ...prev, content: `${prev.content}${prev.content ? '\n' : ''}${linkMarkdown}` };
-        persistDraftNow(nextWriting);
-        return nextWriting;
-      });
+      setWriting(prev => ({ ...prev, content: `${prev.content}${prev.content ? '\n' : ''}${linkMarkdown}` }));
       return;
     }
 
@@ -528,11 +446,7 @@ export function WritingEditor() {
     textarea.value = newText;
 
     // Then update state
-    setWriting(prev => {
-      const nextWriting = { ...prev, content: newText };
-      persistDraftNow(nextWriting);
-      return nextWriting;
-    });
+    setWriting(prev => ({ ...prev, content: newText }));
 
     setTimeout(() => {
       textarea.focus();
@@ -604,7 +518,7 @@ export function WritingEditor() {
         // Update state with the _id returned from server
         setWriting(prev => ({ ...prev, _id: response._id }));
       }
-      clearLocalDraft(); // Clear local draft after successful save
+      autosave.clearDraft(); // Clear local draft after successful save
       alert('Writing saved successfully!');
       navigate('/admin/writings');
     } catch (err) {
@@ -657,35 +571,25 @@ export function WritingEditor() {
               </div>
             </div>
 
-            {/* Local Draft Indicator */}
-            {localDraftStatus !== 'idle' && (
-              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${
-                localDraftStatus === 'saving'
-                  ? 'text-yellow-400 bg-yellow-400/10'
-                  : 'text-green-400 bg-green-400/10'
+            {/* Autosave Status Indicator (unified: local + server) */}
+            {autosave.status !== 'idle' && (
+              <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-all ${
+                autosave.status === 'saving'   ? 'text-yellow-400 bg-yellow-400/10' :
+                autosave.status === 'retrying' ? 'text-orange-400 bg-orange-400/10' :
+                autosave.status === 'error'    ? 'text-red-400 bg-red-400/10' :
+                                                 'text-green-400 bg-green-400/10'
               }`}>
-                <HardDrive className={`w-3 h-3 ${localDraftStatus === 'saving' ? 'animate-pulse' : ''}`} />
-                <span>{localDraftStatus === 'saving' ? 'Local save...' : 'Local ✓'}</span>
+                {autosave.status === 'saving'   && <><Clock className="w-3 h-3 animate-spin" /><span>Saving…</span></>}
+                {autosave.status === 'retrying'  && <><RefreshCw className="w-3 h-3 animate-spin" /><span>{autosave.errorMessage || 'Retrying…'}</span></>}
+                {autosave.status === 'error'     && <><AlertCircle className="w-3 h-3" /><span title={autosave.errorMessage}>Save failed</span></>}
+                {autosave.status === 'saved'     && <><Check className="w-3 h-3" /><span>Saved ✓</span></>}
               </div>
             )}
-
-            {/* Server Autosave Indicator */}
-            {autosaveStatus !== 'idle' && (
-              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${
-                autosaveStatus === 'saving' ? 'text-yellow-400 bg-yellow-400/10' : 'text-green-400 bg-green-400/10'
-              }`}>
-                {autosaveStatus === 'saving' && (
-                  <>
-                    <Clock className="w-3 h-3 animate-spin" />
-                    <span>Saving...</span>
-                  </>
-                )}
-                {autosaveStatus === 'saved' && (
-                  <>
-                    <Check className="w-3 h-3" />
-                    <span>Server ✓</span>
-                  </>
-                )}
+            {/* Local draft indicator (always-on safety net) */}
+            {autosave.hasDraft && autosave.status === 'idle' && (
+              <div className="flex items-center gap-1 text-xs text-[#475569] px-2 py-1">
+                <HardDrive className="w-3 h-3" />
+                <span>Draft saved</span>
               </div>
             )}
 
@@ -926,7 +830,7 @@ export function WritingEditor() {
                 <p className="text-sm text-[#94A3B8]">
                   Anda memiliki draft yang belum disimpan dari{' '}
                   <span className="text-[#F8FAFC] font-medium">
-                    {draftTimestamp ? formatDraftTime(draftTimestamp) : 'sebelumnya'}
+                    {autosave.draftTimestamp ? formatDraftTime(autosave.draftTimestamp) : 'sebelumnya'}
                   </span>
                 </p>
               </div>

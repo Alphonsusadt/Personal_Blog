@@ -38,6 +38,33 @@ interface WritingSidebarProps {
 
 const categories = ['reflections', 'stories', 'fiction'];
 
+function SidebarCard({
+  title,
+  cardKey,
+  collapsed,
+  onToggle,
+  children,
+}: {
+  title: string;
+  cardKey: string;
+  collapsed: Record<string, boolean>;
+  onToggle: (key: string) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-[#1E293B] border border-[#334155] rounded-lg p-4">
+      <h3
+        className="font-medium text-sm text-[#F8FAFC] mb-3 cursor-pointer flex items-center justify-between"
+        onClick={() => onToggle(cardKey)}
+      >
+        {title}
+        <span className="text-[#94A3B8]">{collapsed[cardKey] ? '▶' : '▼'}</span>
+      </h3>
+      {!collapsed[cardKey] && <div>{children}</div>}
+    </div>
+  );
+}
+
 export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, sectionEnabled = true }: WritingSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const { language, setLanguage } = useAutoFixLanguage();
@@ -57,6 +84,22 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
 
   const handleAddTag = useCallback((tag: string) => {
     onUpdate({ ...writingRef.current, tags: [...writingRef.current.tags, tag] });
+  }, [onUpdate]);
+
+  const handleMetaTitleCommit = useCallback((value: string) => {
+    onUpdate({ ...writingRef.current, metaTitle: value });
+  }, [onUpdate]);
+
+  const handleMetaDescriptionCommit = useCallback((value: string) => {
+    onUpdate({ ...writingRef.current, metaDescription: value });
+  }, [onUpdate]);
+
+  const handleKeywordsCommit = useCallback((value: string) => {
+    onUpdate({ ...writingRef.current, keywords: value });
+  }, [onUpdate]);
+
+  const handleOgImageCommit = useCallback((value: string) => {
+    onUpdate({ ...writingRef.current, ogImage: value });
   }, [onUpdate]);
 
   // Auto-generate slug ONLY when: 1) Creating new item, 2) User clicks regenerate
@@ -102,21 +145,12 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
     onUpdate({ ...writing, tags: writing.tags.filter((_, i) => i !== index) });
   };
 
-  const SidebarCard = ({ title, cardKey, children }: { title: string; cardKey: string; children: React.ReactNode }) => (
-    <div className="bg-[#1E293B] border border-[#334155] rounded-lg p-4">
-      <h3 className="font-medium text-sm text-[#F8FAFC] mb-3 cursor-pointer flex items-center justify-between"
-          onClick={() => toggleCard(cardKey)}>
-        {title}
-        <span className="text-[#94A3B8]">{collapsed[cardKey] ? '▶' : '▼'}</span>
-      </h3>
-      {!collapsed[cardKey] && <div>{children}</div>}
-    </div>
-  );
+
 
   return (
     <aside className="space-y-4">
       {/* Auto Fix Language */}
-      <SidebarCard title="Auto Fix" cardKey="autofix">
+      <SidebarCard title="Auto Fix" cardKey="autofix" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-2">
           <label className="block text-xs text-[#94A3B8]">Language</label>
           <select
@@ -132,7 +166,7 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
       </SidebarCard>
 
       {/* Status Card */}
-      <SidebarCard title="Status" cardKey="status">
+      <SidebarCard title="Status" cardKey="status" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-3">
           <select
             value={writing.status || 'draft'}
@@ -184,7 +218,7 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
       </SidebarCard>
 
       {/* Writing Stats */}
-      <SidebarCard title="Writing Stats" cardKey="stats">
+      <SidebarCard title="Writing Stats" cardKey="stats" collapsed={collapsed} onToggle={toggleCard}>
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-[#0F172A] border border-[#334155] rounded-lg p-3">
             <p className="text-[11px] text-[#94A3B8]">Words</p>
@@ -209,7 +243,7 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
       )}
 
       {/* Category Card */}
-      <SidebarCard title="Category" cardKey="category">
+      <SidebarCard title="Category" cardKey="category" collapsed={collapsed} onToggle={toggleCard}>
         <select
           value={writing.category}
           onChange={e => onUpdate({ ...writing, category: e.target.value })}
@@ -222,7 +256,7 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
       </SidebarCard>
 
       {/* Tags Card */}
-      <SidebarCard title="Tags" cardKey="tags">
+      <SidebarCard title="Tags" cardKey="tags" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2 mb-3">
             {writing.tags.map((tag, i) => (
@@ -243,7 +277,7 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
       </SidebarCard>
 
       {/* Excerpt Card */}
-      <SidebarCard title="Excerpt" cardKey="excerpt">
+      <SidebarCard title="Excerpt" cardKey="excerpt" collapsed={collapsed} onToggle={toggleCard}>
         <IsolatedTextarea
           id={writing.id}
           initialValue={writing.excerpt}
@@ -255,7 +289,7 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
       </SidebarCard>
 
       {/* Date & Read Time */}
-      <SidebarCard title="Date & Read Time" cardKey="dateTime">
+      <SidebarCard title="Date & Read Time" cardKey="dateTime" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-3">
           <div>
             <label className="block text-xs text-[#94A3B8] mb-1">Published Date</label>
@@ -280,7 +314,7 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
       </SidebarCard>
 
       {/* ID/Slug Card */}
-      <SidebarCard title="ID/Slug" cardKey="slug">
+      <SidebarCard title="ID/Slug" cardKey="slug" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-2">
           <div className="flex gap-2">
             <input
@@ -310,15 +344,15 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
       </SidebarCard>
 
       {/* SEO Card */}
-      <SidebarCard title="SEO" cardKey="seo">
+      <SidebarCard title="SEO" cardKey="seo" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-3">
           {/* Meta Title */}
           <div>
             <label className="block text-xs text-[#94A3B8] mb-1">Meta Title</label>
-            <input
-              type="text"
-              value={writing.metaTitle || writing.title}
-              onChange={e => onUpdate({ ...writing, metaTitle: e.target.value })}
+            <IsolatedInput
+              id={writing.id + '-meta-title'}
+              initialValue={writing.metaTitle || writing.title}
+              onCommit={handleMetaTitleCommit}
               placeholder="Auto-filled from title"
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />
@@ -328,9 +362,10 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
           {/* Meta Description */}
           <div>
             <label className="block text-xs text-[#94A3B8] mb-1">Meta Description</label>
-            <textarea
-              value={writing.metaDescription || writing.excerpt}
-              onChange={e => onUpdate({ ...writing, metaDescription: e.target.value })}
+            <IsolatedTextarea
+              id={writing.id + '-meta-desc'}
+              initialValue={writing.metaDescription || writing.excerpt}
+              onCommit={handleMetaDescriptionCommit}
               placeholder="Auto-filled from excerpt"
               rows={3}
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] resize-none"
@@ -341,10 +376,10 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
           {/* Keywords */}
           <div>
             <label className="block text-xs text-[#94A3B8] mb-1">Keywords</label>
-            <input
-              type="text"
-              value={writing.keywords || writing.tags.join(', ')}
-              onChange={e => onUpdate({ ...writing, keywords: e.target.value })}
+            <IsolatedInput
+              id={writing.id + '-keywords'}
+              initialValue={writing.keywords || writing.tags.join(', ')}
+              onCommit={handleKeywordsCommit}
               placeholder="Auto-filled from tags"
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />
@@ -353,10 +388,10 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
           {/* OG Image */}
           <div>
             <label className="block text-xs text-[#94A3B8] mb-1">OG Image URL</label>
-            <input
-              type="text"
-              value={writing.ogImage || ''}
-              onChange={e => onUpdate({ ...writing, ogImage: e.target.value })}
+            <IsolatedInput
+              id={writing.id + '-og-image'}
+              initialValue={writing.ogImage || ''}
+              onCommit={handleOgImageCommit}
               placeholder="https://example.com/image.jpg"
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />

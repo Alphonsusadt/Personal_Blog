@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { Lock, User, AlertCircle } from 'lucide-react';
 
@@ -9,6 +9,8 @@ export function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const sessionExpired = (location.state as { expired?: boolean })?.expired;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,10 +38,14 @@ export function Login() {
         </div>
 
         <form onSubmit={handleSubmit} className="bg-[#1E293B] rounded-2xl p-8 border border-[#334155]">
-          {error && (
-            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg mb-6 text-sm">
+          {(error || sessionExpired) && (
+            <div className={`flex items-center gap-2 px-4 py-3 rounded-lg mb-6 text-sm ${
+              sessionExpired && !error
+                ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
+                : 'bg-red-500/10 border border-red-500/30 text-red-400'
+            }`}>
               <AlertCircle className="w-4 h-4 shrink-0" />
-              {error}
+              {sessionExpired && !error ? 'Session expired. Silakan login kembali.' : error}
             </div>
           )}
 

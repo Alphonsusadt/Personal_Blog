@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
+import { invalidateSettingsCache, setCachedSettings } from '../utils/settingsCache.js';
 
 function withSectionDefaults(doc = {}) {
   const sections = doc.sections && typeof doc.sections === 'object' ? doc.sections : {};
@@ -40,6 +41,8 @@ export default function settingsRoutes(db) {
     normalized.key = 'settings';
     normalized.updatedAt = new Date();
     await col.updateOne({ key: 'settings' }, { $set: normalized }, { upsert: true });
+    // Update cache immediately so subsequent requests are fast
+    setCachedSettings(normalized);
     res.json({ message: 'Updated' });
   });
 

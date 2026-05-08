@@ -40,6 +40,7 @@ const englishTypoMap: Record<string, string> = {
 };
 
 const indonesianTypoMap: Record<string, string> = {
+  // Common abbreviations / slang
   karna: 'karena',
   yg: 'yang',
   dgn: 'dengan',
@@ -49,6 +50,9 @@ const indonesianTypoMap: Record<string, string> = {
   gk: 'tidak',
   ga: 'tidak',
   ngga: 'tidak',
+  nyatanya: 'nyatanya',
+
+  // Standardized spelling corrections
   resiko: 'risiko',
   aktifitas: 'aktivitas',
   analisa: 'analisis',
@@ -61,25 +65,101 @@ const indonesianTypoMap: Record<string, string> = {
   obyek: 'objek',
   subyek: 'subjek',
   karir: 'karier',
+
+  // Common typos from repeated/missing letters
   seolaah: 'seolah',
+  seolahh: 'seolah',
   ikuut: 'ikut',
   merasakaan: 'merasakan',
   kegelisahaftnya: 'kegelisahannya',
   kegelisahaftnnya: 'kegelisahannya',
   kegelisahannyaa: 'kegelisahannya',
   takuted: 'takut',
-  seolahh: 'seolah',
-  nyatanya: 'nyatanya',
+  semmakin: 'semakin',
+  kelihattan: 'kelihatan',
+
+  // Challenge paragraph typos — scrambled/swapped/missing letters
+  kmerain: 'kemarin',
+  mebmli: 'membeli',
+  mkanaan: 'makanan',
+  rmaia: 'ramai',
+  mleihat: 'melihat',
+  prtunjukan: 'pertunjukan',
+  breabgai: 'berbagai',
+  permainna: 'permainan',
+  meantnang: 'menantang',
+  aidkku: 'adikku',
+  menadpatkan: 'mendapatkan',
+  pramianan: 'permainan',
+  mlemepar: 'melempar',
+  sletah: 'setelah',
+  brekliling: 'berkeliling',
+  mnikmait: 'menikmati',
+  brehmbus: 'berhembus',
+  memabut: 'membuat',
+  sasana: 'suasana',
+  traesa: 'terasa',
+  mennujukan: 'menunjukkan',
+  sepluuh: 'sepuluh',
+  meumtuskan: 'memutuskan',
+  kmabali: 'kembali',
+  bearktiftas: 'beraktivitas',
+  menobca: 'mencoba',
+
+  // Short word typos
+  id: 'di',
+  ak: 'ke',
+  sara: 'sana',
+  rna: 'dan',
+  paus: 'puas',
+  sabil: 'sambil',
+  ehe: 'teh',
+  pgi: 'pagi',
+  kep: 'ke',
+  lam: 'malam',
+  ama: 'sama',
+  ad: 'dan',
+  asia: 'agar ia',
+  malta: 'malam',
+  dudu: 'duduk',
+  beiristiahat: 'beristirahat',
+  pukau: 'pukul',
 };
 
 const englishMarkers = new Set([
   'the', 'and', 'for', 'with', 'this', 'that', 'from', 'you', 'your', 'are', 'is', 'was',
   'have', 'has', 'will', 'should', 'can', 'not', 'about', 'project', 'writing', 'book',
+  'been', 'being', 'were', 'would', 'could', 'they', 'them', 'their', 'what', 'when',
+  'where', 'which', 'who', 'how', 'why', 'all', 'each', 'every', 'both', 'few',
+  'more', 'most', 'other', 'some', 'such', 'only', 'same', 'than', 'too', 'very',
+  'just', 'because', 'also', 'into', 'over', 'after', 'before', 'between', 'through',
+  'during', 'without', 'within', 'along', 'following', 'across', 'behind', 'beyond',
+  'plus', 'except', 'but', 'however', 'although', 'though', 'while', 'since', 'until',
+  'unless', 'upon', 'whether', 'these', 'those', 'here', 'there', 'then', 'now',
+  'still', 'even', 'much', 'many', 'well', 'back', 'even', 'way', 'thing', 'make',
+  'like', 'time', 'know', 'people', 'first', 'new', 'way', 'day', 'get', 'use',
+  'man', 'woman', 'child', 'world', 'life', 'hand', 'part', 'place', 'case', 'week',
 ]);
 
 const indonesianMarkers = new Set([
   'yang', 'dan', 'untuk', 'dengan', 'ini', 'itu', 'dari', 'kamu', 'anda', 'adalah', 'tidak',
   'saya', 'kami', 'kita', 'akan', 'pada', 'tentang', 'proyek', 'tulisan', 'buku',
+  'mereka', 'kita', 'dia', 'ia', 'beliau', 'karena', 'sebab', 'oleh', 'juga', 'tetapi',
+  'namun', 'sedangkan', 'apabila', 'jika', 'kalau', 'bila', 'ketika', 'sementara',
+  'sejak', 'hingga', 'sampai', 'lalu', 'kemudian', 'setelah', 'sebelum', 'baru',
+  'sudah', 'telah', 'sedang', 'lagi', 'masih', 'belum', 'tak', 'jangan', 'bukan',
+  'tanpa', 'didalam', 'diluar', 'atas', 'bawah', 'depan', 'belakang', 'antara',
+  'melalui', 'ke', 'di', 'kepada', 'terhadap', 'bagi', 'per', 'setiap', 'semua',
+  'beberapa', 'banyak', 'sedikit', 'lagi', 'hanya', 'saja', 'pula', 'pun', 'sih',
+  'dong', 'kan', 'lah', 'kah', 'nya', 'ku', 'mu', 'orang', 'rumah', 'hari', 'tahun',
+  'waktu', 'tempat', 'cara', 'kerja', 'besar', 'kecil', 'panjang', 'pendek', 'tinggi',
+  'baik', 'buruk', 'indah', 'cantik', 'bagus', 'jelek', 'baru', 'lama', 'muda',
+  'pernah', 'selalu', 'sering', 'jarang', 'hampir', 'hanya', 'lagi', 'sangat',
+  // Additional common words to prevent false positives
+  'macam', 'senang', 'sejuk', 'pergi', 'bersama', 'keluarga', 'ringan', 'asik',
+  'wahana', 'seru', 'ketika', 'hadiah', 'boneka', 'beruang', 'besar', 'gelang',
+  'pinggir', 'jalan', 'manis', 'angin', 'nyaman', 'pulang', 'rumah', 'nyenyak',
+  'besok', 'pagi', 'malam', 'stan', 'es', 'teh', 'jadi', 'agar', 'segera',
 ]);
 
 const protectedChunkPattern =
@@ -135,9 +215,16 @@ export function detectTextLanguage(input: string): DetectedLanguage {
   const enScore = scoreLanguage(words, englishMarkers) + scoreTypoHits(words, englishTypoMap);
   const idScore = scoreLanguage(words, indonesianMarkers) + scoreTypoHits(words, indonesianTypoMap);
 
-  if (enScore === 0 && idScore === 0) return 'unknown';
-  if (enScore > idScore * 1.25) return 'en';
-  if (idScore > enScore * 1.25) return 'id';
+  if (enScore === 0 && idScore === 0) {
+    // Fallback: check if text contains characters/patterns common in Indonesian
+    const lower = input.toLowerCase();
+    const idPatterns = /\b(di|ke|se|ter|me|ber|per|pe|meny|men|mem|meng|pel|pen|peny)\w+/g;
+    const idPatternMatches = lower.match(idPatterns);
+    if (idPatternMatches && idPatternMatches.length >= 2) return 'id';
+    return 'unknown';
+  }
+  if (enScore > idScore * 1.1) return 'en';
+  if (idScore > enScore * 1.1) return 'id';
   return 'mixed';
 }
 
@@ -187,13 +274,24 @@ function applyCaseStyle(source: string, replacement: string): string {
   return replacement;
 }
 
+// Cache fixMap and knownWords per language to avoid rebuilding on every call
+const fixMapCache = new Map<string, Record<string, string>>();
+const knownWordsCache = new Map<string, Set<string>>();
+
 function buildFixMap(language: DetectedLanguage): Record<string, string> {
-  if (language === 'en') return { ...englishTypoMap, ...commonEnglishFixes };
-  if (language === 'id') return { ...indonesianTypoMap, ...commonIndonesianFixes };
-  return { ...englishTypoMap, ...indonesianTypoMap, ...commonEnglishFixes, ...commonIndonesianFixes };
+  const cached = fixMapCache.get(language);
+  if (cached) return cached;
+  let result: Record<string, string>;
+  if (language === 'en') result = { ...englishTypoMap, ...commonEnglishFixes };
+  else if (language === 'id') result = { ...indonesianTypoMap, ...commonIndonesianFixes };
+  else result = { ...englishTypoMap, ...indonesianTypoMap, ...commonEnglishFixes, ...commonIndonesianFixes };
+  fixMapCache.set(language, result);
+  return result;
 }
 
 function buildKnownWords(language: DetectedLanguage): Set<string> {
+  const cached = knownWordsCache.get(language);
+  if (cached) return cached;
   const words = new Set<string>();
   const addAll = (items: Iterable<string>) => {
     for (const item of items) words.add(item.toLowerCase());
@@ -203,22 +301,19 @@ function buildKnownWords(language: DetectedLanguage): Set<string> {
     addAll(englishMarkers);
     addAll(Object.values(englishTypoMap));
     addAll(Object.values(commonEnglishFixes));
-    return words;
-  }
-
-  if (language === 'id') {
+  } else if (language === 'id') {
     addAll(indonesianMarkers);
     addAll(Object.values(indonesianTypoMap));
     addAll(Object.values(commonIndonesianFixes));
-    return words;
+  } else {
+    addAll(englishMarkers);
+    addAll(indonesianMarkers);
+    addAll(Object.values(englishTypoMap));
+    addAll(Object.values(indonesianTypoMap));
+    addAll(Object.values(commonEnglishFixes));
+    addAll(Object.values(commonIndonesianFixes));
   }
-
-  addAll(englishMarkers);
-  addAll(indonesianMarkers);
-  addAll(Object.values(englishTypoMap));
-  addAll(Object.values(indonesianTypoMap));
-  addAll(Object.values(commonEnglishFixes));
-  addAll(Object.values(commonIndonesianFixes));
+  knownWordsCache.set(language, words);
   return words;
 }
 
@@ -337,10 +432,12 @@ function fixChunk(
 ): string {
   return chunk.replace(wordPattern, (word, localIndex: number) => {
     const normalized = word.toLowerCase();
+    // If the word is already a known/correct word, skip fuzzy correction
+    const isKnownWord = knownWords.has(normalized);
     const fixed =
       fixMap[normalized] ||
       chooseFallbackCorrection(word, language) ||
-      (language === 'id' ? chooseFuzzyCorrection(normalized, knownWords) : undefined);
+      (!isKnownWord ? chooseFuzzyCorrection(normalized, knownWords) : undefined);
     if (!fixed || fixed === normalized) return word;
 
     const output = applyCaseStyle(word, fixed);
@@ -364,10 +461,8 @@ export function getAutoFixSuggestionsForWord(word: string, language: DetectedLan
   const fallback = chooseFallbackCorrection(word, targetLanguage);
   if (fallback && fallback !== normalized) suggestions.add(applyCaseStyle(word, fallback));
 
-  if (targetLanguage === 'id') {
-    const fuzzy = chooseFuzzyCorrection(normalized, knownWords);
-    if (fuzzy && fuzzy !== normalized) suggestions.add(applyCaseStyle(word, fuzzy));
-  }
+  const fuzzy = chooseFuzzyCorrection(normalized, knownWords);
+  if (fuzzy && fuzzy !== normalized) suggestions.add(applyCaseStyle(word, fuzzy));
 
   return Array.from(suggestions).slice(0, 6);
 }

@@ -3,9 +3,11 @@ node_modules/
 cms/node_modules/
 
 # Environment variables - JANGAN COMMIT FILE INI
+# (Ini akan mencegah API keys seperti Supabase & Cloudinary ter-publish)
 .env
 .env.local
 .env.production
+.env.development
 cms/.env
 cms/.env.local
 cms/.env.production

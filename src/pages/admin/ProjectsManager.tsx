@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../../lib/api';
+import { api, getRuntimeCache, setRuntimeCache } from '../../lib/api';
 import { Plus, Pencil, Trash2, Clock, Calendar, Eye, EyeOff } from 'lucide-react';
 
 interface Project {
@@ -28,10 +28,30 @@ export function ProjectsManager() {
   const navigate = useNavigate();
   const [items, setItems] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const cacheKey = 'admin:projects:list';
 
   const load = () => {
+    const cached = getRuntimeCache<Project[]>(cacheKey);
+    if (cached) {
+      setItems(cached);
+      setLoading(false);
+      api.get('/api/projects')
+        .then((fresh) => {
+          setRuntimeCache(cacheKey, fresh);
+          setItems(fresh);
+        })
+        .catch(console.error);
+      return;
+    }
+
     setLoading(true);
-    api.get('/api/projects').then(setItems).catch(console.error).finally(() => setLoading(false));
+    api.get('/api/projects')
+      .then((fresh) => {
+        setRuntimeCache(cacheKey, fresh);
+        setItems(fresh);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);

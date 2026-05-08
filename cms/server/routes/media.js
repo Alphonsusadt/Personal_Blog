@@ -6,21 +6,134 @@
  */
 
 import fs from 'fs/promises';
+import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import express from 'express';
+import sharp from 'sharp';
 import multer from 'multer';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const UPLOAD_DIR = path.join(__dirname, '../../public/uploads');
+const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
+
+async function getFileHash(filePath) {
+  const buffer = await fs.readFile(filePath);
+  return crypto.createHash('sha256').update(buffer).digest('hex');
+}
+
+import cloudinary from '../config/cloudinary.js';
+
+async function persistUpload(db, file, altText, uploadedBy) {
+  const mediaCollection = db.collection('media');
+  const hash = await getFileHash(file.path);
+  const existing = await mediaCollection.findOne({ hash });
+
+  if (existing) {
+    await fs.unlink(file.path).catch(() => {});
+    return {
+      success: true,
+      imageUrl: existing.url,
+      altText: existing.altText || altText,
+      fileName: existing.filename,
+      uploadedAt: existing.uploadedAt,
+      deduplicated: true,
+    };
+  }
+
+  const baseUrl = process.env.PUBLIC_URL || 'http://localhost:5000';
+  let imageUrl = `${baseUrl}/uploads/${file.filename}`;
+  let finalThumbUrl = '';
+  let isCloudinary = false;
+  const uploadedAt = new Date();
+
+  // Attempt Cloudinary upload if configured
+  if (cloudinary && process.env.CLOUDINARY_CLOUD_NAME) {
+    try {
+      const result = await cloudinary.uploader.upload(file.path, {
+        folder: 'portfolio',
+      });
+      imageUrl = result.secure_url;
+      // Generate a thumbnail URL using Cloudinary transformations
+      finalThumbUrl = result.secure_url.replace('/upload/', '/upload/w_300,c_limit,q_auto/');
+      isCloudinary = true;
+      // We can remove the local temp file since it's uploaded
+      await fs.unlink(file.path).catch(() => {});
+    } catch (err) {
+      console.error('Cloudinary upload error:', err);
+      // Fall back to local storage
+    }
+  }
+
+  await mediaCollection.insertOne({
+    filename: file.filename,
+    originalName: file.originalname,
+    altText,
+    size: file.size,
+    mimetype: file.mimetype,
+    url: imageUrl,
+    hash,
+    uploadedAt,
+    uploadedBy,
+  });
+
+  if (isCloudinary) {
+    await mediaCollection.updateOne(
+      { hash },
+      { $set: { thumbnail: finalThumbUrl } }
+    );
+  } else {
+    // Local Post-process: generate thumbnail and optimized main image
+    const thumbName = `${file.filename.replace(/\.[^.]+$/, '')}-thumb.jpg`;
+    const thumbPath = path.join(UPLOAD_DIR, thumbName);
+    const filePath = file.path;
+
+    try {
+      // Create thumbnail (300px wide)
+      await sharp(filePath)
+        .resize({ width: 300 })
+        .jpeg({ quality: 75 })
+        .toFile(thumbPath);
+
+      // Optimize main image: resize if wider than 1600 and recompress
+      const image = sharp(filePath);
+      const metadata = await image.metadata();
+      if ((metadata.width || 0) > 1600) {
+        await image.resize({ width: 1600 }).jpeg({ quality: 85 }).toFile(filePath + '.opt');
+        await fs.rename(filePath + '.opt', filePath);
+      } else {
+        await image.jpeg({ quality: 85 }).toFile(filePath + '.opt');
+        await fs.rename(filePath + '.opt', filePath);
+      }
+
+      // Update DB with new size and thumbnail info
+      const stats = await fs.stat(filePath);
+      await mediaCollection.updateOne(
+        { hash },
+        { $set: { size: stats.size, thumbnail: `${baseUrl}/uploads/${thumbName}` } }
+      );
+    } catch (err) {
+      console.error('Post-process image error:', err);
+    }
+  }
+
+  return {
+    success: true,
+    imageUrl,
+    altText,
+    fileName: file.filename,
+    uploadedAt,
+    deduplicated: false,
+  };
+}
 
 // Configure multer untuk temporary file storage
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../../public/uploads');
     try {
-      await fs.mkdir(uploadDir, { recursive: true });
-      cb(null, uploadDir);
+      await fs.mkdir(UPLOAD_DIR, { recursive: true });
+      cb(null, UPLOAD_DIR);
     } catch (err) {
       cb(err);
     }
@@ -43,17 +156,10 @@ const upload = multer({
       return;
     }
 
-    // Max size 5MB
-    const maxSize = 5 * 1024 * 1024;
-    if ((req).fileSize && (req).fileSize > maxSize) {
-      cb(new Error('File size exceeds 5MB'));
-      return;
-    }
-
     cb(null, true);
   },
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB
+    fileSize: MAX_UPLOAD_SIZE,
   },
 });
 
@@ -87,29 +193,11 @@ export default function mediaRoutes(db) {
 
       const { altText = '' } = req.body;
 
-      // Generate public URL (bisa disesuaikan dengan deployment)
-      const baseUrl = process.env.PUBLIC_URL || 'http://localhost:5000';
-      const imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
-
-      // Optionally: Save metadata ke database
-      const mediaCollection = db.collection('media');
-      await mediaCollection.insertOne({
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        altText: altText,
-        size: req.file.size,
-        mimetype: req.file.mimetype,
-        url: imageUrl,
-        uploadedAt: new Date(),
-        uploadedBy: req.user?.id || 'anonymous',
-      });
+      const result = await persistUpload(db, req.file, altText, req.user?.id || 'anonymous');
 
       res.json({
-        success: true,
-        imageUrl,
-        altText: altText,
-        fileName: req.file.filename,
-        uploadedAt: new Date().toISOString(),
+        ...result,
+        uploadedAt: result.uploadedAt.toISOString(),
       });
     } catch (error) {
       console.error('Upload error:', error);
@@ -157,30 +245,14 @@ export default function mediaRoutes(db) {
         });
       }
 
-      const baseUrl = process.env.PUBLIC_URL || 'http://localhost:5000';
-      const mediaCollection = db.collection('media');
       const results = [];
 
       for (const file of req.files) {
         try {
-          const imageUrl = `${baseUrl}/uploads/${file.filename}`;
-
-          // Save metadata
-          await mediaCollection.insertOne({
-            filename: file.filename,
-            originalName: file.originalname,
-            altText: '',
-            size: file.size,
-            mimetype: file.mimetype,
-            url: imageUrl,
-            uploadedAt: new Date(),
-            uploadedBy: req.user?.id || 'anonymous',
-          });
-
+          const result = await persistUpload(db, file, '', req.user?.id || 'anonymous');
           results.push({
-            success: true,
-            imageUrl,
-            fileName: file.filename,
+            ...result,
+            uploadedAt: result.uploadedAt.toISOString(),
           });
         } catch (error) {
           results.push({
@@ -214,13 +286,25 @@ export default function mediaRoutes(db) {
    */
   router.get('/list', async (req, res) => {
     try {
-      const limit = parseInt(req.query.limit) || 20;
-      const offset = parseInt(req.query.offset) || 0;
+      const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+      const offset = Math.max(parseInt(req.query.offset) || 0, 0);
       const sort = req.query.sort === 'oldest' ? 1 : -1;
 
       const mediaCollection = db.collection('media');
       const items = await mediaCollection
-        .find({})
+        .find({}, {
+          projection: {
+            filename: 1,
+            originalName: 1,
+            altText: 1,
+            size: 1,
+            mimetype: 1,
+            url: 1,
+            uploadedAt: 1,
+            uploadedBy: 1,
+            hash: 1,
+          },
+        })
         .sort({ uploadedAt: sort })
         .skip(offset)
         .limit(limit)
@@ -260,8 +344,7 @@ export default function mediaRoutes(db) {
         });
       }
 
-      const uploadDir = path.join(__dirname, '../../public/uploads');
-      const filePath = path.join(uploadDir, filename);
+      const filePath = path.join(UPLOAD_DIR, filename);
 
       // Security: ensure file path is within upload directory
       if (!filePath.startsWith(uploadDir)) {

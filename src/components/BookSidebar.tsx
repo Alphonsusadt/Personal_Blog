@@ -2,7 +2,8 @@ import { X, Star, RefreshCw } from 'lucide-react';
 import { ImageGallery } from './ImageGallery';
 import React, { useCallback, useRef } from 'react';
 import { generateSlug, isValidSlug } from '../utils/slugify';
-import { IsolatedTagInput } from './IsolatedInput';
+import { IsolatedInput, IsolatedTextarea, IsolatedTagInput } from './IsolatedInput';
+import { useAutoFixLanguage } from '../hooks/useAutoFixLanguage';
 
 interface Book {
   _id?: string;
@@ -30,13 +31,43 @@ interface BookSidebarProps {
   onUpdate: (book: Book) => void;
   onSave: () => Promise<void>;
   isSaving?: boolean;
+  wordCount?: number;
+  characterCount?: number;
   sectionEnabled?: boolean;
 }
 
 const categories = ['technical', 'biography', 'spiritual', 'philosophy'];
 
-export function BookSidebar({ book, onUpdate, onSave, isSaving, sectionEnabled = true }: BookSidebarProps) {
+function SidebarCard({
+  title,
+  cardKey,
+  collapsed,
+  onToggle,
+  children,
+}: {
+  title: string;
+  cardKey: string;
+  collapsed: Record<string, boolean>;
+  onToggle: (key: string) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-[#1E293B] border border-[#334155] rounded-lg p-4">
+      <h3
+        className="font-medium text-sm text-[#F8FAFC] mb-3 cursor-pointer flex items-center justify-between"
+        onClick={() => onToggle(cardKey)}
+      >
+        {title}
+        <span className="text-[#94A3B8]">{collapsed[cardKey] ? '▶' : '▼'}</span>
+      </h3>
+      {!collapsed[cardKey] && <div>{children}</div>}
+    </div>
+  );
+}
+
+export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, sectionEnabled = true }: BookSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
+  const { language, setLanguage } = useAutoFixLanguage();
   
   // Use ref to always have latest book without causing re-renders
   const bookRef = useRef(book);
@@ -45,6 +76,22 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, sectionEnabled =
   // Stable callback for adding takeaways - use ref
   const handleAddTakeaway = useCallback((takeaway: string) => {
     onUpdate({ ...bookRef.current, takeaways: [...bookRef.current.takeaways, takeaway] });
+  }, [onUpdate]);
+
+  const handleMetaTitleCommit = useCallback((value: string) => {
+    onUpdate({ ...bookRef.current, metaTitle: value });
+  }, [onUpdate]);
+
+  const handleMetaDescriptionCommit = useCallback((value: string) => {
+    onUpdate({ ...bookRef.current, metaDescription: value });
+  }, [onUpdate]);
+
+  const handleKeywordsCommit = useCallback((value: string) => {
+    onUpdate({ ...bookRef.current, keywords: value });
+  }, [onUpdate]);
+
+  const handleOgImageCommit = useCallback((value: string) => {
+    onUpdate({ ...bookRef.current, ogImage: value });
   }, [onUpdate]);
 
   // Auto-generate slug ONLY when: 1) Creating new item, 2) User clicks regenerate
@@ -90,21 +137,42 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, sectionEnabled =
     onUpdate({ ...book, takeaways: book.takeaways.filter((_, i) => i !== index) });
   };
 
-  const SidebarCard = ({ title, cardKey, children }: { title: string; cardKey: string; children: React.ReactNode }) => (
-    <div className="bg-[#1E293B] border border-[#334155] rounded-lg p-4">
-      <h3 className="font-medium text-sm text-[#F8FAFC] mb-3 cursor-pointer flex items-center justify-between"
-          onClick={() => toggleCard(cardKey)}>
-        {title}
-        <span className="text-[#94A3B8]">{collapsed[cardKey] ? '▶' : '▼'}</span>
-      </h3>
-      {!collapsed[cardKey] && <div>{children}</div>}
-    </div>
-  );
+
 
   return (
     <aside className="space-y-4">
+      {/* Auto Fix Language */}
+      <SidebarCard title="Auto Fix" cardKey="autofix" collapsed={collapsed} onToggle={toggleCard}>
+        <div className="space-y-2">
+          <label className="block text-xs text-[#94A3B8]">Language</label>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value as 'id' | 'en')}
+            className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+          >
+            <option value="id">Indonesia</option>
+            <option value="en">English</option>
+          </select>
+          <p className="text-[11px] text-[#94A3B8]">Mempengaruhi Auto Fix + spellcheck di editor.</p>
+        </div>
+      </SidebarCard>
+
+      {/* Content Stats */}
+      <SidebarCard title="Content Stats" cardKey="stats" collapsed={collapsed} onToggle={toggleCard}>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-[#0F172A] border border-[#334155] rounded-lg p-3">
+            <p className="text-[11px] text-[#94A3B8]">Words</p>
+            <p className="text-lg font-semibold text-[#F8FAFC]">{wordCount}</p>
+          </div>
+          <div className="bg-[#0F172A] border border-[#334155] rounded-lg p-3">
+            <p className="text-[11px] text-[#94A3B8]">Characters</p>
+            <p className="text-lg font-semibold text-[#F8FAFC]">{characterCount}</p>
+          </div>
+        </div>
+      </SidebarCard>
+
       {/* Status Card */}
-      <SidebarCard title="Status & Scheduling" cardKey="status">
+      <SidebarCard title="Status & Scheduling" cardKey="status" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-3">
           <select
             value={book.status || 'draft'}
@@ -166,7 +234,7 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, sectionEnabled =
       </SidebarCard>
 
       {/* Category Card */}
-      <SidebarCard title="Category" cardKey="category">
+      <SidebarCard title="Category" cardKey="category" collapsed={collapsed} onToggle={toggleCard}>
         <select
           value={book.category}
           onChange={e => onUpdate({ ...book, category: e.target.value })}
@@ -179,7 +247,7 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, sectionEnabled =
       </SidebarCard>
 
       {/* Rating Card */}
-      <SidebarCard title="Rating" cardKey="rating">
+      <SidebarCard title="Rating" cardKey="rating" collapsed={collapsed} onToggle={toggleCard}>
         <div className="flex gap-1">
           {[1,2,3,4,5].map(n => (
             <button
@@ -194,7 +262,7 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, sectionEnabled =
       </SidebarCard>
 
       {/* Takeaways Card */}
-      <SidebarCard title="Takeaways" cardKey="takeaways">
+      <SidebarCard title="Takeaways" cardKey="takeaways" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-2">
           <div className="space-y-2 mb-2">
             {book.takeaways.map((takeaway, i) => (
@@ -215,7 +283,7 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, sectionEnabled =
       </SidebarCard>
 
       {/* Image Gallery Card */}
-      <SidebarCard title="Images" cardKey="images">
+      <SidebarCard title="Images" cardKey="images" collapsed={collapsed} onToggle={toggleCard}>
         <ImageGallery
           content={book.review}
           onRemoveImage={(markdown) => {
@@ -226,7 +294,7 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, sectionEnabled =
       </SidebarCard>
 
       {/* ID/Slug Card */}
-      <SidebarCard title="ID/Slug" cardKey="slug">
+      <SidebarCard title="ID/Slug" cardKey="slug" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-2">
           <div className="flex gap-2">
             <input
@@ -256,7 +324,7 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, sectionEnabled =
       </SidebarCard>
 
       {/* Cover URL Card */}
-      <SidebarCard title="Cover URL" cardKey="cover">
+      <SidebarCard title="Cover URL" cardKey="cover" collapsed={collapsed} onToggle={toggleCard}>
         <input
           type="text"
           value={book.cover}
@@ -267,15 +335,15 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, sectionEnabled =
       </SidebarCard>
 
       {/* SEO Card */}
-      <SidebarCard title="SEO" cardKey="seo">
+      <SidebarCard title="SEO" cardKey="seo" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-3">
           {/* Meta Title */}
           <div>
             <label className="block text-xs text-[#94A3B8] mb-1">Meta Title</label>
-            <input
-              type="text"
-              value={book.metaTitle || `${book.title} by ${book.author}`}
-              onChange={e => onUpdate({ ...book, metaTitle: e.target.value })}
+            <IsolatedInput
+              id={book.id + '-meta-title'}
+              initialValue={book.metaTitle || `${book.title} by ${book.author}`}
+              onCommit={handleMetaTitleCommit}
               placeholder="Auto-filled from title and author"
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />
@@ -285,9 +353,10 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, sectionEnabled =
           {/* Meta Description */}
           <div>
             <label className="block text-xs text-[#94A3B8] mb-1">Meta Description</label>
-            <textarea
-              value={book.metaDescription || `Book review: ${book.title} by ${book.author}. Rating: ${book.rating}/5 stars.`}
-              onChange={e => onUpdate({ ...book, metaDescription: e.target.value })}
+            <IsolatedTextarea
+              id={book.id + '-meta-desc'}
+              initialValue={book.metaDescription || `Book review: ${book.title} by ${book.author}. Rating: ${book.rating}/5 stars.`}
+              onCommit={handleMetaDescriptionCommit}
               placeholder="Auto-generated from book info"
               rows={3}
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] resize-none"
@@ -298,10 +367,10 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, sectionEnabled =
           {/* Keywords */}
           <div>
             <label className="block text-xs text-[#94A3B8] mb-1">Keywords</label>
-            <input
-              type="text"
-              value={book.keywords || `${book.title}, ${book.author}, book review, ${book.category}`}
-              onChange={e => onUpdate({ ...book, keywords: e.target.value })}
+            <IsolatedInput
+              id={book.id + '-keywords'}
+              initialValue={book.keywords || `${book.title}, ${book.author}, book review, ${book.category}`}
+              onCommit={handleKeywordsCommit}
               placeholder="Auto-generated from book details"
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />
@@ -310,10 +379,10 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, sectionEnabled =
           {/* OG Image */}
           <div>
             <label className="block text-xs text-[#94A3B8] mb-1">OG Image URL</label>
-            <input
-              type="text"
-              value={book.ogImage || book.cover}
-              onChange={e => onUpdate({ ...book, ogImage: e.target.value })}
+            <IsolatedInput
+              id={book.id + '-og-image'}
+              initialValue={book.ogImage || book.cover}
+              onCommit={handleOgImageCommit}
               placeholder="Uses book cover by default"
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />

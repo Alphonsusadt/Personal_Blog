@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api } from '../../lib/api';
+import { api, getRuntimeCache, setRuntimeCache } from '../../lib/api';
 import { BookToolbar } from '../../components/BookToolbar';
 import { BookSidebar } from '../../components/BookSidebar';
 import { ImageUploadDialog } from '../../components/ImageUploadDialog';
@@ -13,6 +13,9 @@ import { renderMarkdown } from '../../utils/renderers';
 import { formatDraftTime } from '../../hooks/useLocalDraft';
 import { IsolatedContentEditor } from '../../components/IsolatedInput';
 import { AutoFixButton } from '../../components/AutoFixButton';
+import { useAutoFixLanguage } from '../../hooks/useAutoFixLanguage';
+import { getAutoFixSuggestionsForWord } from '../../utils/textAutoFix';
+import { getSpellSuggestions } from '../../utils/spellSuggester';
 
 interface Book {
   _id?: string;
@@ -119,8 +122,65 @@ export function BookEditor() {
   const [showDraftRecovery, setShowDraftRecovery] = useState(false);
   const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null);
 
+  const { language: autoFixLanguage } = useAutoFixLanguage();
+
+  const [caretWord, setCaretWord] = useState<{ word: string; start: number; end: number } | null>(null);
+  const [caretSuggestions, setCaretSuggestions] = useState<string[]>([]);
+  const caretSuggestionRequestRef = useRef(0);
+
+  const getWordAt = useCallback((text: string, index: number): { word: string; start: number; end: number } | null => {
+    if (!text) return null;
+    const clamp = Math.max(0, Math.min(index, text.length));
+    const isWordChar = (ch: string) => /[\p{L}']/u.test(ch);
+    let start = clamp;
+    while (start > 0 && isWordChar(text[start - 1])) start -= 1;
+    let end = clamp;
+    while (end < text.length && isWordChar(text[end])) end += 1;
+    if (end <= start) return null;
+    const word = text.slice(start, end);
+    if (!word.trim()) return null;
+    return { word, start, end };
+  }, []);
+
+  const isRangeProtected = useCallback((text: string, start: number, end: number): boolean => {
+    const pattern = /(```[\s\S]*?```|`[^`\n]*`|\[[^\]]*\]\([^)]*\)|https?:\/\/\S+|www\.\S+|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,})/g;
+    pattern.lastIndex = 0;
+    let match: RegExpExecArray | null = pattern.exec(text);
+    while (match) {
+      const mStart = match.index;
+      const mEnd = mStart + match[0].length;
+      if (start >= mStart && end <= mEnd) return true;
+      if (mStart > end) return false;
+      match = pattern.exec(text);
+    }
+    return false;
+  }, []);
+
+  const updateCaretSuggestions = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const text = textarea.value ?? '';
+    const pos = textarea.selectionStart ?? 0;
+    const range = getWordAt(text, pos);
+    if (!range || range.word.length < 3) { setCaretWord(null); setCaretSuggestions([]); return; }
+    if (isRangeProtected(text, range.start, range.end)) { setCaretWord(null); setCaretSuggestions([]); return; }
+    const requestId = caretSuggestionRequestRef.current + 1;
+    caretSuggestionRequestRef.current = requestId;
+    const normalized = range.word.toLowerCase();
+    void (async () => {
+      const fromAutoFix = getAutoFixSuggestionsForWord(range.word, autoFixLanguage);
+      const fromDict = await getSpellSuggestions(range.word, autoFixLanguage);
+      if (caretSuggestionRequestRef.current !== requestId) return;
+      const merged = Array.from(new Set([...fromAutoFix, ...fromDict]))
+        .filter((s) => s.toLowerCase() !== normalized)
+        .slice(0, 6);
+      setCaretWord(range);
+      setCaretSuggestions(merged);
+    })();
+  }, [autoFixLanguage, getWordAt, isRangeProtected]);
+
   useEffect(() => {
-    api.get('/api/settings')
+    api.getAdminSettings()
       .then((settings: any) => {
         setBooksSectionEnabled(settings?.sections?.books?.enabled !== false);
       })
@@ -177,7 +237,7 @@ export function BookEditor() {
         const parsed = JSON.parse(savedDraft);
         setDraftTimestamp(parsed.timestamp);
         if (hasMeaningfulBookDraft(parsed.data) && (Date.now() - parsed.timestamp) < 86400000) {
-          setShowDraftRecovery(false);
+          setShowDraftRecovery(true);
         }
       }
     } catch (e) {
@@ -185,21 +245,51 @@ export function BookEditor() {
     }
   }, [draftKey]);
 
+  // Load book if editing existing one — use single-item endpoint with fallback
   useEffect(() => {
     if (!slug || slug === 'new') {
       setLoading(false);
       return;
     }
+    const cacheKey = `admin:books:item:${slug}`;
+    const cached = getRuntimeCache<Book>(cacheKey);
+    if (cached) {
+      setBook(cached);
+      setLoading(false);
+      api
+        .get(`/api/books/admin/${encodeURIComponent(slug)}`)
+        .then((data: Book) => {
+          setRuntimeCache(cacheKey, data);
+          setBook(data);
+        })
+        .catch(() => {
+          api.get('/api/books').then((books: Book[]) => {
+            const found = books.find(b => b.id === slug || b._id === slug);
+            if (found) {
+              setRuntimeCache(cacheKey, found);
+              setBook(found);
+            }
+          }).catch(console.error);
+        });
+      return;
+    }
     setLoading(true);
     api
-      .get(`/api/books`)
-      .then((books: Book[]) => {
-        const found = books.find(b => b.id === slug || b._id === slug);
-        if (found) {
-          setBook(found);
-        }
+      .get(`/api/books/admin/${encodeURIComponent(slug)}`)
+      .then((data: Book) => {
+        setRuntimeCache(cacheKey, data);
+        setBook(data);
       })
-      .catch(console.error)
+      .catch(() => {
+        // Fallback: load all and search client-side
+        api.get('/api/books').then((books: Book[]) => {
+          const found = books.find(b => b.id === slug || b._id === slug);
+          if (found) {
+            setRuntimeCache(cacheKey, found);
+            setBook(found);
+          }
+        }).catch(console.error);
+      })
       .finally(() => setLoading(false));
   }, [slug]);
 
@@ -319,6 +409,38 @@ export function BookEditor() {
       return nextBook;
     });
   }, [persistDraftNow]);
+
+  // Track caret changes for suggestions.
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const handler = () => updateCaretSuggestions();
+    textarea.addEventListener('keyup', handler);
+    textarea.addEventListener('click', handler);
+    textarea.addEventListener('mouseup', handler);
+    textarea.addEventListener('select', handler);
+    textarea.addEventListener('input', handler);
+    handler();
+    return () => {
+      textarea.removeEventListener('keyup', handler);
+      textarea.removeEventListener('click', handler);
+      textarea.removeEventListener('mouseup', handler);
+      textarea.removeEventListener('select', handler);
+      textarea.removeEventListener('input', handler);
+    };
+  }, [updateCaretSuggestions, book._id, book.id]);
+
+  const applyCaretSuggestion = useCallback((replacement: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea || !caretWord) return;
+    const text = textarea.value ?? '';
+    const nextText = text.slice(0, caretWord.start) + replacement + text.slice(caretWord.end);
+    textarea.value = nextText;
+    handleAutoFixReview(nextText);
+    const nextPos = caretWord.start + replacement.length;
+    setTimeout(() => { textarea.focus(); textarea.selectionStart = nextPos; textarea.selectionEnd = nextPos; }, 0);
+    setTimeout(() => updateCaretSuggestions(), 0);
+  }, [caretWord, handleAutoFixReview, updateCaretSuggestions]);
 
   const insertMarkdown = (before: string, after: string = '') => {
     const textarea = textareaRef.current;
@@ -624,6 +746,7 @@ export function BookEditor() {
                 <AutoFixButton
                   text={book.review}
                   onApply={handleAutoFixReview}
+                  language={autoFixLanguage}
                 />
 
                 {/* Live Preview Toggle */}
@@ -646,6 +769,30 @@ export function BookEditor() {
               <span>Characters: {characterCount}</span>
             </div>
 
+            {/* Caret Suggestions */}
+            {caretWord && caretSuggestions.length > 0 && (
+              <div className="bg-[#1E293B] border border-[#334155] rounded-lg px-3 py-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] text-[#94A3B8]">Suggestions for</span>
+                  <span className="text-[11px] text-[#F8FAFC] font-medium">{caretWord.word}</span>
+                  <span className="text-[11px] text-[#94A3B8]">:</span>
+                  <div className="flex flex-wrap gap-2">
+                    {caretSuggestions.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => applyCaretSuggestion(s)}
+                        className="px-2 py-1 rounded-md text-[11px] border border-[#334155] bg-[#0F172A] text-[#F8FAFC] hover:bg-[#111C33] transition-colors"
+                        title="Replace word"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Content Area - Editor or Split View */}
             {showPreview ? (
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -657,6 +804,8 @@ export function BookEditor() {
                     onCommit={handleReviewCommit}
                     id={book._id || book.id}
                     textareaRef={textareaRef}
+                    spellCheck
+                    lang={autoFixLanguage}
                     placeholder="Book review... (Markdown, LaTeX $$...$$ supported)"
                     className="flex-1 min-h-[60vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
                   />
@@ -690,6 +839,8 @@ export function BookEditor() {
                 onCommit={handleReviewCommit}
                 id={book._id || book.id}
                 textareaRef={textareaRef}
+                spellCheck
+                lang={autoFixLanguage}
                 placeholder="Book review... (Markdown, LaTeX $$...$$ supported)"
                 className="w-full min-h-[70vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
               />
@@ -703,6 +854,8 @@ export function BookEditor() {
               onUpdate={handleUpdateBook}
               onSave={handleSave}
               isSaving={isSaving}
+              wordCount={wordCount}
+              characterCount={characterCount}
               sectionEnabled={booksSectionEnabled}
             />
           </div>
