@@ -9,7 +9,7 @@ import { FullPagePreview } from '../../components/FullPagePreview';
 import { sanitizeMarkdown } from '../../lib/mediaUploader';
 import { hasBase64Images } from '../../utils/media';
 import { ArrowLeft, Check, Clock, Eye, EyeOff, Maximize2, HardDrive, AlertCircle } from 'lucide-react';
-import { renderMarkdown } from '../../utils/renderers';
+import { useRenderedMarkdown } from '../../hooks/useRenderedMarkdown';
 import { formatDraftTime } from '../../hooks/useLocalDraft';
 import { IsolatedContentEditor } from '../../components/IsolatedInput';
 import { AutoFixButton } from '../../components/AutoFixButton';
@@ -128,6 +128,7 @@ export function ProjectEditor() {
   const [showFullPreview, setShowFullPreview] = useState(false);
   const [localDraftStatus, setLocalDraftStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showDraftRecovery, setShowDraftRecovery] = useState(false);
+  const previewHtml = useRenderedMarkdown(project.content || '*Start writing to see preview...*');
   const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null);
 
   const { language: autoFixLanguage } = useAutoFixLanguage();
@@ -532,7 +533,7 @@ export function ProjectEditor() {
     });
   };
 
-  const handleSave = async (shouldPublish: boolean = false) => {
+  const handleSave = async () => {
     console.log('handleSave called with project:', project);
     
     if (!project.title) {
@@ -555,11 +556,7 @@ export function ProjectEditor() {
       console.log('Auto-generated slug:', autoSlug);
     }
 
-    let payload: Project = {
-      ...finalProject,
-      // If button says "Publish" (not already published), set status to published
-      status: shouldPublish ? 'published' : finalProject.status
-    };
+    let payload: Project = { ...finalProject };
 
     console.log('Payload to save:', payload);
 
@@ -708,20 +705,17 @@ export function ProjectEditor() {
             )}
 
             <button
-              onClick={() => {
-                const shouldPublish = projectsSectionEnabled && project.status !== 'published';
-                handleSave(shouldPublish);
-              }}
+              onClick={() => handleSave()}
               disabled={isSaving || !project.title}
               className="px-3 sm:px-4 py-2 bg-[#1E40AF] text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-[#1E3A8A] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSaving
                 ? 'Saving...'
                 : project.status === 'published'
-                  ? 'Update'
-                  : projectsSectionEnabled
-                    ? 'Publish'
-                    : 'Save'}
+                  ? 'Update Published'
+                  : project.status === 'scheduled'
+                    ? 'Save Scheduled'
+                    : 'Save Draft'}
             </button>
           </div>
         </div>
@@ -839,7 +833,7 @@ export function ProjectEditor() {
                       prose-ul:text-[#374151]
                       prose-ol:text-[#374151]
                       prose-li:text-[#374151]"
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(project.content || '*Start writing to see preview...*') }}
+                    dangerouslySetInnerHTML={{ __html: previewHtml }}
                   />
                 </div>
               </div>

@@ -391,14 +391,6 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, c
         </div>
       </SidebarCard>
 
-      {/* Update Button */}
-      <button
-        onClick={onSave}
-        disabled={isSaving}
-        className="w-full bg-[#1E40AF] text-white px-4 py-3 rounded-lg font-medium hover:bg-[#1E3A8A] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      >
-        {isSaving ? 'Saving...' : 'Update Book'}
-      </button>
     </aside>
   );
 }

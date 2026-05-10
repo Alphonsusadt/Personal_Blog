@@ -9,7 +9,7 @@ import { FullPagePreview } from '../../components/FullPagePreview';
 import { sanitizeMarkdown } from '../../lib/mediaUploader';
 import { hasBase64Images } from '../../utils/media';
 import { ArrowLeft, Check, Clock, Maximize2, HardDrive, AlertCircle, RefreshCw, EyeOff, Eye } from 'lucide-react';
-import { renderMarkdown } from '../../utils/renderers';
+import { useRenderedMarkdown } from '../../hooks/useRenderedMarkdown';
 import { formatDraftTime } from '../../hooks/useLocalDraft';
 import { IsolatedContentEditor } from '../../components/IsolatedInput';
 import { AutoFixButton } from '../../components/AutoFixButton';
@@ -106,6 +106,7 @@ export function WritingEditor() {
   const [showPreview, setShowPreview] = useState(false);
   const [showFullPreview, setShowFullPreview] = useState(false);
   const [showDraftRecovery, setShowDraftRecovery] = useState(false);
+  const previewHtml = useRenderedMarkdown(writing.content || '*Start writing to see preview...*');
 
   const { language: autoFixLanguage } = useAutoFixLanguage();
 
@@ -627,17 +628,17 @@ export function WritingEditor() {
             )}
 
             <button
-              onClick={handleSave}
+              onClick={() => handleSave()}
               disabled={isSaving || !writing.title}
               className="px-4 py-2 bg-[#1E40AF] text-white rounded-lg text-sm font-medium hover:bg-[#1E3A8A] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSaving
                 ? 'Saving...'
                 : writing.status === 'published'
-                  ? 'Update'
-                  : writingsSectionEnabled
-                    ? (writing.status === 'scheduled' ? 'Schedule' : 'Save Draft')
-                    : 'Save'}
+                  ? 'Update Published'
+                  : writing.status === 'scheduled'
+                    ? 'Save Scheduled'
+                    : 'Save Draft'}
             </button>
           </div>
         </div>
@@ -754,7 +755,7 @@ export function WritingEditor() {
                       prose-ul:text-[#374151]
                       prose-ol:text-[#374151]
                       prose-li:text-[#374151]"
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(writing.content || '*Start writing to see preview...*') }}
+                    dangerouslySetInnerHTML={{ __html: previewHtml }}
                   />
                 </div>
               </div>

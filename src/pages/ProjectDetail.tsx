@@ -2,8 +2,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Tag, ExternalLink, Clock } from 'lucide-react';
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { api } from '../lib/api';
-import katex from 'katex';
-import mermaid from 'mermaid';
+import { embedYouTube } from '../lib/youtubeEmbed';
 
 interface Project {
   _id?: string;
@@ -23,13 +22,6 @@ interface Project {
   paperUrl?: string;
   demoUrl?: string;
 }
-
-// Initialize mermaid
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'neutral',
-  securityLevel: 'loose',
-});
 
 function formatDateTimeDetailed(dateString?: string) {
   if (!dateString) return null;
@@ -83,7 +75,14 @@ interface ContentPart {
   index: number;
 }
 
-function renderMarkdown(content: string): string {
+let katexModule: typeof import('katex') | null = null;
+async function getKatex() {
+  if (!katexModule) katexModule = await import('katex');
+  return katexModule.default;
+}
+
+async function renderMarkdown(content: string): Promise<string> {
+  const katex = await getKatex();
   let html = content;
 
   // Process block LaTeX equations ($$...$$)
@@ -105,29 +104,27 @@ function renderMarkdown(content: string): string {
   });
 
   // Process Markdown
-  // Headers
   html = html.replace(/^### (.+)$/gm, '<h3 class="text-xl font-semibold text-[#1A1A1A] dark:text-[#F8FAFC] mt-8 mb-4">$1</h3>');
   html = html.replace(/^## (.+)$/gm, '<h2 class="text-2xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mt-10 mb-4 pb-2 border-b border-[#E5E7EB] dark:border-[#334155]">$1</h2>');
   html = html.replace(/^# (.+)$/gm, '<h1 class="text-3xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-6">$1</h1>');
-
-  // Bold and italic
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold">$1</strong>');
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-
-  // Lists
   html = html.replace(/^- (.+)$/gm, '<li class="ml-4 mb-2 text-[#4B5563] dark:text-[#94A3B8]">$1</li>');
   html = html.replace(/(<li.*<\/li>\n?)+/g, '<ul class="list-disc list-inside my-4 space-y-1">$&</ul>');
-
-  // Numbered lists
   html = html.replace(/^\d+\. (.+)$/gm, '<li class="ml-4 mb-2 text-[#4B5563] dark:text-[#94A3B8]">$1</li>');
 
-  // Paragraphs (lines that don't start with special characters)
-  html = html.replace(/^(?!<[hul]|<div|<li|```)([\w\S].*)$/gm, '<p class="text-[#4B5563] dark:text-[#94A3B8] leading-relaxed mb-4">$1</p>');
+  // Process markdown links
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-[#1E40AF] dark:text-[#60A5FA] hover:underline">$1</a>');
+
+  html = html.replace(/^(?!<[hul]|<div|<li|<a|```)([\w\S].*)$/gm, '<p class="text-[#4B5563] dark:text-[#94A3B8] leading-relaxed mb-4">$1</p>');
+
+  // Embed YouTube videos from links and bare URLs
+  html = embedYouTube(html);
 
   return html;
 }
 
-function parseContent(content: string): ContentPart[] {
+function splitContent(content: string): ContentPart[] {
   const parts: ContentPart[] = [];
   const mermaidRegex = /```mermaid\n([\s\S]*?)```/g;
   let lastIndex = 0;
@@ -136,25 +133,21 @@ function parseContent(content: string): ContentPart[] {
   let partIndex = 0;
 
   while ((match = mermaidRegex.exec(content)) !== null) {
-    // Add HTML part before this mermaid block
     if (match.index > lastIndex) {
       const htmlContent = content.slice(lastIndex, match.index);
       if (htmlContent.trim()) {
-        parts.push({ type: 'html', content: renderMarkdown(htmlContent), index: partIndex++ });
+        parts.push({ type: 'html', content: htmlContent, index: partIndex++ });
       }
     }
-
-    // Add mermaid block
     parts.push({ type: 'mermaid', content: match[1].trim(), index: mermaidIndex++ });
     lastIndex = match.index + match[0].length;
     partIndex++;
   }
 
-  // Add remaining HTML content
   if (lastIndex < content.length) {
     const remaining = content.slice(lastIndex);
     if (remaining.trim()) {
-      parts.push({ type: 'html', content: renderMarkdown(remaining), index: partIndex });
+      parts.push({ type: 'html', content: remaining, index: partIndex });
     }
   }
 
@@ -165,18 +158,25 @@ function MermaidDiagram({ code, id }: { code: string; id: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let cancelled = false;
     const renderDiagram = async () => {
-      if (containerRef.current) {
-        try {
-          const { svg } = await mermaid.render(`mermaid-diagram-${id}`, code);
+      if (!containerRef.current) return;
+      try {
+        const mermaid = (await import('mermaid')).default;
+        mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
+        if (cancelled) return;
+        const { svg } = await mermaid.render(`mermaid-diagram-${id}`, code);
+        if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = svg;
-        } catch (error) {
-          console.error('Mermaid render error:', error);
+        }
+      } catch (error) {
+        if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = `<pre class="text-red-500">Diagram render error</pre>`;
         }
       }
     };
     renderDiagram();
+    return () => { cancelled = true; };
   }, [code, id]);
 
   return (
@@ -234,10 +234,28 @@ export function ProjectDetail() {
     };
   }, [id, navigate]);
 
-  const contentParts = useMemo(() => {
+  const rawParts = useMemo(() => {
     if (!project) return [];
-    return parseContent(project.content);
+    return splitContent(project.content);
   }, [project]);
+
+  const [renderedParts, setRenderedParts] = useState<ContentPart[]>([]);
+
+  useEffect(() => {
+    if (rawParts.length === 0) return;
+    let cancelled = false;
+    Promise.all(
+      rawParts.map(async (part) => {
+        if (part.type === 'html') {
+          return { ...part, content: await renderMarkdown(part.content) };
+        }
+        return part;
+      })
+    ).then((parts) => {
+      if (!cancelled) setRenderedParts(parts);
+    });
+    return () => { cancelled = true; };
+  }, [rawParts]);
 
   if (loading) {
     return (
@@ -422,7 +440,7 @@ export function ProjectDetail() {
 
         {/* Project Content */}
         <article className="prose prose-lg dark:prose-invert max-w-none">
-          {contentParts.map((part, idx) => {
+          {renderedParts.map((part, idx) => {
             if (part.type === 'html') {
               return (
                 <div

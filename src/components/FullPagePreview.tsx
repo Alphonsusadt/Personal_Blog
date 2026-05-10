@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { renderMarkdown } from '../utils/renderers';
+import { useRenderedMarkdown } from '../hooks/useRenderedMarkdown';
 import { Star, CheckCircle, Calendar, Clock, Tag, Github, FileText, Globe } from 'lucide-react';
 
 interface Writing {
@@ -102,6 +102,7 @@ export function FullPagePreview({ isOpen, onClose, type, data }: FullPagePreview
 
 // Writing Preview Component
 function WritingPreview({ data }: { data: Writing }) {
+  const contentHtml = useRenderedMarkdown(data.content || '*Mulai menulis untuk melihat preview...*');
   const categoryLabels: Record<string, string> = {
     'reflections': 'Refleksi',
     'technical': 'Teknikal',
@@ -162,7 +163,7 @@ function WritingPreview({ data }: { data: Writing }) {
           prose-pre:bg-gray-900 prose-pre:text-gray-100
           prose-blockquote:border-l-blue-500 prose-blockquote:bg-blue-50 prose-blockquote:py-2 prose-blockquote:px-4
           prose-img:rounded-lg prose-img:shadow-md"
-        dangerouslySetInnerHTML={{ __html: renderMarkdown(data.content || '*Mulai menulis untuk melihat preview...*') }}
+        dangerouslySetInnerHTML={{ __html: contentHtml }}
       />
     </article>
   );
@@ -170,6 +171,7 @@ function WritingPreview({ data }: { data: Writing }) {
 
 // Book Preview Component
 function BookPreview({ data }: { data: Book }) {
+  const reviewHtml = useRenderedMarkdown(data.review || '*Tulis review buku di sini...*');
   return (
     <article className="max-w-3xl mx-auto px-6 py-8">
       {/* Book Header */}
@@ -250,7 +252,7 @@ function BookPreview({ data }: { data: Book }) {
             prose-p:text-gray-700 prose-p:leading-relaxed
             prose-a:text-blue-600
             prose-img:rounded-lg prose-img:shadow-md"
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(data.review || '*Tulis review buku di sini...*') }}
+          dangerouslySetInnerHTML={{ __html: reviewHtml }}
         />
       </section>
     </article>
@@ -259,6 +261,7 @@ function BookPreview({ data }: { data: Book }) {
 
 // Project Preview Component
 function ProjectPreview({ data }: { data: Project }) {
+  const contentHtml = useRenderedMarkdown(data.content || '*Mulai menulis untuk melihat preview...*');
   const statusColors: Record<string, string> = {
     'planning': 'bg-blue-100 text-blue-700',
     'ongoing': 'bg-yellow-100 text-yellow-700',
@@ -346,7 +349,7 @@ function ProjectPreview({ data }: { data: Project }) {
           prose-pre:bg-gray-900 prose-pre:text-gray-100
           prose-blockquote:border-l-blue-500 prose-blockquote:bg-blue-50 prose-blockquote:py-2 prose-blockquote:px-4
           prose-img:rounded-lg prose-img:shadow-md"
-        dangerouslySetInnerHTML={{ __html: renderMarkdown(data.content || '*Mulai menulis untuk melihat preview...*') }}
+        dangerouslySetInnerHTML={{ __html: contentHtml }}
       />
     </article>
   );

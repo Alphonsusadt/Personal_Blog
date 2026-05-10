@@ -123,7 +123,7 @@ export default function writingsRoutes(db) {
   });
 
   router.put('/:id', authMiddleware, async (req, res) => {
-    const { _id, ...data } = req.body;
+    const { _id, id, ...data } = req.body;
     data.updatedAt = new Date().toISOString();
     data.visible = data.visible !== false;
     
@@ -177,7 +177,7 @@ export default function writingsRoutes(db) {
         
       if (error) {
         console.error('PUT /:id error:', error);
-        return res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: error.message, details: error.details, hint: error.hint });
       }
       res.json({ message: 'Updated' });
     } else {

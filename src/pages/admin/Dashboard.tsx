@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../../lib/api';
+import { api, getRuntimeCache, setRuntimeCache } from '../../lib/api';
 import { FolderKanban, PenLine, BookOpen, Plus, Calendar, Eye, Edit, TrendingUp } from 'lucide-react';
 
 interface Writing {
@@ -36,6 +36,26 @@ interface Project {
   updatedAt?: string;
 }
 
+interface DashboardData {
+  stats: { projects: number; writings: number; books: number };
+  recentWritings: Writing[];
+  recentBooks: Book[];
+  recentProjects: Project[];
+}
+
+const DASHBOARD_CACHE_TTL = 30_000; // 30 seconds
+const DASHBOARD_CACHE_KEY = 'admin_dashboard';
+
+async function fetchDashboardData(force = false): Promise<DashboardData> {
+  if (!force) {
+    const cached = getRuntimeCache<DashboardData>(DASHBOARD_CACHE_KEY, DASHBOARD_CACHE_TTL);
+    if (cached) return cached;
+  }
+  const data = await api.get('/api/dashboard');
+  setRuntimeCache(DASHBOARD_CACHE_KEY, data);
+  return data;
+}
+
 const formatDate = (dateStr?: string) => {
   if (!dateStr) return 'Unknown';
   return new Date(dateStr).toLocaleDateString('id-ID', { 
@@ -53,23 +73,17 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      api.get('/api/stats').catch(() => ({ projects: 0, writings: 0, books: 0 })),
-      api.get('/api/writings').catch(() => []).then((writings: Writing[]) => 
-        writings.filter(w => w.status === 'published').slice(0, 5)
-      ),
-      api.get('/api/books').catch(() => []).then((books: Book[]) => 
-        books.filter(b => b.status === 'published').slice(0, 5)
-      ),
-      api.get('/api/projects').catch(() => []).then((projects: Project[]) => 
-        projects.filter(p => p.status === 'published').slice(0, 5)
-      ),
-    ]).then(([statsData, writingsData, booksData, projectsData]) => {
-      setStats(statsData);
-      setRecentWritings(writingsData);
-      setRecentBooks(booksData);
-      setRecentProjects(projectsData);
-    }).finally(() => setLoading(false));
+    fetchDashboardData()
+      .then((data) => {
+        setStats(data.stats);
+        setRecentWritings(data.recentWritings || []);
+        setRecentBooks(data.recentBooks || []);
+        setRecentProjects(data.recentProjects || []);
+      })
+      .catch(() => {
+        // If unauthorized, the api module will redirect to login
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const cards = [

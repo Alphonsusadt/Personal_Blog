@@ -400,14 +400,6 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
         </div>
       </SidebarCard>
 
-      {/* Update Button */}
-      <button
-        onClick={onSave}
-        disabled={isSaving}
-        className="w-full bg-[#1E40AF] text-white px-4 py-3 rounded-lg font-medium hover:bg-[#1E3A8A] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      >
-        {isSaving ? 'Saving...' : 'Update Writing'}
-      </button>
     </aside>
   );
 }

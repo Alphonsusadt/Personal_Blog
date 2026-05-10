@@ -103,7 +103,11 @@ export const api = {
       method: 'PUT', headers: this.headers(), body: JSON.stringify(data),
     });
     if (res.status === 401) { this.logout(); window.location.href = '/admin/login'; throw new Error('Unauthorized'); }
-    if (!res.ok) throw new Error(`PUT ${path} failed`);
+    if (!res.ok) {
+      let detail = '';
+      try { const body = await res.json(); detail = body.error || body.message || ''; } catch { /* ignore */ }
+      throw new Error(`PUT ${path} failed${detail ? ': ' + detail : ''}`);
+    }
     return res.json();
   },
 

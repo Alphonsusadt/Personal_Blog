@@ -1,43 +1,58 @@
-import katex from 'katex';
-import mermaid from 'mermaid';
+let katexModule: typeof import('katex') | null = null;
+let mermaidModule: typeof import('mermaid') | null = null;
+let mermaidInitialized = false;
 
-// Initialize Mermaid
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'default',
-  flowchart: {
-    useMaxWidth: true,
-    htmlLabels: true,
-    curve: 'basis',
-  },
-  themeCSS: `
-    .node rect {
-      fill: #F8FAFC;
-      stroke: #1E40AF;
-      stroke-width: 1px;
-    }
-    .edgeLabel {
-      background-color: #F8FAFC;
-      color: #1A1A1A;
-    }
-    .label {
-      color: #1A1A1A;
-    }
-    .dark .node rect {
-      fill: #1E293B;
-      stroke: #60A5FA;
-    }
-    .dark .edgeLabel {
-      background-color: #1E293B;
-      color: #F8FAFC;
-    }
-    .dark .label {
-      color: #F8FAFC;
-    }
-  `
-});
+async function getKatex() {
+  if (!katexModule) katexModule = await import('katex');
+  return katexModule.default;
+}
 
-export function renderLaTeX(content: string): string {
+async function getMermaid() {
+  if (!mermaidModule) mermaidModule = await import('mermaid');
+  const m = mermaidModule.default;
+  if (!mermaidInitialized) {
+    m.initialize({
+      startOnLoad: false,
+      theme: 'default',
+      flowchart: {
+        useMaxWidth: true,
+        htmlLabels: true,
+        curve: 'basis',
+      },
+      themeCSS: `
+        .node rect {
+          fill: #F8FAFC;
+          stroke: #1E40AF;
+          stroke-width: 1px;
+        }
+        .edgeLabel {
+          background-color: #F8FAFC;
+          color: #1A1A1A;
+        }
+        .label {
+          color: #1A1A1A;
+        }
+        .dark .node rect {
+          fill: #1E293B;
+          stroke: #60A5FA;
+        }
+        .dark .edgeLabel {
+          background-color: #1E293B;
+          color: #F8FAFC;
+        }
+        .dark .label {
+          color: #F8FAFC;
+        }
+      `
+    });
+    mermaidInitialized = true;
+  }
+  return m;
+}
+
+export async function renderLaTeX(content: string): Promise<string> {
+  const katex = await getKatex();
+
   // Handle block equations $$...$$
   content = content.replace(/\$\$([\s\S]*?)\$\$/g, (_match, equation) => {
     try {
@@ -46,7 +61,7 @@ export function renderLaTeX(content: string): string {
         throwOnError: false,
         strict: 'ignore'
       });
-    } catch (error) {
+    } catch {
       return `<div class="text-red-500">Error rendering equation: ${equation}</div>`;
     }
   });
@@ -59,7 +74,7 @@ export function renderLaTeX(content: string): string {
         throwOnError: false,
         strict: 'ignore'
       });
-    } catch (error) {
+    } catch {
       return `<span class="text-red-500">Error: ${equation}</span>`;
     }
   });
@@ -68,7 +83,7 @@ export function renderLaTeX(content: string): string {
 }
 
 export async function renderMermaid(content: string): Promise<string> {
-  // Find all mermaid code blocks
+  const mermaid = await getMermaid();
   const mermaidRegex = /```mermaid\n([\s\S]*?)\n```/g;
   const matches = [...content.matchAll(mermaidRegex)];
 
@@ -80,7 +95,7 @@ export async function renderMermaid(content: string): Promise<string> {
         chartDefinition
       );
       content = content.replace(match[0], `<div class="mermaid">${svg}</div>`);
-    } catch (error) {
+    } catch {
       content = content.replace(
         match[0],
         `<div class="text-red-500">Error rendering diagram</div>`
@@ -92,7 +107,7 @@ export async function renderMermaid(content: string): Promise<string> {
 }
 
 export async function renderContent(content: string): Promise<string> {
-  let processedContent = renderLaTeX(content);
+  let processedContent = await renderLaTeX(content);
   processedContent = await renderMermaid(processedContent);
   return processedContent;
 }
@@ -142,10 +157,13 @@ export function markdownToHtml(content: string): string {
 }
 
 // Combined Markdown + LaTeX renderer for live preview
-export function renderMarkdown(content: string): string {
+export async function renderMarkdown(content: string): Promise<string> {
   // First render LaTeX equations
-  let processed = renderLaTeX(content);
+  let processed = await renderLaTeX(content);
   // Then convert markdown to HTML
   processed = markdownToHtml(processed);
+  // Embed YouTube videos from links and bare URLs
+  const { embedYouTube } = await import('../lib/youtubeEmbed');
+  processed = embedYouTube(processed);
   return processed;
 }

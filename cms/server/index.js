@@ -17,6 +17,7 @@ import mediaRoutes from './routes/media.js';
 import fs from 'fs/promises';
 import spellCheckRoutes from './routes/spellCheck.js';
 import { initQueue } from './utils/autosaveQueue.js';
+import { authMiddleware } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -133,14 +134,55 @@ async function start() {
   // Spell-check routes (using hunspell-id dictionary)
   app.use('/api', spellCheckRoutes);
 
-  // Stats endpoint for dashboard
-  app.get('/api/stats', async (_req, res) => {
+  // Stats endpoint (lightweight, used for auth verification)
+  app.get('/api/stats', authMiddleware, async (_req, res) => {
     const [projects, writings, books] = await Promise.all([
       db.collection('projects').countDocuments(),
       db.collection('writings').countDocuments(),
       db.collection('books').countDocuments(),
     ]);
     res.json({ projects, writings, books });
+  });
+
+  // Consolidated dashboard endpoint — single request returns stats + recent published items
+  app.get('/api/dashboard', authMiddleware, async (_req, res) => {
+    const RECENT_LIMIT = 5;
+    const publishedFilter = {
+      visible: { $ne: false },
+      $or: [
+        { status: 'published' },
+        { status: 'scheduled', publishAt: { $lte: new Date() } },
+      ],
+    };
+    const recentProjection = { title: 1, id: 1, status: 1, category: 1, updatedAt: 1, createdAt: 1, date: 1 };
+
+    const [
+      projectsCount, writingsCount, booksCount,
+      recentWritings, recentBooks, recentProjects,
+    ] = await Promise.all([
+      db.collection('projects').countDocuments(),
+      db.collection('writings').countDocuments(),
+      db.collection('books').countDocuments(),
+      db.collection('writings').find(
+        { ...publishedFilter },
+        { projection: { ...recentProjection, excerpt: 1 } },
+      ).sort({ updatedAt: -1, createdAt: -1 }).limit(RECENT_LIMIT).toArray(),
+      db.collection('books').find(
+        { ...publishedFilter },
+        { projection: { ...recentProjection, author: 1, rating: 1 } },
+      ).sort({ updatedAt: -1, createdAt: -1 }).limit(RECENT_LIMIT).toArray(),
+      db.collection('projects').find(
+        { ...publishedFilter },
+        { projection: { ...recentProjection, description: 1, devStatus: 1 } },
+      ).sort({ updatedAt: -1, createdAt: -1 }).limit(RECENT_LIMIT).toArray(),
+    ]);
+
+    res.json({
+      stats: { projects: projectsCount, writings: writingsCount, books: booksCount },
+      recentWritings,
+      recentBooks,
+      recentProjects,
+    });
   });
 
   // Create indexes for fast lookups
