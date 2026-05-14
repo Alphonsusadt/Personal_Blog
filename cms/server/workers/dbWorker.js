@@ -33,7 +33,7 @@ parentPort.on('message', async (message) => {
             const { error } = await supabase
               .from('artikel')
               .update(updateFields)
-              .eq('id', documentId);
+              .eq('_id', documentId);
             if (error) throw new Error(error.message);
             parentPort.postMessage({
               type: 'AUTOSAVE_SUCCESS',

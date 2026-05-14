@@ -6,9 +6,17 @@ export function useRenderedMarkdown(content: string): string {
 
   useEffect(() => {
     let cancelled = false;
-    renderMarkdown(content).then((result) => {
-      if (!cancelled) setHtml(result);
-    });
+    renderMarkdown(content)
+      .then((result) => {
+        if (!cancelled) setHtml(result);
+      })
+      .catch((err) => {
+        console.error('[useRenderedMarkdown] Failed to render:', err);
+        // Fallback: show raw content escaped
+        if (!cancelled) {
+          setHtml(content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br/>'));
+        }
+      });
     return () => { cancelled = true; };
   }, [content]);
 

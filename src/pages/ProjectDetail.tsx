@@ -3,6 +3,7 @@ import { ArrowLeft, Calendar, Tag, ExternalLink, Clock } from 'lucide-react';
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { embedYouTube } from '../lib/youtubeEmbed';
+import { CodeBlock } from '../components/CodeBlock';
 
 interface Project {
   _id?: string;
@@ -70,9 +71,11 @@ function CategoryBadge({ category }: { category: Project['category'] }) {
 }
 
 interface ContentPart {
-  type: 'html' | 'mermaid';
+  type: 'html' | 'mermaid' | 'code';
   content: string;
   index: number;
+  language?: string;
+  title?: string;
 }
 
 let katexModule: typeof import('katex') | null = null;
@@ -126,20 +129,34 @@ async function renderMarkdown(content: string): Promise<string> {
 
 function splitContent(content: string): ContentPart[] {
   const parts: ContentPart[] = [];
-  const mermaidRegex = /```mermaid\n([\s\S]*?)```/g;
+  const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
   let lastIndex = 0;
-  let match;
   let mermaidIndex = 0;
   let partIndex = 0;
+  let match;
 
-  while ((match = mermaidRegex.exec(content)) !== null) {
+  while ((match = codeBlockRegex.exec(content)) !== null) {
     if (match.index > lastIndex) {
       const htmlContent = content.slice(lastIndex, match.index);
       if (htmlContent.trim()) {
         parts.push({ type: 'html', content: htmlContent, index: partIndex++ });
       }
     }
-    parts.push({ type: 'mermaid', content: match[1].trim(), index: mermaidIndex++ });
+
+    const lang = match[1].toLowerCase();
+
+    if (lang === 'mermaid') {
+      parts.push({ type: 'mermaid', content: match[2].trim(), index: mermaidIndex++ });
+    } else {
+      parts.push({
+        type: 'code',
+        content: match[2],
+        index: partIndex,
+        language: lang || 'plaintext',
+        title: lang || undefined,
+      });
+    }
+
     lastIndex = match.index + match[0].length;
     partIndex++;
   }
@@ -446,6 +463,15 @@ export function ProjectDetail() {
                 <div
                   key={`html-${idx}`}
                   dangerouslySetInnerHTML={{ __html: part.content }}
+                />
+              );
+            } else if (part.type === 'code') {
+              return (
+                <CodeBlock
+                  key={`code-${idx}`}
+                  code={part.content}
+                  language={part.language || 'plaintext'}
+                  title={part.title}
                 />
               );
             } else {

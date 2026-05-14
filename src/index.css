@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import 'katex/dist/katex.min.css';
+@import 'prismjs/themes/prism-tomorrow.css';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -69,6 +70,31 @@
 .mermaid {
   text-align: center;
   margin: 2em 0;
+}
+
+/* YouTube responsive embed */
+.yt-embed-container {
+  margin: 1.5rem 0;
+  width: 100%;
+}
+
+.yt-embed-wrapper {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%; /* 16:9 aspect ratio */
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  background: #000;
+}
+
+.yt-embed-wrapper iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
 }
 
 .dark {

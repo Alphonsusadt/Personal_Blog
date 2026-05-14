@@ -76,7 +76,7 @@ export default function writingsRoutes(db) {
         return res.status(500).json({ error: error.message });
       }
       
-      const mapped = data.map(d => ({ ...d, _id: d.id }));
+      const mapped = data.map(d => ({ ...d, _id: d._id }));
       return res.json(mapped);
     } else {
       const items = await fallbackCol.find().sort({ updatedAt: -1, createdAt: -1, date: -1 }).toArray();
@@ -112,7 +112,7 @@ export default function writingsRoutes(db) {
         console.error('POST / error:', error);
         return res.status(500).json({ error: error.message });
       }
-      res.status(201).json({ ...inserted, _id: inserted.id });
+      res.status(201).json({ ...inserted, _id: inserted._id });
     } else {
       if (data.publishAt) data.publishAt = new Date(data.publishAt);
       data.createdAt = new Date();
@@ -132,13 +132,25 @@ export default function writingsRoutes(db) {
     const enabled = await isSectionEnabled(db, 'writings');
 
     if (supabase) {
-      const { data: existing, error: findError } = await supabase
-        .from('artikel')
-        .select('*')
-        .eq('id', req.params.id)
-        .single();
+      // Try UUID lookup first (_id column), then fallback to slug (id column)
+      const lookupValue = _id || req.params.id;
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lookupValue);
+      
+      let existing = null;
+      let matchCol = '_id';
+      
+      if (isUUID) {
+        const { data: found, error } = await supabase.from('artikel').select('*').eq('_id', lookupValue).single();
+        if (!error) { existing = found; matchCol = '_id'; }
+      }
+      
+      if (!existing) {
+        // Fallback: lookup by slug (id column)
+        const { data: found, error } = await supabase.from('artikel').select('*').eq('id', lookupValue).limit(1).single();
+        if (!error) { existing = found; matchCol = 'id'; }
+      }
         
-      if (findError || !existing) return res.status(404).json({ error: 'Not found' });
+      if (!existing) return res.status(404).json({ error: 'Not found' });
 
       if (!enabled) {
         const existingStatus = existing.status || 'draft';
@@ -173,7 +185,7 @@ export default function writingsRoutes(db) {
       const { error } = await supabase
         .from('artikel')
         .update(data)
-        .eq('id', req.params.id);
+        .eq('_id', existing._id);
         
       if (error) {
         console.error('PUT /:id error:', error);
@@ -207,7 +219,7 @@ export default function writingsRoutes(db) {
         $setDoc.publishAt = null;
       }
 
-      queueAutosave('writings', req.params.id, $setDoc);
+      queueAutosave('writings', _id || req.params.id, $setDoc);
       res.json({ message: 'Queued for autosave' });
     } catch (err) {
       console.error('[autosave] PATCH /writings/:id failed:', err);
@@ -218,9 +230,9 @@ export default function writingsRoutes(db) {
   router.delete('/:id', authMiddleware, async (req, res) => {
     if (supabase) {
       const { error } = await supabase
-        .from('writings')
+        .from('artikel')
         .delete()
-        .eq('id', req.params.id);
+        .eq('_id', req.params.id);
       if (error) return res.status(500).json({ error: error.message });
       res.json({ message: 'Deleted' });
     } else {
