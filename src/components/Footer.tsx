@@ -2,6 +2,8 @@ import { Github, Linkedin, Mail, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { useSiteLanguage } from '../hooks/useSiteLanguage';
+import { t } from '../lib/translations';
 
 interface Settings {
   footerBio?: string;
@@ -11,6 +13,7 @@ interface Settings {
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
+  const { language } = useSiteLanguage();
   const [settings, setSettings] = useState<Settings>({
     footerBio: 'Biomedical Engineering student exploring the intersection of medical signals, faith, and human life. Bridging the precision of engineering with the mystery of spirituality.',
     footerName: 'Alphonsus Aditya',
@@ -39,11 +42,11 @@ export function Footer() {
   }, []);
 
   const quickLinks = [
-    { to: '/', label: 'Home' },
-    { to: '/engineering', label: 'Engineering', enabled: sections.projects },
-    { to: '/writings', label: 'Writings', enabled: sections.writings },
-    { to: '/library', label: 'Library', enabled: sections.books },
-    { to: '/about', label: 'About' },
+    { to: '/', label: t('nav.home', language) },
+    { to: '/engineering', label: t('nav.engineering', language), enabled: sections.projects },
+    { to: '/writings', label: t('nav.writings', language), enabled: sections.writings },
+    { to: '/library', label: t('nav.library', language), enabled: sections.books },
+    { to: '/about', label: t('nav.about', language) },
   ].filter((l) => l.enabled !== false);
 
   return (
@@ -86,7 +89,7 @@ export function Footer() {
           {/* Quick Links */}
           <div>
             <h4 className="caption text-inverse-ink opacity-60 mb-6">
-              Quick Links
+              {t('footer.quickLinks', language)}
             </h4>
             <ul className="space-y-4">
               {quickLinks.map((link) => (
@@ -105,7 +108,7 @@ export function Footer() {
           {/* Contact */}
           <div>
             <h4 className="caption text-inverse-ink opacity-60 mb-6">
-              Connect
+              {t('footer.connect', language)}
             </h4>
             <ul className="space-y-4">
               <li>
@@ -142,12 +145,12 @@ export function Footer() {
         <div className="border-t border-inverse-ink border-opacity-20 mt-16 pt-8">
           <div className="flex flex-col md:flex-row items-center justify-between">
             <p className="caption text-inverse-ink opacity-60 text-center md:text-left">
-              © {currentYear} Alphonsus Aditya. All rights reserved.
+              © {currentYear} Alphonsus Aditya. {t('footer.copyright', language)}
             </p>
             <p className="caption text-inverse-ink opacity-60 mt-4 md:mt-0 flex items-center">
-              Built with 
+              {t('footer.builtWith', language)} 
               <Heart className="w-4 h-4 mx-2 text-inverse-ink" fill="currentColor" /> 
-              and biomedical curiosity
+              {t('footer.andCuriosity', language)}
             </p>
           </div>
         </div>

@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { embedYouTube } from '../lib/youtubeEmbed';
 import { resolveLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
+import { t } from '../lib/translations';
 
 interface Writing {
   id: string;
@@ -21,7 +22,7 @@ interface Writing {
   updatedAt?: string;
 }
 
-function CategoryBadge({ category }: { category: Writing['category'] }) {
+function CategoryBadge({ category, language }: { category: Writing['category']; language: 'en' | 'id' }) {
   const getStyle = () => {
     switch (category) {
       case 'reflections':
@@ -38,11 +39,11 @@ function CategoryBadge({ category }: { category: Writing['category'] }) {
   const getLabel = () => {
     switch (category) {
       case 'reflections':
-        return 'Reflections';
+        return t('category.reflections', language);
       case 'stories':
-        return 'Stories';
+        return t('category.stories', language);
       case 'fiction':
-        return 'Fiction';
+        return t('category.fiction', language);
       default:
         return category;
     }
@@ -305,17 +306,17 @@ export function WritingDetail() {
               <BookOpen className="w-12 h-12 text-[#6B7280]" />
             </div>
             <h1 className="text-3xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-4">
-              Writing Not Found
+              {t('writings.writingNotFound', language)}
             </h1>
             <p className="text-[#6B7280] mb-8">
-              The writing you're looking for doesn't exist or has been removed.
+              {t('writings.writingNotFoundHint', language)}
             </p>
             <Link
               to="/writings"
               className="inline-flex items-center px-6 py-3 bg-[#1E40AF] text-white rounded-lg hover:bg-[#1E3A8A] transition-colors"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Writings
+              {t('writings.backToWritings', language)}
             </Link>
           </div>
         </div>
@@ -332,13 +333,13 @@ export function WritingDetail() {
           className="inline-flex items-center caption text-ink opacity-60 hover:opacity-100 transition-opacity mb-8"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Writings
+          {t('writings.backToWritings', language)}
         </button>
 
         {/* Writing Header */}
         <header className="mb-10">
           <div className="flex flex-wrap items-center gap-3 mb-4">
-            <CategoryBadge category={writing.category} />
+            <CategoryBadge category={writing.category} language={language} />
           </div>
 
           <h1 className="display-lg text-ink mb-6 serif-font">
@@ -357,7 +358,7 @@ export function WritingDetail() {
             </span>
             <span className="flex items-center">
               <Clock className="w-4 h-4 mr-1.5" />
-              {writing.readTime} read
+              {writing.readTime} {t('writings.read', language)}
             </span>
           </div>
 
@@ -365,10 +366,10 @@ export function WritingDetail() {
           {(writing.createdAt || writing.updatedAt) && (
             <div className="flex flex-wrap items-center gap-4 caption text-ink opacity-40 mb-6">
               {writing.createdAt && (
-                <span>Diposting: {formatDateTimeDetailed(writing.createdAt)}</span>
+                <span>{t('writings.postedAt', language)} {formatDateTimeDetailed(writing.createdAt)}</span>
               )}
               {writing.updatedAt && writing.updatedAt !== writing.createdAt && (
-                <span>• Diperbarui: {formatDateTimeDetailed(writing.updatedAt)}</span>
+                <span>• {t('writings.updatedAt', language)} {formatDateTimeDetailed(writing.updatedAt)}</span>
               )}
             </div>
           )}
@@ -421,7 +422,7 @@ export function WritingDetail() {
             className="btn btn-secondary inline-flex items-center"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            View All Writings
+            {t('writings.viewAllWritings', language)}
           </Link>
         </div>
       </div>

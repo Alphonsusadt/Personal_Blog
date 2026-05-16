@@ -230,7 +230,10 @@ export function BookEditor() {
     setBook(prev => ({ ...prev, title: setLocalizedText(prev.title, autoFixLanguage, value) }));
   };
 
-  const plainContent = exactLocalizedReview
+  // Use resolveLocalizedText with fallback to ensure counter works even when content
+  // is stored in a different language than the currently selected one
+  const reviewForCounter = resolveLocalizedText(book.review, autoFixLanguage);
+  const plainContent = reviewForCounter
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`[^`]*`/g, ' ')
     .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')

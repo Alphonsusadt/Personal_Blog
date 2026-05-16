@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { resolveLocalizedText, getExactLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
+import { t } from '../lib/translations';
 
 interface Book {
   id: string;
@@ -61,11 +62,11 @@ export function Library() {
   }, [navigate]);
 
   const categories = [
-    { value: 'all', label: 'All Books', icon: Book },
-    { value: 'technical', label: 'Technical', icon: Book },
-    { value: 'biography', label: 'Biography', icon: User },
-    { value: 'spiritual', label: 'Spiritual', icon: Sparkles },
-    { value: 'philosophy', label: 'Philosophy', icon: Sparkles }
+    { value: 'all', label: t('category.allBooks', language), icon: Book },
+    { value: 'technical', label: t('category.technical', language), icon: Book },
+    { value: 'biography', label: t('category.biography', language), icon: User },
+    { value: 'spiritual', label: t('category.spiritual', language), icon: Sparkles },
+    { value: 'philosophy', label: t('category.philosophy', language), icon: Sparkles }
   ];
 
   const filteredBooks = useMemo(() => {
@@ -98,10 +99,10 @@ export function Library() {
         {/* Header */}
         <div className="text-center mb-[48px]">
           <h1 className="display-lg text-ink mb-4">
-            Library
+            {t('library.title', language)}
           </h1>
           <p className="subhead text-ink opacity-80 max-w-2xl mx-auto">
-            Books that shape my thinking on technology, faith, and philosophy
+            {t('library.subtitle', language)}
           </p>
         </div>
 
@@ -112,7 +113,7 @@ export function Library() {
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-ink opacity-60 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search books by title, author, or review..."
+              placeholder={t('library.searchPlaceholder', language)}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-4 rounded-[8px] border border-hairline bg-surface-soft text-ink focus:outline-none focus:border-ink transition-colors body"
@@ -145,12 +146,12 @@ export function Library() {
         {/* Results Count */}
         <div className="mb-8 text-center">
           {loading ? (
-            <p className="text-ink opacity-60 body-sm">Loading books...</p>
+            <p className="text-ink opacity-60 body-sm">{t('library.loading', language)}</p>
           ) : (
             <p className="text-ink opacity-60 body-sm">
               {selectedCategory === 'all'
-                ? `Showing ${filteredBooks.length} books`
-                : `Showing ${filteredBooks.length} ${selectedCategory} books`
+                ? `${t('library.showing', language)} ${filteredBooks.length} ${t('library.books', language)}`
+                : `${t('library.showing', language)} ${filteredBooks.length} ${selectedCategory} ${t('library.books', language)}`
               }
             </p>
           )}
@@ -170,10 +171,10 @@ export function Library() {
               <Search className="w-10 h-10 text-ink opacity-40" />
             </div>
             <h3 className="card-title text-ink mb-2">
-              No books found
+              {t('library.noResults', language)}
             </h3>
             <p className="body-sm text-ink opacity-60">
-              Try adjusting your search terms or category filter
+              {t('library.noResultsHint', language)}
             </p>
           </div>
         )}

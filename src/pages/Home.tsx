@@ -7,6 +7,7 @@ import { BookCard } from '../components/BookCard';
 import { api } from '../lib/api';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { getExactLocalizedText } from '../lib/localized';
+import { t } from '../lib/translations';
 import type { Project } from '../data/projects';
 import type { Writing } from '../data/writings';
 import type { Book } from '../data/library';
@@ -350,14 +351,14 @@ export function Home() {
                   to="/engineering"
                   className="btn btn-primary inline-flex items-center justify-center space-x-2"
                 >
-                  <span>View Projects</span>
+                  <span>{t('home.viewProjects', language)}</span>
                   <ExternalLink className="w-4 h-4" />
                 </Link>
                 <Link
                   to="/writings"
                   className="btn btn-secondary inline-flex items-center justify-center space-x-2"
                 >
-                  <span>Read Reflections</span>
+                  <span>{t('home.readReflections', language)}</span>
                   <ChevronRight className="w-4 h-4" />
                 </Link>
               </div>
@@ -696,7 +697,7 @@ export function Home() {
                 to="/engineering"
                 className="btn btn-primary inline-flex items-center space-x-2"
               >
-                <span>View All Projects</span>
+                <span>{t('home.viewAllProjects', language)}</span>
                 <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
@@ -730,7 +731,7 @@ export function Home() {
                 to="/writings"
                 className="btn btn-primary inline-flex items-center space-x-2"
               >
-                <span>Read All Writings</span>
+                <span>{t('home.readAllWritings', language)}</span>
                 <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
@@ -764,7 +765,7 @@ export function Home() {
                 to="/library"
                 className="btn btn-primary inline-flex items-center space-x-2"
               >
-                <span>Browse Library</span>
+                <span>{t('home.browseLibrary', language)}</span>
                 <ChevronRight className="w-4 h-4" />
               </Link>
             </div>

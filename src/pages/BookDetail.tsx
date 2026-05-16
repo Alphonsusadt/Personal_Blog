@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { resolveLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
+import { t } from '../lib/translations';
 
 interface BookType {
   _id?: string;
@@ -33,7 +34,7 @@ function formatDateTimeDetailed(dateString?: string) {
   });
 }
 
-function CategoryBadge({ category }: { category: BookType['category'] }) {
+function CategoryBadge({ category, language }: { category: BookType['category']; language: 'en' | 'id' }) {
   const getStyle = () => {
     switch (category) {
       case 'technical':
@@ -52,13 +53,13 @@ function CategoryBadge({ category }: { category: BookType['category'] }) {
   const getLabel = () => {
     switch (category) {
       case 'technical':
-        return 'Technical';
+        return t('category.technical', language);
       case 'biography':
-        return 'Biography';
+        return t('category.biography', language);
       case 'spiritual':
-        return 'Spiritual';
+        return t('category.spiritual', language);
       case 'philosophy':
-        return 'Philosophy';
+        return t('category.philosophy', language);
       default:
         return category;
     }
@@ -180,17 +181,17 @@ export function BookDetail() {
               <Book className="w-12 h-12 text-[#6B7280]" />
             </div>
             <h1 className="text-3xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-4">
-              Book Not Found
+              {t('library.bookNotFound', language)}
             </h1>
             <p className="text-[#6B7280] mb-8">
-              The book you're looking for doesn't exist or has been removed.
+              {t('library.bookNotFoundHint', language)}
             </p>
             <Link
               to="/library"
               className="inline-flex items-center px-6 py-3 bg-[#1E40AF] text-white rounded-lg hover:bg-[#1E3A8A] transition-colors"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Library
+              {t('library.backToLibrary', language)}
             </Link>
           </div>
         </div>
@@ -207,7 +208,7 @@ export function BookDetail() {
           className="inline-flex items-center caption text-ink opacity-60 hover:opacity-100 transition-opacity mb-8"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Library
+          {t('library.backToLibrary', language)}
         </button>
 
         {/* Book Header */}
@@ -225,7 +226,7 @@ export function BookDetail() {
             {/* Book Info */}
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-3 mb-4">
-                <CategoryBadge category={book.category} />
+                <CategoryBadge category={book.category} language={language} />
               </div>
 
               <h1 className="display-lg text-ink mb-2">
@@ -250,13 +251,13 @@ export function BookDetail() {
                   {book.createdAt && (
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
-                      Diposting: {formatDateTimeDetailed(book.createdAt)}
+                      {t('library.postedAt', language)} {formatDateTimeDetailed(book.createdAt)}
                     </span>
                   )}
                   {book.updatedAt && book.updatedAt !== book.createdAt && (
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      Diperbarui: {formatDateTimeDetailed(book.updatedAt)}
+                      {t('library.updatedAt', language)} {formatDateTimeDetailed(book.updatedAt)}
                     </span>
                   )}
                 </div>
@@ -271,7 +272,7 @@ export function BookDetail() {
         {/* Review Section */}
         <section className="mb-[96px]">
           <h2 className="display-md text-ink mb-8">
-            My Review
+            {t('library.myReview', language)}
           </h2>
           <div className="bg-surface-soft border border-hairline rounded-[24px] p-8 lg:p-12">
             <p className="body-lg text-ink opacity-80 leading-relaxed serif-font">
@@ -283,7 +284,7 @@ export function BookDetail() {
         {/* Key Takeaways Section */}
         <section className="mb-[96px]">
           <h2 className="display-md text-ink mb-8">
-            Key Takeaways
+            {t('library.keyTakeaways', language)}
           </h2>
           <div className="space-y-6">
             {book.takeaways.map((takeaway, index) => (

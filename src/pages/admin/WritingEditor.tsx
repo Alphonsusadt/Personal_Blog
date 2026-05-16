@@ -242,7 +242,10 @@ export function WritingEditor() {
     setWriting(prev => ({ ...prev, title: setLocalizedText(prev.title, autoFixLanguage, value) }));
   };
 
-  const plainContent = exactLocalizedContent
+  // Use resolveLocalizedText with fallback to ensure counter works even when content
+  // is stored in a different language than the currently selected one
+  const contentForCounter = resolveLocalizedText(writing.content, autoFixLanguage);
+  const plainContent = contentForCounter
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`[^`]*`/g, ' ')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')

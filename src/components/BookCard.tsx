@@ -3,6 +3,7 @@ import { Star, StarHalf, BookOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { resolveLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
+import { t } from '../lib/translations';
 
 interface BookCardProps {
   book: Book;
@@ -64,13 +65,13 @@ export function BookCard({ book }: BookCardProps) {
   const getCategoryLabel = (category: Book['category']) => {
     switch (category) {
       case 'technical':
-        return 'Technical';
+        return t('category.technical', language);
       case 'biography':
-        return 'Biography';
+        return t('category.biography', language);
       case 'spiritual':
-        return 'Spiritual';
+        return t('category.spiritual', language);
       case 'philosophy':
-        return 'Philosophy';
+        return t('category.philosophy', language);
       default:
         return category;
     }
@@ -100,7 +101,7 @@ export function BookCard({ book }: BookCardProps) {
             <h3 className="card-title text-ink group-hover:opacity-70 transition-opacity line-clamp-2">
               {resolveLocalizedText(book.title, language)}
             </h3>
-            <p className="body-sm text-ink opacity-60 mt-1">by {resolveLocalizedText(book.author, language)}</p>
+            <p className="body-sm text-ink opacity-60 mt-1">{t('book.by', language)} {resolveLocalizedText(book.author, language)}</p>
           </div>
         </div>
 
@@ -112,7 +113,7 @@ export function BookCard({ book }: BookCardProps) {
         {/* Key Takeaways */}
         <div className="border-t border-hairline pt-4">
           <h4 className="caption text-ink opacity-60 mb-2">
-            Key Takeaways:
+            {t('library.keyTakeawaysLabel', language)}
           </h4>
           <ul className="space-y-1">
             {book.takeaways.slice(0, 2).map((takeaway, index) => (
@@ -123,7 +124,7 @@ export function BookCard({ book }: BookCardProps) {
             ))}
             {book.takeaways.length > 2 && (
               <li className="text-sm text-ink opacity-60 italic">
-                +{book.takeaways.length - 2} more insights
+                +{book.takeaways.length - 2} {t('library.moreInsights', language)}
               </li>
             )}
           </ul>
@@ -133,7 +134,7 @@ export function BookCard({ book }: BookCardProps) {
         <div className="flex items-center justify-between pt-4 mt-auto border-t border-hairline">
           <div className="flex items-center text-ink opacity-60 text-sm group-hover:opacity-100 transition-opacity">
             <BookOpen className="w-4 h-4 mr-2" />
-            Read Full Review
+            {t('library.readFullReview', language)}
           </div>
           <div className="flex items-center space-x-1">
             {[...Array(4)].map((_, i) => (

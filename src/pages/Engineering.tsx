@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { resolveLocalizedText, getExactLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
+import { t } from '../lib/translations';
 
 interface Project {
   id: string;
@@ -62,10 +63,10 @@ export function Engineering() {
   }, [navigate]);
 
   const categories = [
-    { value: 'all', label: 'All Projects', icon: Code },
-    { value: 'signal-processing', label: 'Signal Processing', icon: Activity },
-    { value: 'control', label: 'Control', icon: Database },
-    { value: 'data-analysis', label: 'Data Analysis', icon: Database }
+    { value: 'all', label: t('category.allProjects', language), icon: Code },
+    { value: 'signal-processing', label: t('category.signalProcessing', language), icon: Activity },
+    { value: 'control', label: t('category.control', language), icon: Database },
+    { value: 'data-analysis', label: t('category.dataAnalysis', language), icon: Database }
   ];
 
   const filteredProjects = useMemo(() => {
@@ -97,10 +98,10 @@ export function Engineering() {
         {/* Header */}
         <div className="text-center mb-[48px]">
           <h1 className="display-lg text-ink mb-4">
-            Engineering Projects
+            {t('engineering.title', language)}
           </h1>
           <p className="subhead text-ink opacity-80 max-w-2xl mx-auto">
-            Exploring biomedical engineering through signal processing, medical devices, and data analysis
+            {t('engineering.subtitle', language)}
           </p>
         </div>
 
@@ -111,7 +112,7 @@ export function Engineering() {
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-ink opacity-60 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search projects by title, description, or tags..."
+              placeholder={t('engineering.searchPlaceholder', language)}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-4 rounded-[8px] border border-hairline bg-surface-soft text-ink focus:outline-none focus:border-ink transition-colors body"
@@ -144,10 +145,10 @@ export function Engineering() {
         {/* Results Count */}
         <div className="mb-6">
           {loading ? (
-            <p className="text-ink opacity-60 body-sm">Loading projects...</p>
+            <p className="text-ink opacity-60 body-sm">{t('engineering.loading', language)}</p>
           ) : (
             <p className="text-ink opacity-60 body-sm">
-              Showing {filteredProjects.length} of {allProjects.length} projects
+              {t('engineering.showing', language)} {filteredProjects.length} {t('engineering.of', language)} {allProjects.length} {t('engineering.projects', language)}
             </p>
           )}
         </div>
@@ -169,10 +170,10 @@ export function Engineering() {
               <Search className="w-10 h-10 text-ink opacity-40" />
             </div>
             <h3 className="card-title text-ink mb-2">
-              No projects found
+              {t('engineering.noResults', language)}
             </h3>
             <p className="body-sm text-ink opacity-60">
-              Try adjusting your search terms or filters
+              {t('engineering.noResultsHint', language)}
             </p>
           </div>
         )}
@@ -189,7 +190,7 @@ export function Engineering() {
               <div className="inline-block w-full max-w-4xl p-8 my-8 text-left align-middle transition-all transform bg-canvas border border-hairline shadow-sm rounded-[24px]">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="display-lg text-ink">
-                    {selectedProject.title}
+                    {resolveLocalizedText(selectedProject.title, language)}
                   </h2>
                   <button
                     onClick={() => setSelectedProject(null)}
@@ -200,7 +201,7 @@ export function Engineering() {
                 </div>
 
                 <div className="prose max-w-none">
-                  <p className="body text-ink mb-6">{selectedProject.description}</p>
+                  <p className="body text-ink mb-6">{resolveLocalizedText(selectedProject.description, language)}</p>
                   
                   <div className="flex flex-wrap gap-2 mb-6">
                     {selectedProject.tags.map((tag, index) => (
@@ -215,7 +216,7 @@ export function Engineering() {
 
                   <div className="bg-block-lime rounded-[24px] p-8 mt-8">
                     <p className="body text-ink text-center">
-                      Click "View Project" to see the full project details with LaTeX equations and diagrams
+                      {t('engineering.viewFullDetails', language)}
                     </p>
                   </div>
                 </div>
@@ -225,7 +226,7 @@ export function Engineering() {
                     onClick={() => setSelectedProject(null)}
                     className="btn btn-primary"
                   >
-                    Close
+                    {t('generic.close', language)}
                   </button>
                 </div>
               </div>

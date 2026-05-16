@@ -15,3 +15,5 @@
 ## Catatan
 - Fokus awal hanya pada homepage CMS dan tampilan public homepage.
 - Kalau hasilnya sudah stabil, baru lanjut ke linkage translation untuk konten lain.
+
+

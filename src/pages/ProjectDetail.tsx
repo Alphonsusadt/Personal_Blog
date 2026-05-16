@@ -6,6 +6,7 @@ import { embedYouTube } from '../lib/youtubeEmbed';
 import { CodeBlock } from '../components/CodeBlock';
 import { resolveLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
+import { t } from '../lib/translations';
 
 interface Project {
   _id?: string;
@@ -38,7 +39,7 @@ function formatDateTimeDetailed(dateString?: string) {
   });
 }
 
-function CategoryBadge({ category }: { category: Project['category'] }) {
+function CategoryBadge({ category, language }: { category: Project['category']; language: 'en' | 'id' }) {
   const getStyle = () => {
     switch (category) {
       case 'signal-processing':
@@ -55,11 +56,11 @@ function CategoryBadge({ category }: { category: Project['category'] }) {
   const getLabel = () => {
     switch (category) {
       case 'signal-processing':
-        return 'Signal Processing';
+        return t('category.signalProcessing', language);
       case 'control':
-        return 'Control';
+        return t('category.control', language);
       case 'data-analysis':
-        return 'Data Analysis';
+        return t('category.dataAnalysis', language);
       default:
         return category;
     }
@@ -296,17 +297,17 @@ export function ProjectDetail() {
               <ExternalLink className="w-12 h-12 text-[#6B7280]" />
             </div>
             <h1 className="text-3xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-4">
-              Project Not Found
+              {t('engineering.projectNotFound', language)}
             </h1>
             <p className="text-[#6B7280] mb-8">
-              The project you're looking for doesn't exist or has been removed.
+              {t('engineering.projectNotFoundHint', language)}
             </p>
             <Link
               to="/engineering"
               className="inline-flex items-center px-6 py-3 bg-[#1E40AF] text-white rounded-lg hover:bg-[#1E3A8A] transition-colors"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Projects
+              {t('engineering.backToProjects', language)}
             </Link>
           </div>
         </div>
@@ -323,13 +324,13 @@ export function ProjectDetail() {
           className="inline-flex items-center caption text-ink opacity-60 hover:opacity-100 transition-opacity mb-8"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Projects
+          {t('engineering.backToProjects', language)}
         </button>
 
         {/* Project Header */}
         <div className="mb-10">
           <div className="flex flex-wrap items-center gap-3 mb-4">
-            <CategoryBadge category={project.category} />
+            <CategoryBadge category={project.category} language={language} />
             {project.date && (
               <span className="caption text-ink opacity-60 flex items-center">
                 <Calendar className="w-4 h-4 mr-1" />
@@ -382,7 +383,7 @@ export function ProjectDetail() {
             <div className="bg-canvas rounded-[24px] p-8 border border-hairline shadow-sm">
               <h3 className="card-title text-ink mb-6 flex items-center gap-2">
                 <ExternalLink className="w-5 h-5 text-ink" />
-                Project Links
+                {t('engineering.projectLinks', language)}
               </h3>
               <div className="flex flex-wrap gap-4">
                 {project.githubUrl && (
@@ -392,7 +393,7 @@ export function ProjectDetail() {
                     rel="noopener noreferrer"
                     className="btn btn-secondary inline-flex items-center"
                   >
-                    GitHub Repository
+                    {t('engineering.githubRepo', language)}
                   </a>
                 )}
 
@@ -403,7 +404,7 @@ export function ProjectDetail() {
                     rel="noopener noreferrer"
                     className="btn btn-primary inline-flex items-center"
                   >
-                    Research Paper
+                    {t('engineering.researchPaper', language)}
                   </a>
                 )}
 
@@ -414,7 +415,7 @@ export function ProjectDetail() {
                     rel="noopener noreferrer"
                     className="btn btn-secondary inline-flex items-center"
                   >
-                    Live Demo
+                    {t('engineering.liveDemo', language)}
                   </a>
                 )}
               </div>
@@ -463,7 +464,7 @@ export function ProjectDetail() {
             className="btn btn-secondary inline-flex items-center"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            View All Projects
+            {t('engineering.viewAllProjects', language)}
           </Link>
         </div>
       </div>

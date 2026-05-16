@@ -4,6 +4,7 @@ import { Menu, X, Sun, Moon, Github, Linkedin, Mail } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { api } from '../lib/api';
+import { t } from '../lib/translations';
 
 export function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -42,14 +43,14 @@ export function Navigation() {
 
   const navItems = useMemo(() => {
     const items = [
-      { path: '/', label: 'Home' },
-      { path: '/engineering', label: 'Engineering', enabled: sections.projects },
-      { path: '/writings', label: 'Writings', enabled: sections.writings },
-      { path: '/library', label: 'Library', enabled: sections.books },
-      { path: '/about', label: 'About' },
+      { path: '/', label: t('nav.home', language) },
+      { path: '/engineering', label: t('nav.engineering', language), enabled: sections.projects },
+      { path: '/writings', label: t('nav.writings', language), enabled: sections.writings },
+      { path: '/library', label: t('nav.library', language), enabled: sections.books },
+      { path: '/about', label: t('nav.about', language) },
     ];
     return items.filter((item) => item.enabled !== false);
-  }, [sections.books, sections.projects, sections.writings]);
+  }, [sections.books, sections.projects, sections.writings, language]);
 
   return (
     <header className="sticky top-0 z-50 bg-canvas border-b border-hairline dark:border-hairline-soft">
@@ -155,7 +156,7 @@ export function Navigation() {
           <div className="md:hidden py-4 border-t border-hairline bg-canvas">
             <div className="flex flex-col space-y-4 px-6">
               <div className="flex items-center justify-between">
-                <span className="caption text-ink opacity-60">Language</span>
+                <span className="caption text-ink opacity-60">{language === 'en' ? 'Language' : 'Bahasa'}</span>
                 <div className="flex items-center rounded-full bg-surface-soft p-1">
                   <button
                     onClick={() => setLanguage('en')}

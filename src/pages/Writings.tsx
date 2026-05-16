@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { resolveLocalizedText, getExactLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
+import { t } from '../lib/translations';
 
 interface Writing {
   id: string;
@@ -58,10 +59,10 @@ export function Writings() {
   }, [navigate]);
 
   const categories = [
-    { value: 'all', label: 'All Writings', icon: BookOpen },
-    { value: 'reflections', label: 'Reflections', icon: BookOpen },
-    { value: 'stories', label: 'Stories', icon: Edit3 },
-    { value: 'fiction', label: 'Fiction', icon: PenTool }
+    { value: 'all', label: t('category.allWritings', language), icon: BookOpen },
+    { value: 'reflections', label: t('category.reflections', language), icon: BookOpen },
+    { value: 'stories', label: t('category.stories', language), icon: Edit3 },
+    { value: 'fiction', label: t('category.fiction', language), icon: PenTool }
   ];
 
   const filteredWritings = useMemo(() => {
@@ -95,10 +96,10 @@ export function Writings() {
         {/* Header */}
         <div className="text-center mb-[48px]">
           <h1 className="display-lg text-ink mb-4">
-            Writings
+            {t('writings.title', language)}
           </h1>
           <p className="subhead text-ink opacity-80 max-w-2xl mx-auto">
-            Reflections on faith, engineering, and the human experience
+            {t('writings.subtitle', language)}
           </p>
         </div>
 
@@ -130,7 +131,7 @@ export function Writings() {
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-ink opacity-60 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search writings by title, excerpt, or tags..."
+              placeholder={t('writings.searchPlaceholder', language)}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-4 rounded-[8px] border border-hairline bg-surface-soft text-ink focus:outline-none focus:border-ink transition-colors body"
@@ -141,12 +142,12 @@ export function Writings() {
         {/* Results Count */}
         <div className="mb-8 text-center">
           {loading ? (
-            <p className="text-ink opacity-60 body-sm">Loading writings...</p>
+            <p className="text-ink opacity-60 body-sm">{t('writings.loading', language)}</p>
           ) : (
             <p className="text-ink opacity-60 body-sm">
               {selectedCategory === 'all'
-                ? `Showing ${filteredWritings.length} writings`
-                : `Showing ${filteredWritings.length} ${selectedCategory} writings`
+                ? `${t('writings.showing', language)} ${filteredWritings.length} ${t('writings.writings', language)}`
+                : `${t('writings.showing', language)} ${filteredWritings.length} ${selectedCategory} ${t('writings.writings', language)}`
               }
             </p>
           )}
@@ -166,10 +167,10 @@ export function Writings() {
               <Search className="w-10 h-10 text-ink opacity-40" />
             </div>
             <h3 className="card-title text-ink mb-2">
-              No writings found
+              {t('writings.noResults', language)}
             </h3>
             <p className="body-sm text-ink opacity-60">
-              Try adjusting your search terms or category filter
+              {t('writings.noResultsHint', language)}
             </p>
           </div>
         )}

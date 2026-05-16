@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { cn } from '../utils/cn';
 import { resolveLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
+import { t } from '../lib/translations';
 
 interface WritingCardProps {
   writing: Writing;
@@ -40,11 +41,11 @@ export function WritingCard({ writing }: WritingCardProps) {
   const getCategoryLabel = (category: Writing['category']) => {
     switch (category) {
       case 'reflections':
-        return 'Reflections';
+        return t('category.reflections', language);
       case 'stories':
-        return 'Stories';
+        return t('category.stories', language);
       case 'fiction':
-        return 'Fiction';
+        return t('category.fiction', language);
       default:
         return category;
     }
@@ -95,7 +96,7 @@ export function WritingCard({ writing }: WritingCardProps) {
             </span>
             <span className="flex items-center">
               <Clock className="w-4 h-4 mr-1" />
-              {writing.readTime}
+              {writing.readTime} {t('writings.read', language)}
             </span>
           </div>
 
@@ -120,7 +121,7 @@ export function WritingCard({ writing }: WritingCardProps) {
               ))}
               {writing.tags.length > 3 && (
                 <span className="tag">
-                  +{writing.tags.length - 3} more
+                  +{writing.tags.length - 3} {t('generic.more', language)}
                 </span>
               )}
             </div>
@@ -130,7 +131,7 @@ export function WritingCard({ writing }: WritingCardProps) {
           <div className="flex items-center justify-between pt-4 mt-auto border-t border-hairline">
             <div className="flex items-center text-ink opacity-60 text-sm group-hover:opacity-100 transition-opacity">
               <BookOpen className="w-4 h-4 mr-2" />
-              Read More
+              {t('writings.readMore', language)}
             </div>
             <div className="flex items-center space-x-1">
               {[...Array(4)].map((_, i) => (

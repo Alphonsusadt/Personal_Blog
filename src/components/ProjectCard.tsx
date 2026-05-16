@@ -4,6 +4,7 @@ import { Project } from '../data/projects';
 import { cn } from '../utils/cn';
 import { resolveLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
+import { t } from '../lib/translations';
 
 interface ProjectCardProps {
   project: Project;
@@ -82,11 +83,11 @@ export function ProjectCard({ project, featured = false }: ProjectCardProps) {
   const getCategoryLabel = (category: Project['category']) => {
     switch (category) {
       case 'signal-processing':
-        return 'Signal Processing';
+        return t('category.signalProcessing', language);
       case 'control':
-        return 'Control';
+        return t('category.control', language);
       case 'data-analysis':
-        return 'Data Analysis';
+        return t('category.dataAnalysis', language);
       default:
         return category;
     }
@@ -171,7 +172,7 @@ export function ProjectCard({ project, featured = false }: ProjectCardProps) {
                   </div>
                 )}
                 <span className="text-xs text-ink opacity-60">
-                  Links available
+                  {t('engineering.linksAvailable', language)}
                 </span>
               </div>
             )}
@@ -179,7 +180,7 @@ export function ProjectCard({ project, featured = false }: ProjectCardProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center text-ink opacity-60 text-sm group-hover:opacity-100 transition-opacity">
                 <ExternalLink className="w-4 h-4 mr-2" />
-                View Project
+                {t('engineering.viewProject', language)}
               </div>
               <div className="flex items-center space-x-1">
                 {[...Array(4)].map((_, i) => (
