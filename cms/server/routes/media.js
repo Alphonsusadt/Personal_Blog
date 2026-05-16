@@ -346,8 +346,10 @@ export default function mediaRoutes(db) {
 
       const filePath = path.join(UPLOAD_DIR, filename);
 
-      // Security: ensure file path is within upload directory
-      if (!filePath.startsWith(uploadDir)) {
+      // Security: ensure file path resolves within upload directory
+      const resolvedPath = path.resolve(filePath);
+      const uploadDirResolved = path.resolve(UPLOAD_DIR);
+      if (!resolvedPath.startsWith(uploadDirResolved)) {
         return res.status(403).json({
           success: false,
           error: 'Access denied',

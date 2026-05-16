@@ -29,7 +29,7 @@ parentPort.on('message', async (message) => {
         try {
           const { supabase } = await import('../config/supabase.js');
           if (supabase) {
-            const { _id, _clientVersion, ...updateFields } = $setDoc;
+            const { _id, _clientVersion, translationOfId, contentLanguage, ...updateFields } = $setDoc;
             const { error } = await supabase
               .from('artikel')
               .update(updateFields)

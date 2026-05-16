@@ -114,6 +114,13 @@ export function useAdminAutosave<T>({
   const dataRef = useRef(data);
   dataRef.current = data;
 
+  // Seed initial fingerprint when enabled becomes true (data loaded from server)
+  useEffect(() => {
+    if (enabled && lastSavedFingerprintRef.current === '') {
+      lastSavedFingerprintRef.current = fingerprint(dataRef.current);
+    }
+  }, [enabled]);
+
   // Stable ref to saveToServer (avoids re-subscribing effects on each render)
   const saveToServerRef = useRef(saveToServer);
   saveToServerRef.current = saveToServer;
@@ -125,6 +132,18 @@ export function useAdminAutosave<T>({
     setStatus('saved');
     statusResetRef.current = setTimeout(() => setStatus('idle'), resetStatusMs);
   }, [resetStatusMs]);
+
+  // ── Draft management ──────────────────────────────────────────────────────
+
+  const clearDraft = useCallback(() => {
+    try {
+      localStorage.removeItem(storageKey);
+      setHasDraft(false);
+      setDraftTimestamp(null);
+    } catch (err) {
+      console.error('[autosave] clear draft failed:', err);
+    }
+  }, [storageKey]);
 
   // ── 1 + 4 + 5 + 6: Core server-save with Queue + Retry + Atomic ──────────
 
@@ -156,6 +175,7 @@ export function useAdminAutosave<T>({
       // Success — update dirty flag baseline
       lastSavedFingerprintRef.current = fp;
       retryQueueRef.current = null;
+      clearDraft(); // Clear local draft since server is synced
       showSaved();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -209,6 +229,14 @@ export function useAdminAutosave<T>({
     }
   }, [storageKey]);
 
+  // ── Public: mark as saved (used by manual save to sync dirty flag) ────────
+  
+  const markAsSaved = useCallback((snapshot: T) => {
+    dataRef.current = snapshot; // Synchronously update ref to avoid stale state on immediate unmount
+    lastSavedFingerprintRef.current = fingerprint(snapshot);
+    clearDraft();
+  }, [clearDraft]);
+
   // ── Public: force-save now (used by Save button) ──────────────────────────
 
   const saveNow = useCallback(async () => {
@@ -225,24 +253,13 @@ export function useAdminAutosave<T>({
     await executeServerSave({ payload: snapshot, version: versionRef.current, attempt: 0 });
   }, [enabled, executeServerSave, hasMeaningfulData, persistLocalDraft]);
 
-  // ── Draft management ──────────────────────────────────────────────────────
-
-  const clearDraft = useCallback(() => {
-    try {
-      localStorage.removeItem(storageKey);
-      setHasDraft(false);
-      setDraftTimestamp(null);
-    } catch (err) {
-      console.error('[autosave] clearDraft failed:', err);
-    }
-  }, [storageKey]);
-
   const readDraft = useCallback((): { data: T; timestamp: number } | null => {
     try {
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) return null;
-      return JSON.parse(raw) as { data: T; timestamp: number };
-    } catch {
+      const stored = localStorage.getItem(storageKey);
+      if (!stored) return null;
+      return JSON.parse(stored);
+    } catch (err) {
+      console.error('[autosave] read draft failed:', err);
       return null;
     }
   }, [storageKey]);
@@ -323,13 +340,21 @@ export function useAdminAutosave<T>({
 
   useEffect(() => {
     if (!enabled) return;
-    const handleUnload = () => persistLocalDraft(dataRef.current);
+    const handleUnload = () => {
+      const currentFp = fingerprint(dataRef.current);
+      // Only save draft if there are unsaved changes compared to last server save
+      if (currentFp !== lastSavedFingerprintRef.current) {
+        persistLocalDraft(dataRef.current);
+      } else {
+        clearDraft(); // Clean up if no unsaved changes
+      }
+    };
     window.addEventListener('beforeunload', handleUnload);
     return () => {
-      handleUnload(); // also save on React unmount (navigation)
+      handleUnload(); // also check/save on React unmount (navigation)
       window.removeEventListener('beforeunload', handleUnload);
     };
-  }, [enabled, persistLocalDraft]);
+  }, [enabled, persistLocalDraft, clearDraft]);
 
   // ── Cleanup all timers on unmount ─────────────────────────────────────────
 
@@ -351,6 +376,7 @@ export function useAdminAutosave<T>({
     hasDraft,
     draftTimestamp,
     saveNow,
+    markAsSaved,
     clearDraft,
     readDraft,
     persistLocalDraft,

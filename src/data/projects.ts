@@ -1,11 +1,13 @@
+import type { LocalizedTextValue } from '../lib/localized';
+
 export interface Project {
   id: string;
-  title: string;
-  description: string;
+  title: LocalizedTextValue;
+  description: LocalizedTextValue;
   tags: string[];
   category: 'signal-processing' | 'control' | 'data-analysis';
   thumbnail?: string;
-  content: string;
+  content: LocalizedTextValue;
   status?: 'draft' | 'published' | 'scheduled';
   publishAt?: string;
   createdAt?: string;
@@ -15,6 +17,9 @@ export interface Project {
   githubUrl?: string;
   paperUrl?: string;
   demoUrl?: string;
+  translationGroupId?: string;
+  translationOfId?: string;
+  contentLanguage?: 'en' | 'id' | 'bilingual';
 }
 
 export const projects: Project[] = [

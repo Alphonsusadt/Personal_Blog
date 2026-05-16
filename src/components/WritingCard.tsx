@@ -2,12 +2,15 @@ import { Writing } from '../data/writings';
 import { Calendar, Clock, BookOpen, Edit3, PenTool } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '../utils/cn';
+import { resolveLocalizedText } from '../lib/localized';
+import { useSiteLanguage } from '../hooks/useSiteLanguage';
 
 interface WritingCardProps {
   writing: Writing;
 }
 
 export function WritingCard({ writing }: WritingCardProps) {
+  const { language } = useSiteLanguage();
   const getIcon = (category: Writing['category']) => {
     switch (category) {
       case 'reflections':
@@ -24,13 +27,13 @@ export function WritingCard({ writing }: WritingCardProps) {
   const getCategoryColor = (category: Writing['category']) => {
     switch (category) {
       case 'reflections':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+        return 'bg-block-lilac text-ink border border-hairline';
       case 'stories':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+        return 'bg-block-lime text-ink border border-hairline';
       case 'fiction':
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+        return 'bg-block-coral text-ink border border-hairline';
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+        return 'bg-surface-soft text-ink border border-hairline';
     }
   };
 
@@ -57,35 +60,35 @@ export function WritingCard({ writing }: WritingCardProps) {
   };
 
   return (
-    <div className="card group hover:shadow-lg transition-all duration-300">
-      <Link to={`/writings/${writing.id}`}>
-        <div className="p-6">
+    <div className="card group transition-all duration-300 flex flex-col">
+      <Link to={`/writings/${writing.id}`} className="flex flex-col flex-1 w-full">
+        <div className="p-6 flex flex-col flex-1 w-full">
           {/* Header */}
           <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <div className="flex items-center space-x-3 mb-2">
-                <div className={cn('p-2 rounded-lg', getCategoryColor(writing.category))}>
+            <div className="flex-1 min-w-0 pr-4">
+              <div className="flex items-center flex-wrap gap-2 mb-2">
+                <div className={cn('p-2 rounded-[6px]', getCategoryColor(writing.category))}>
                   {getIcon(writing.category)}
                 </div>
                 <div>
-                  <span className={cn('inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium', getCategoryColor(writing.category))}>
+                  <span className={cn('inline-flex items-center px-2.5 py-1 rounded-[6px] text-xs', getCategoryColor(writing.category))}>
                     {getCategoryLabel(writing.category)}
                   </span>
                 </div>
               </div>
               <h3 className={cn(
-                'text-xl font-semibold mb-2',
+                'card-title mb-2 break-words',
                 writing.category === 'reflections' || writing.category === 'stories' ? 'serif-font' : ''
               )}>
-                <span className="text-[#1A1A1A] dark:text-[#F8FAFC] group-hover:text-[#1E40AF] dark:group-hover:text-[#60A5FA] transition-colors">
-                  {writing.title}
+                <span className="text-ink group-hover:opacity-70 transition-opacity">
+                  {resolveLocalizedText(writing.title, language)}
                 </span>
               </h3>
             </div>
           </div>
 
           {/* Meta Information */}
-          <div className="flex items-center space-x-4 text-sm text-[#6B7280] mb-4">
+          <div className="flex items-center space-x-4 text-sm text-ink opacity-60 mb-4">
             <span className="flex items-center">
               <Calendar className="w-4 h-4 mr-1" />
               {formatDate(writing.date)}
@@ -98,10 +101,10 @@ export function WritingCard({ writing }: WritingCardProps) {
 
           {/* Excerpt */}
           <p className={cn(
-            'text-[#6B7280] mb-4 line-clamp-3 leading-relaxed',
-            writing.category === 'reflections' || writing.category === 'stories' ? 'serif-font text-base' : ''
+            'text-ink opacity-60 mb-4 line-clamp-3 leading-relaxed',
+            writing.category === 'reflections' || writing.category === 'stories' ? 'serif-font text-base' : 'body-sm'
           )}>
-            {writing.excerpt}
+            {resolveLocalizedText(writing.excerpt, language)}
           </p>
 
           {/* Tags */}
@@ -110,13 +113,13 @@ export function WritingCard({ writing }: WritingCardProps) {
               {writing.tags.slice(0, 3).map((tag, index) => (
                 <span
                   key={index}
-                  className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#E5E7EB] text-[#6B7280] text-xs font-medium"
+                  className="tag"
                 >
                   {tag}
                 </span>
               ))}
               {writing.tags.length > 3 && (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#E5E7EB] text-[#6B7280] text-xs font-medium">
+                <span className="tag">
                   +{writing.tags.length - 3} more
                 </span>
               )}
@@ -124,8 +127,8 @@ export function WritingCard({ writing }: WritingCardProps) {
           )}
 
           {/* Footer */}
-          <div className="flex items-center justify-between pt-4 border-t border-[#E5E7EB] dark:border-[#334155]">
-            <div className="flex items-center text-[#6B7280] text-sm group-hover:text-[#1E40AF] dark:group-hover:text-[#60A5FA] transition-colors">
+          <div className="flex items-center justify-between pt-4 mt-auto border-t border-hairline">
+            <div className="flex items-center text-ink opacity-60 text-sm group-hover:opacity-100 transition-opacity">
               <BookOpen className="w-4 h-4 mr-2" />
               Read More
             </div>
@@ -133,7 +136,7 @@ export function WritingCard({ writing }: WritingCardProps) {
               {[...Array(4)].map((_, i) => (
                 <div
                   key={i}
-                  className="w-1 h-1 bg-[#6B7280] dark:bg-[#94A3B8] rounded-full group-hover:bg-[#1E40AF] dark:group-hover:bg-[#60A5FA] transition-colors"
+                  className="w-1 h-1 bg-ink opacity-30 rounded-full group-hover:opacity-100 transition-opacity"
                 />
               ))}
             </div>

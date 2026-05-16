@@ -2,6 +2,8 @@ import { ExternalLink, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Project } from '../data/projects';
 import { cn } from '../utils/cn';
+import { resolveLocalizedText } from '../lib/localized';
+import { useSiteLanguage } from '../hooks/useSiteLanguage';
 
 interface ProjectCardProps {
   project: Project;
@@ -63,16 +65,17 @@ function CategoryIcon({ category }: { category: Project['category'] }) {
 }
 
 export function ProjectCard({ project, featured = false }: ProjectCardProps) {
+  const { language } = useSiteLanguage();
   const getCategoryColor = (category: Project['category']) => {
     switch (category) {
       case 'signal-processing':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+        return 'bg-block-lilac text-ink';
       case 'control':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+        return 'bg-block-lime text-ink';
       case 'data-analysis':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+        return 'bg-block-pink text-ink';
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+        return 'bg-surface-soft text-ink';
     }
   };
 
@@ -96,22 +99,22 @@ export function ProjectCard({ project, featured = false }: ProjectCardProps) {
         featured && 'md:col-span-2 md:row-span-2'
       )}
     >
-      <Link to={`/engineering/${project.id}`} className="flex flex-col flex-1">
+      <Link to={`/engineering/${project.id}`} className="flex flex-col flex-1 w-full">
         <div className="p-6 flex flex-col flex-1">
           {/* Project Header */}
           <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <div className="flex items-center space-x-2 mb-2">
-                <span className={cn('inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium', getCategoryColor(project.category))}>
+            <div className="flex-1 min-w-0 pr-4">
+              <div className="flex items-center flex-wrap gap-2 mb-2">
+                <span className={cn('inline-flex items-center px-2.5 py-1 rounded-[6px] text-xs border border-hairline', getCategoryColor(project.category))}>
                   {getCategoryLabel(project.category)}
                 </span>
-                <span className="text-[#6B7280] text-xs flex items-center">
+                <span className="text-ink opacity-60 text-xs flex items-center whitespace-nowrap">
                   <Calendar className="w-3 h-3 mr-1" />
                   2024
                 </span>
               </div>
-              <h3 className="text-xl font-semibold text-[#1A1A1A] dark:text-[#F8FAFC] group-hover:text-[#1E40AF] dark:group-hover:text-[#60A5FA] transition-colors">
-                {project.title}
+              <h3 className="card-title text-ink group-hover:opacity-70 transition-opacity break-words">
+                {resolveLocalizedText(project.title, language)}
               </h3>
             </div>
             <div className="ml-4 flex-shrink-0">
@@ -120,8 +123,8 @@ export function ProjectCard({ project, featured = false }: ProjectCardProps) {
           </div>
 
           {/* Description */}
-          <p className="text-[#6B7280] mb-4 line-clamp-3">
-            {project.description}
+          <p className="text-ink opacity-60 mb-4 line-clamp-3 body-sm">
+            {resolveLocalizedText(project.description, language)}
           </p>
 
           {/* Tags */}
@@ -129,21 +132,20 @@ export function ProjectCard({ project, featured = false }: ProjectCardProps) {
             {project.tags.slice(0, featured ? 5 : 3).map((tag, index) => (
               <span
                 key={index}
-                className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#E5E7EB] text-[#6B7280] text-xs font-medium hover:bg-[#1E40AF] hover:text-white transition-colors cursor-default"
+                className="tag"
               >
-                <span className="w-1 h-1 bg-current rounded-full mr-1.5"></span>
                 {tag}
               </span>
             ))}
             {project.tags.length > (featured ? 5 : 3) && (
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#E5E7EB] text-[#6B7280] text-xs font-medium">
+              <span className="tag">
                 +{project.tags.length - (featured ? 5 : 3)} more
               </span>
             )}
           </div>
 
           {/* Footer */}
-          <div className="mt-auto pt-4 border-t border-[#E5E7EB] dark:border-[#334155]">
+          <div className="mt-auto pt-4 border-t border-hairline">
             {/* Project Links Preview */}
             {(project.githubUrl || project.paperUrl || project.demoUrl) && (
               <div className="flex items-center gap-2 mb-3">
@@ -168,14 +170,14 @@ export function ProjectCard({ project, featured = false }: ProjectCardProps) {
                     </svg>
                   </div>
                 )}
-                <span className="text-xs text-[#6B7280]">
+                <span className="text-xs text-ink opacity-60">
                   Links available
                 </span>
               </div>
             )}
 
             <div className="flex items-center justify-between">
-              <div className="flex items-center text-[#6B7280] text-sm group-hover:text-[#1E40AF] dark:group-hover:text-[#60A5FA] transition-colors">
+              <div className="flex items-center text-ink opacity-60 text-sm group-hover:opacity-100 transition-opacity">
                 <ExternalLink className="w-4 h-4 mr-2" />
                 View Project
               </div>
@@ -183,7 +185,7 @@ export function ProjectCard({ project, featured = false }: ProjectCardProps) {
                 {[...Array(4)].map((_, i) => (
                   <div
                     key={i}
-                    className="w-1 h-1 bg-[#6B7280] dark:bg-[#94A3B8] rounded-full group-hover:bg-[#1E40AF] dark:group-hover:bg-[#60A5FA] transition-colors"
+                    className="w-1 h-1 bg-ink opacity-30 rounded-full group-hover:opacity-100 transition-opacity"
                   />
                 ))}
               </div>

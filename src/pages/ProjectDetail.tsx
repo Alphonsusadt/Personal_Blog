@@ -4,6 +4,8 @@ import { useEffect, useRef, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { embedYouTube } from '../lib/youtubeEmbed';
 import { CodeBlock } from '../components/CodeBlock';
+import { resolveLocalizedText } from '../lib/localized';
+import { useSiteLanguage } from '../hooks/useSiteLanguage';
 
 interface Project {
   _id?: string;
@@ -40,13 +42,13 @@ function CategoryBadge({ category }: { category: Project['category'] }) {
   const getStyle = () => {
     switch (category) {
       case 'signal-processing':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+        return 'bg-block-lilac text-ink border border-hairline';
       case 'control':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+        return 'bg-block-lime text-ink border border-hairline';
       case 'data-analysis':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+        return 'bg-block-pink text-ink border border-hairline';
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+        return 'bg-surface-soft text-ink border border-hairline';
     }
   };
 
@@ -107,19 +109,19 @@ async function renderMarkdown(content: string): Promise<string> {
   });
 
   // Process Markdown
-  html = html.replace(/^### (.+)$/gm, '<h3 class="text-xl font-semibold text-[#1A1A1A] dark:text-[#F8FAFC] mt-8 mb-4">$1</h3>');
-  html = html.replace(/^## (.+)$/gm, '<h2 class="text-2xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mt-10 mb-4 pb-2 border-b border-[#E5E7EB] dark:border-[#334155]">$1</h2>');
-  html = html.replace(/^# (.+)$/gm, '<h1 class="text-3xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-6">$1</h1>');
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold">$1</strong>');
+  html = html.replace(/^### (.+)$/gm, '<h3 class="card-title text-ink mt-8 mb-4">$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2 class="display-sm text-ink mt-10 mb-4 pb-2 border-b border-hairline">$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1 class="display-md text-ink mb-6">$1</h1>');
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong class="font-[480]">$1</strong>');
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  html = html.replace(/^- (.+)$/gm, '<li class="ml-4 mb-2 text-[#4B5563] dark:text-[#94A3B8]">$1</li>');
+  html = html.replace(/^- (.+)$/gm, '<li class="ml-4 mb-2 body text-ink opacity-80">$1</li>');
   html = html.replace(/(<li.*<\/li>\n?)+/g, '<ul class="list-disc list-inside my-4 space-y-1">$&</ul>');
-  html = html.replace(/^\d+\. (.+)$/gm, '<li class="ml-4 mb-2 text-[#4B5563] dark:text-[#94A3B8]">$1</li>');
+  html = html.replace(/^\d+\. (.+)$/gm, '<li class="ml-4 mb-2 body text-ink opacity-80">$1</li>');
 
   // Process markdown links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-[#1E40AF] dark:text-[#60A5FA] hover:underline">$1</a>');
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">$1</a>');
 
-  html = html.replace(/^(?!<[hul]|<div|<li|<a|```)([\w\S].*)$/gm, '<p class="text-[#4B5563] dark:text-[#94A3B8] leading-relaxed mb-4">$1</p>');
+  html = html.replace(/^(?!<[hul]|<div|<li|<a|```)([\w\S].*)$/gm, '<p class="body text-ink opacity-80 leading-relaxed mb-4">$1</p>');
 
   // Embed YouTube videos from links and bare URLs
   html = embedYouTube(html);
@@ -199,7 +201,7 @@ function MermaidDiagram({ code, id }: { code: string; id: string }) {
   return (
     <div
       ref={containerRef}
-      className="my-8 p-6 bg-[#F8FAFC] dark:bg-[#1E293B] rounded-xl flex justify-center overflow-x-auto"
+      className="my-8 p-6 bg-surface-soft border border-hairline rounded-[16px] flex justify-center overflow-x-auto"
     />
   );
 }
@@ -207,6 +209,7 @@ function MermaidDiagram({ code, id }: { code: string; id: string }) {
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { language } = useSiteLanguage();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -253,8 +256,8 @@ export function ProjectDetail() {
 
   const rawParts = useMemo(() => {
     if (!project) return [];
-    return splitContent(project.content);
-  }, [project]);
+    return splitContent(resolveLocalizedText(project.content, language));
+  }, [language, project]);
 
   const [renderedParts, setRenderedParts] = useState<ContentPart[]>([]);
 
@@ -312,12 +315,12 @@ export function ProjectDetail() {
   }
 
   return (
-    <div className="min-h-screen py-16">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen py-[96px] bg-canvas">
+      <div className="max-w-[1280px] mx-auto px-6 lg:px-12">
         {/* Back Button */}
         <button
           onClick={() => navigate(-1)}
-          className="inline-flex items-center text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors mb-8"
+          className="inline-flex items-center caption text-ink opacity-60 hover:opacity-100 transition-opacity mb-8"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Projects
@@ -328,24 +331,24 @@ export function ProjectDetail() {
           <div className="flex flex-wrap items-center gap-3 mb-4">
             <CategoryBadge category={project.category} />
             {project.date && (
-              <span className="text-[#6B7280] text-sm flex items-center">
+              <span className="caption text-ink opacity-60 flex items-center">
                 <Calendar className="w-4 h-4 mr-1" />
                 {new Date(project.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'long' })}
               </span>
             )}
           </div>
 
-          <h1 className="text-4xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-4">
-            {project.title}
+          <h1 className="display-lg text-ink mb-6">
+            {resolveLocalizedText(project.title, language)}
           </h1>
 
-          <p className="text-xl text-[#6B7280] mb-4">
-            {project.description}
+          <p className="body-lg text-ink opacity-80 mb-6">
+            {resolveLocalizedText(project.description, language)}
           </p>
 
           {/* Timestamps */}
           {(project.createdAt || project.updatedAt) && (
-            <div className="flex flex-wrap items-center gap-4 text-xs text-[#9CA3AF] dark:text-[#6B7280] mb-4">
+            <div className="flex flex-wrap items-center gap-4 caption text-ink opacity-40 mb-6">
               {project.createdAt && (
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
@@ -362,11 +365,11 @@ export function ProjectDetail() {
           )}
 
           {/* Tags */}
-          <div className="flex flex-wrap gap-2 mb-6">
+          <div className="flex flex-wrap gap-2 mb-8">
             {project.tags.map((tag, index) => (
               <span
                 key={index}
-                className="inline-flex items-center px-3 py-1.5 rounded-full bg-[#E5E7EB] dark:bg-[#334155] text-[#6B7280] dark:text-[#94A3B8] text-sm font-medium"
+                className="tag"
               >
                 <Tag className="w-3 h-3 mr-1.5" />
                 {tag}
@@ -376,31 +379,20 @@ export function ProjectDetail() {
 
           {/* Project Links */}
           {(project.githubUrl || project.paperUrl || project.demoUrl) && (
-            <div className="bg-[#F8FAFC] dark:bg-[#1E293B] rounded-xl p-6 border border-[#E5E7EB] dark:border-[#334155]">
-              <h3 className="text-lg font-semibold text-[#1A1A1A] dark:text-[#F8FAFC] mb-4 flex items-center gap-2">
-                <ExternalLink className="w-5 h-5 text-[#1E40AF] dark:text-[#60A5FA]" />
+            <div className="bg-canvas rounded-[24px] p-8 border border-hairline shadow-sm">
+              <h3 className="card-title text-ink mb-6 flex items-center gap-2">
+                <ExternalLink className="w-5 h-5 text-ink" />
                 Project Links
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="flex flex-wrap gap-4">
                 {project.githubUrl && (
                   <a
                     href={project.githubUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 p-4 bg-white dark:bg-[#0F172A] rounded-lg border border-[#E5E7EB] dark:border-[#334155] hover:border-[#1E40AF] dark:hover:border-[#60A5FA] transition-colors group"
+                    className="btn btn-secondary inline-flex items-center"
                   >
-                    <div className="w-10 h-10 bg-gray-900 dark:bg-gray-100 rounded-lg flex items-center justify-center">
-                      <svg className="w-5 h-5 text-white dark:text-gray-900" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[#1A1A1A] dark:text-[#F8FAFC] group-hover:text-[#1E40AF] dark:group-hover:text-[#60A5FA]">
-                        GitHub Repository
-                      </p>
-                      <p className="text-xs text-[#6B7280] truncate">View source code</p>
-                    </div>
-                    <ExternalLink className="w-4 h-4 text-[#6B7280] group-hover:text-[#1E40AF] dark:group-hover:text-[#60A5FA]" />
+                    GitHub Repository
                   </a>
                 )}
 
@@ -409,20 +401,9 @@ export function ProjectDetail() {
                     href={project.paperUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 p-4 bg-white dark:bg-[#0F172A] rounded-lg border border-[#E5E7EB] dark:border-[#334155] hover:border-[#1E40AF] dark:hover:border-[#60A5FA] transition-colors group"
+                    className="btn btn-primary inline-flex items-center"
                   >
-                    <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
-                      <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[#1A1A1A] dark:text-[#F8FAFC] group-hover:text-[#1E40AF] dark:group-hover:text-[#60A5FA]">
-                        Research Paper
-                      </p>
-                      <p className="text-xs text-[#6B7280] truncate">Read documentation</p>
-                    </div>
-                    <ExternalLink className="w-4 h-4 text-[#6B7280] group-hover:text-[#1E40AF] dark:group-hover:text-[#60A5FA]" />
+                    Research Paper
                   </a>
                 )}
 
@@ -431,20 +412,9 @@ export function ProjectDetail() {
                     href={project.demoUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 p-4 bg-white dark:bg-[#0F172A] rounded-lg border border-[#E5E7EB] dark:border-[#334155] hover:border-[#1E40AF] dark:hover:border-[#60A5FA] transition-colors group"
+                    className="btn btn-secondary inline-flex items-center"
                   >
-                    <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
-                      <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M11,16.5L18,12L11,7.5V16.5Z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[#1A1A1A] dark:text-[#F8FAFC] group-hover:text-[#1E40AF] dark:group-hover:text-[#60A5FA]">
-                        Live Demo
-                      </p>
-                      <p className="text-xs text-[#6B7280] truncate">Try the application</p>
-                    </div>
-                    <ExternalLink className="w-4 h-4 text-[#6B7280] group-hover:text-[#1E40AF] dark:group-hover:text-[#60A5FA]" />
+                    Live Demo
                   </a>
                 )}
               </div>
@@ -453,7 +423,7 @@ export function ProjectDetail() {
         </div>
 
         {/* Divider */}
-        <hr className="border-[#E5E7EB] dark:border-[#334155] mb-10" />
+        <hr className="border-hairline mb-10" />
 
         {/* Project Content */}
         <article className="prose prose-lg dark:prose-invert max-w-none">
@@ -487,10 +457,10 @@ export function ProjectDetail() {
         </article>
 
         {/* Bottom Navigation */}
-        <div className="mt-16 pt-8 border-t border-[#E5E7EB] dark:border-[#334155]">
+        <div className="mt-16 pt-8 border-t border-hairline">
           <Link
             to="/engineering"
-            className="inline-flex items-center px-6 py-3 bg-[#1E40AF] text-white rounded-lg hover:bg-[#1E3A8A] transition-colors"
+            className="btn btn-secondary inline-flex items-center"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             View All Projects

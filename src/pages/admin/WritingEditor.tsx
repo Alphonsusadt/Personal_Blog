@@ -13,21 +13,23 @@ import { useRenderedMarkdown } from '../../hooks/useRenderedMarkdown';
 import { formatDraftTime } from '../../hooks/useLocalDraft';
 import { IsolatedContentEditor } from '../../components/IsolatedInput';
 import { AutoFixButton } from '../../components/AutoFixButton';
+import { AssetReuserDialog } from '../../components/AssetReuserDialog';
 import { useAutoFixLanguage } from '../../hooks/useAutoFixLanguage';
 import { getAutoFixSuggestionsForWord } from '../../utils/textAutoFix';
 import { getSpellSuggestions } from '../../utils/spellSuggester';
 import { useAdminAutosave } from '../../hooks/useAdminAutosave';
+import { resolveLocalizedText, getExactLocalizedText, setLocalizedText, type LocalizedTextValue } from '../../lib/localized';
 
 interface Writing {
   _id?: string;
   id: string;
-  title: string;
-  excerpt: string;
+  title: LocalizedTextValue;
+  excerpt: LocalizedTextValue;
   date: string;
   readTime: string;
   category: string;
   tags: string[];
-  content: string;
+  content: LocalizedTextValue;
   status?: 'draft' | 'published' | 'scheduled';
   publishAt?: string;
   createdAt?: string;
@@ -37,6 +39,8 @@ interface Writing {
   ogImage?: string;
   keywords?: string;
   metaTitle?: string;
+  contentLanguage?: 'en' | 'id' | 'bilingual';
+  translationOfId?: string;
 }
 
 const emptyWriting: Writing = {
@@ -54,9 +58,9 @@ const emptyWriting: Writing = {
 
 function hasMeaningfulWritingDraft(data: Writing): boolean {
   return Boolean(
-    data.title?.trim() ||
-    data.excerpt?.trim() ||
-    data.content?.trim() ||
+    resolveLocalizedText(data.title, 'en').trim() ||
+    resolveLocalizedText(data.excerpt, 'en').trim() ||
+    resolveLocalizedText(data.content, 'en').trim() ||
     data.tags?.length ||
     data.metaDescription?.trim() ||
     data.ogImage?.trim() ||
@@ -106,9 +110,12 @@ export function WritingEditor() {
   const [showPreview, setShowPreview] = useState(false);
   const [showFullPreview, setShowFullPreview] = useState(false);
   const [showDraftRecovery, setShowDraftRecovery] = useState(false);
-  const previewHtml = useRenderedMarkdown(writing.content || '*Start writing to see preview...*');
+  const [assetReuserOpen, setAssetReuserOpen] = useState(false);
 
-  const { language: autoFixLanguage } = useAutoFixLanguage();
+  const { language: autoFixLanguage, setLanguage: setAutoFixLanguage } = useAutoFixLanguage();
+  const exactLocalizedTitle = getExactLocalizedText(writing.title, autoFixLanguage);
+  const exactLocalizedContent = getExactLocalizedText(writing.content, autoFixLanguage);
+  const previewHtml = useRenderedMarkdown(exactLocalizedContent || '*Start writing to see preview...*');
 
   const [caretWord, setCaretWord] = useState<{ word: string; start: number; end: number } | null>(null);
   const [caretSuggestions, setCaretSuggestions] = useState<string[]>([]);
@@ -211,7 +218,7 @@ export function WritingEditor() {
         await api.patch(`/api/writings/${snapshot._id}`, snapshot);
       } else if (!pendingCreateRef.current) {
         pendingCreateRef.current = true;
-        const draftId = snapshot.id || createAutosaveDraftId(snapshot.title, snapshot.content, 'writing');
+        const draftId = snapshot.id || createAutosaveDraftId(resolveLocalizedText(snapshot.title, autoFixLanguage), resolveLocalizedText(snapshot.content, autoFixLanguage), 'writing');
         const response = await api.post('/api/writings', { ...snapshot, id: draftId });
         setWriting(prev => ({ ...prev, _id: response._id }));
         pendingCreateRef.current = false;
@@ -225,17 +232,17 @@ export function WritingEditor() {
   });
 
 
-  // Sync localTitle when writing changes from external source (load, restore)
+  // Sync localTitle when writing changes from external source (load, restore) OR language switches
   useEffect(() => {
-    setLocalTitle(writing.title);
-  }, [writing.title]);
+    setLocalTitle(exactLocalizedTitle);
+  }, [exactLocalizedTitle, autoFixLanguage]);
 
   const handleTitleChange = (value: string) => {
     setLocalTitle(value);
-    setWriting(prev => ({ ...prev, title: value }));
+    setWriting(prev => ({ ...prev, title: setLocalizedText(prev.title, autoFixLanguage, value) }));
   };
 
-  const plainContent = writing.content
+  const plainContent = exactLocalizedContent
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`[^`]*`/g, ' ')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
@@ -349,15 +356,15 @@ export function WritingEditor() {
 
   // Stable callback for content updates
   const handleContentCommit = useCallback((content: string) => {
-    setWriting(prev => ({ ...prev, content }));
-  }, []);
+    setWriting(prev => ({ ...prev, content: setLocalizedText(prev.content, autoFixLanguage, content) }));
+  }, [autoFixLanguage]);
 
   const handleAutoFixContent = useCallback((nextContent: string) => {
     setWriting(prev => {
-      if (prev.content === nextContent) return prev;
-      return { ...prev, content: nextContent };
+      if (getExactLocalizedText(prev.content, autoFixLanguage) === nextContent) return prev;
+      return { ...prev, content: setLocalizedText(prev.content, autoFixLanguage, nextContent) };
     });
-  }, []);
+  }, [autoFixLanguage]);
 
   const applyCaretSuggestion = useCallback((replacement: string) => {
     const textarea = textareaRef.current;
@@ -382,20 +389,30 @@ export function WritingEditor() {
 
   const insertMarkdown = (before: string, after: string = '') => {
     const textarea = textareaRef.current;
-    if (!textarea) return;
+
+    // If no textarea ref (dialog inserts when editor not focused), update state only
+    if (!textarea) {
+      setWriting(prev => {
+        const current = getExactLocalizedText(prev.content, autoFixLanguage);
+        const newText = current + before + after;
+        return { ...prev, content: setLocalizedText(prev.content, autoFixLanguage, newText) };
+      });
+      return;
+    }
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const text = textarea.value;
     const selected = text.substring(start, end);
-
     const newText = text.substring(0, start) + before + selected + after + text.substring(end);
 
-    // Update textarea directly FIRST for instant feedback
+    // Update textarea value directly for instant visual feedback
     textarea.value = newText;
+    // Fire native input event so IsolatedContentEditor internal state syncs
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
 
-    // Then update state
-    setWriting(prev => ({ ...prev, content: newText }));
+    // Also update React state
+    setWriting(prev => ({ ...prev, content: setLocalizedText(prev.content, autoFixLanguage, newText) }));
 
     // Restore cursor position
     setTimeout(() => {
@@ -408,7 +425,7 @@ export function WritingEditor() {
   const insertImageMarkdown = (imageMarkdown: string) => {
     const textarea = textareaRef.current;
     if (!textarea) {
-      setWriting(prev => ({ ...prev, content: `${prev.content}\n${imageMarkdown}\n` }));
+      setWriting(prev => ({ ...prev, content: setLocalizedText(prev.content, autoFixLanguage, `${getExactLocalizedText(prev.content, autoFixLanguage)}\n${imageMarkdown}\n`) }));
       return;
     }
 
@@ -421,7 +438,7 @@ export function WritingEditor() {
     textarea.value = newText;
 
     // Then update state
-    setWriting(prev => ({ ...prev, content: newText }));
+    setWriting(prev => ({ ...prev, content: setLocalizedText(prev.content, autoFixLanguage, newText) }));
 
     setTimeout(() => {
       textarea.focus();
@@ -434,7 +451,7 @@ export function WritingEditor() {
   const insertLinkMarkdown = (linkMarkdown: string) => {
     const textarea = textareaRef.current;
     if (!textarea) {
-      setWriting(prev => ({ ...prev, content: `${prev.content}${prev.content ? '\n' : ''}${linkMarkdown}` }));
+      setWriting(prev => ({ ...prev, content: setLocalizedText(prev.content, autoFixLanguage, `${getExactLocalizedText(prev.content, autoFixLanguage)}${getExactLocalizedText(prev.content, autoFixLanguage) ? '\n' : ''}${linkMarkdown}`) }));
       return;
     }
 
@@ -447,7 +464,7 @@ export function WritingEditor() {
     textarea.value = newText;
 
     // Then update state
-    setWriting(prev => ({ ...prev, content: newText }));
+    setWriting(prev => ({ ...prev, content: setLocalizedText(prev.content, autoFixLanguage, newText) }));
 
     setTimeout(() => {
       textarea.focus();
@@ -460,15 +477,15 @@ export function WritingEditor() {
   const handleSave = async () => {
     console.log('handleSave called with writing:', writing);
     
-    if (!writing.title) {
+    if (!getExactLocalizedText(writing.title, autoFixLanguage)) {
       alert('Title is required');
       return;
     }
 
     // Auto-generate slug if not provided
     let finalWriting = { ...writing };
-    if (!finalWriting.id && finalWriting.title) {
-      const autoSlug = finalWriting.title
+    if (!finalWriting.id && getExactLocalizedText(finalWriting.title, autoFixLanguage)) {
+      const autoSlug = getExactLocalizedText(finalWriting.title, autoFixLanguage)
         .toLowerCase()
         .replace(/[^a-z0-9\s-]/g, '')
         .replace(/\s+/g, '-')
@@ -493,11 +510,11 @@ export function WritingEditor() {
     console.log('Payload to save:', payload);
 
     // Sanitize base64 images to URLs if present
-    if (hasBase64Images(payload.content)) {
+    if (hasBase64Images(getExactLocalizedText(payload.content, autoFixLanguage))) {
       setIsSaving(true);
       try {
-        const sanitized = await sanitizeMarkdown(payload.content);
-        payload.content = sanitized;
+        const sanitized = await sanitizeMarkdown(getExactLocalizedText(payload.content, autoFixLanguage));
+        payload.content = setLocalizedText(payload.content, autoFixLanguage, sanitized);
       } catch (err) {
         console.error('Image sanitization failed:', err);
         alert('Peringatan: Beberapa gambar mungkin gagal diupload, namun konten akan disimpan');
@@ -511,15 +528,19 @@ export function WritingEditor() {
       if (writing._id) {
         console.log('Updating existing writing with _id:', writing._id);
         await api.put(`/api/writings/${writing._id}`, payload);
+        setWriting(payload as Writing);
+        autosave.markAsSaved(payload as Writing);
       } else {
         console.log('Creating new writing...');
         // Create new writing and capture the _id from response
         const response = await api.post('/api/writings', payload);
         console.log('API response:', response);
         // Update state with the _id returned from server
-        setWriting(prev => ({ ...prev, _id: response._id }));
+        const newWriting = { ...payload, _id: response._id };
+        setWriting(newWriting);
+        autosave.markAsSaved(newWriting as Writing);
       }
-      autosave.clearDraft(); // Clear local draft after successful save
+      
       alert('Writing saved successfully!');
       navigate('/admin/writings');
     } catch (err) {
@@ -555,7 +576,7 @@ export function WritingEditor() {
               <h1 className="text-lg font-bold text-[#F8FAFC]">
                 {writing._id ? 'Edit Writing' : 'New Writing'}
               </h1>
-              <p className="text-xs text-[#94A3B8]">{writing.title || 'Untitled'}</p>
+              <p className="text-xs text-[#94A3B8]">{resolveLocalizedText(writing.title, autoFixLanguage) || 'Untitled'}</p>
             </div>
           </div>
 
@@ -629,7 +650,7 @@ export function WritingEditor() {
 
             <button
               onClick={() => handleSave()}
-              disabled={isSaving || !writing.title}
+              disabled={isSaving || !resolveLocalizedText(writing.title, autoFixLanguage)}
               className="px-4 py-2 bg-[#1E40AF] text-white rounded-lg text-sm font-medium hover:bg-[#1E3A8A] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSaving
@@ -649,13 +670,51 @@ export function WritingEditor() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl">
           {/* Editor Area - Left Sidebar (2/3 width) */}
           <div className="md:col-span-2 space-y-4">
+            
+            {/* Language Tabs & ID Display */}
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#334155] pb-2">
+              <div className="flex items-center gap-1">
+                {(!writing.contentLanguage || writing.contentLanguage === 'bilingual' || writing.contentLanguage === 'id') && (
+                  <button
+                    onClick={() => setAutoFixLanguage('id')}
+                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${autoFixLanguage === 'id' ? 'bg-[#1E40AF] text-white' : 'bg-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC]'}`}
+                  >
+                    🇮🇩 Indonesia
+                  </button>
+                )}
+                {(!writing.contentLanguage || writing.contentLanguage === 'bilingual' || writing.contentLanguage === 'en') && (
+                  <button
+                    onClick={() => setAutoFixLanguage('en')}
+                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${autoFixLanguage === 'en' ? 'bg-[#1E40AF] text-white' : 'bg-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC]'}`}
+                  >
+                    🇬🇧 English
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 text-[11px] text-[#94A3B8] pb-2">
+                <div className="flex items-center gap-1">
+                  <span>ID:</span>
+                  <code className="bg-[#0F172A] px-1.5 py-0.5 rounded text-[#60A5FA] select-all cursor-text font-mono">
+                    {writing._id || 'Unsaved'}
+                  </code>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>Slug:</span>
+                  <code className="bg-[#0F172A] px-1.5 py-0.5 rounded text-[#60A5FA] select-all cursor-text font-mono">
+                    {writing.id || 'Unsaved'}
+                  </code>
+                </div>
+              </div>
+            </div>
+
             {/* Title Input */}
             <div>
               <input
                 type="text"
                 value={localTitle}
                 onChange={e => handleTitleChange(e.target.value)}
-                placeholder="Writing Title..."
+                placeholder={autoFixLanguage === 'id' ? 'Judul Tulisan...' : 'Writing Title...'}
                 className="w-full text-3xl font-bold text-[#F8FAFC] bg-transparent border-b-2 border-[#334155] pb-3 focus:outline-none focus:border-[#60A5FA] transition-colors placeholder:text-[#475569]"
               />
             </div>
@@ -667,11 +726,12 @@ export function WritingEditor() {
                 onInsert={insertMarkdown}
                 onOpenImageDialog={() => setImageDialogOpen(true)}
                 onOpenLinkDialog={() => setLinkDialogOpen(true)}
+                onOpenAssetReuser={writing.contentLanguage === 'bilingual' ? () => setAssetReuserOpen(true) : undefined}
               />
 
               <div className="flex items-center gap-2">
                 <AutoFixButton
-                  text={writing.content}
+                  text={exactLocalizedContent}
                   onApply={handleAutoFixContent}
                   language={autoFixLanguage}
                 />
@@ -727,9 +787,9 @@ export function WritingEditor() {
                 <div className="flex flex-col h-full">
                   <label className="text-xs text-[#94A3B8] font-medium mb-2">MARKDOWN</label>
                   <IsolatedContentEditor
-                    initialValue={writing.content}
+                    initialValue={exactLocalizedContent}
                     onCommit={handleContentCommit}
-                    id={writing._id || writing.id}
+                    id={`${writing._id || writing.id}-${autoFixLanguage}`}
                     textareaRef={textareaRef}
                     spellCheck
                     lang={autoFixLanguage}
@@ -762,9 +822,9 @@ export function WritingEditor() {
             ) : (
               /* Full Editor (no preview) */
               <IsolatedContentEditor
-                initialValue={writing.content}
+                initialValue={exactLocalizedContent}
                 onCommit={handleContentCommit}
-                id={writing._id || writing.id}
+                id={`${writing._id || writing.id}-${autoFixLanguage}`}
                 textareaRef={textareaRef}
                 spellCheck
                 lang={autoFixLanguage}
@@ -804,6 +864,14 @@ export function WritingEditor() {
         }}
       />
 
+      <AssetReuserDialog
+        isOpen={assetReuserOpen}
+        onClose={() => setAssetReuserOpen(false)}
+        sourceLanguage={autoFixLanguage === 'en' ? 'id' : 'en'}
+        otherLanguageContent={getExactLocalizedText(writing.content, autoFixLanguage === 'en' ? 'id' : 'en')}
+        onInsert={(markdown) => insertMarkdown(markdown)}
+      />
+
       <LinkInsertDialog
         isOpen={linkDialogOpen}
         onClose={() => setLinkDialogOpen(false)}
@@ -815,7 +883,7 @@ export function WritingEditor() {
         isOpen={showFullPreview}
         onClose={() => setShowFullPreview(false)}
         type="writing"
-        data={writing}
+        data={writing as never}
       />
 
       {/* Draft Recovery Dialog */}

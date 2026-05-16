@@ -3,6 +3,8 @@ import { ArrowLeft, Calendar, Clock, Tag, BookOpen, Edit3, PenTool } from 'lucid
 import { useMemo, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import { embedYouTube } from '../lib/youtubeEmbed';
+import { resolveLocalizedText } from '../lib/localized';
+import { useSiteLanguage } from '../hooks/useSiteLanguage';
 
 interface Writing {
   id: string;
@@ -23,13 +25,13 @@ function CategoryBadge({ category }: { category: Writing['category'] }) {
   const getStyle = () => {
     switch (category) {
       case 'reflections':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+        return 'bg-block-lilac text-ink border border-hairline';
       case 'stories':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+        return 'bg-block-lime text-ink border border-hairline';
       case 'fiction':
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+        return 'bg-block-pink text-ink border border-hairline';
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+        return 'bg-surface-soft text-ink border border-hairline';
     }
   };
 
@@ -87,7 +89,7 @@ async function renderMarkdown(content: string): Promise<string> {
   html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => {
     const safeAlt = alt.replace(/"/g, '&quot;');
     const safeUrl = url.replace(/"/g, '&quot;');
-    return `<img src="${safeUrl}" alt="${safeAlt}" class="my-6 rounded-lg max-w-full h-auto border border-[#E5E7EB] dark:border-[#334155]" onerror="this.onerror=null; this.src='/placeholder-image.svg'; this.classList.add('opacity-50');" loading="lazy" />`;
+    return `<img src="${safeUrl}" alt="${safeAlt}" class="my-6 rounded-[16px] max-w-full h-auto border border-hairline" onerror="this.onerror=null; this.src='/placeholder-image.svg'; this.classList.add('opacity-50');" loading="lazy" />`;
   });
 
   // Process block LaTeX equations ($$...$$)
@@ -108,20 +110,20 @@ async function renderMarkdown(content: string): Promise<string> {
     }
   });
 
-  html = html.replace(/^> (.+)$/gm, '<blockquote class="border-l-4 border-[#1E40AF] dark:border-[#60A5FA] pl-4 my-6 italic text-[#6B7280] serif-font">$1</blockquote>');
-  html = html.replace(/^### (.+)$/gm, '<h3 class="text-xl font-semibold text-[#1A1A1A] dark:text-[#F8FAFC] mt-8 mb-4">$1</h3>');
-  html = html.replace(/^## (.+)$/gm, '<h2 class="text-2xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mt-10 mb-4 pb-2 border-b border-[#E5E7EB] dark:border-[#334155]">$1</h2>');
-  html = html.replace(/^# (.+)$/gm, '<h1 class="text-3xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-6">$1</h1>');
-  html = html.replace(/\*\*\[(.+?)\]\*\*/g, '<strong class="font-semibold">[$1]</strong>');
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold">$1</strong>');
+  html = html.replace(/^> (.+)$/gm, '<blockquote class="border-l-4 border-primary pl-4 my-6 italic text-ink opacity-80 serif-font">$1</blockquote>');
+  html = html.replace(/^### (.+)$/gm, '<h3 class="card-title text-ink mt-8 mb-4">$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2 class="display-sm text-ink mt-10 mb-4 pb-2 border-b border-hairline">$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1 class="display-md text-ink mb-6">$1</h1>');
+  html = html.replace(/\*\*\[(.+?)\]\*\*/g, '<strong class="font-[480]">[$1]</strong>');
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong class="font-[480]">$1</strong>');
   html = html.replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>');
-  html = html.replace(/^- (.+)$/gm, '<li class="ml-4 mb-2 text-[#4B5563] dark:text-[#94A3B8] serif-font">$1</li>');
+  html = html.replace(/^- (.+)$/gm, '<li class="ml-4 mb-2 body text-ink opacity-80 serif-font">$1</li>');
   html = html.replace(/(<li.*<\/li>\n?)+/g, '<ul class="list-disc list-inside my-4 space-y-1">$&</ul>');
 
   // Process markdown links (but not images which are already converted)
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-[#1E40AF] dark:text-[#60A5FA] hover:underline">$1</a>');
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">$1</a>');
 
-  html = html.replace(/^(?!<[hublq]|<div|<li|<img|<a|```)([\w\S].*)$/gm, '<p class="text-[#4B5563] dark:text-[#94A3B8] leading-relaxed mb-4 serif-font">$1</p>');
+  html = html.replace(/^(?!<[hublq]|<div|<li|<img|<a|```)([\w\S].*)$/gm, '<p class="body text-ink opacity-80 leading-relaxed mb-4 serif-font">$1</p>');
 
   // Embed YouTube videos from links and bare URLs
   html = embedYouTube(html);
@@ -187,7 +189,7 @@ function MermaidDiagram({ code, id }: { code: string; id: string }) {
   return (
     <div
       ref={containerRef}
-      className="my-8 p-6 bg-[#F8FAFC] dark:bg-[#1E293B] rounded-xl flex justify-center overflow-x-auto"
+      className="my-8 p-6 bg-surface-soft border border-hairline rounded-[16px] flex justify-center overflow-x-auto"
     />
   );
 }
@@ -195,6 +197,7 @@ function MermaidDiagram({ code, id }: { code: string; id: string }) {
 export function WritingDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { language } = useSiteLanguage();
   const [writing, setWriting] = useState<Writing | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -241,8 +244,8 @@ export function WritingDetail() {
 
   const rawParts = useMemo(() => {
     if (!writing) return [];
-    return splitContent(writing.content);
-  }, [writing]);
+    return splitContent(resolveLocalizedText(writing.content, language));
+  }, [language, writing]);
 
   const [renderedParts, setRenderedParts] = useState<ContentPart[]>([]);
 
@@ -321,12 +324,12 @@ export function WritingDetail() {
   }
 
   return (
-    <div className="min-h-screen py-16">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen py-[96px] bg-canvas">
+      <div className="max-w-[1280px] mx-auto px-6 lg:px-12">
         {/* Back Button */}
         <button
           onClick={() => navigate(-1)}
-          className="inline-flex items-center text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors mb-8"
+          className="inline-flex items-center caption text-ink opacity-60 hover:opacity-100 transition-opacity mb-8"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Writings
@@ -338,16 +341,16 @@ export function WritingDetail() {
             <CategoryBadge category={writing.category} />
           </div>
 
-          <h1 className="text-4xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-4 serif-font">
-            {writing.title}
+          <h1 className="display-lg text-ink mb-6 serif-font">
+            {resolveLocalizedText(writing.title, language)}
           </h1>
 
-          <p className="text-xl text-[#6B7280] mb-6 serif-font italic">
-            {writing.excerpt}
+          <p className="body-lg text-ink opacity-80 mb-6 serif-font italic">
+            {resolveLocalizedText(writing.excerpt, language)}
           </p>
 
           {/* Meta */}
-          <div className="flex flex-wrap items-center gap-4 text-sm text-[#6B7280] mb-6">
+          <div className="flex flex-wrap items-center gap-4 caption text-ink opacity-60 mb-6">
             <span className="flex items-center">
               <Calendar className="w-4 h-4 mr-1.5" />
               {formatDate(writing.date)}
@@ -360,7 +363,7 @@ export function WritingDetail() {
 
           {/* Timestamps */}
           {(writing.createdAt || writing.updatedAt) && (
-            <div className="flex flex-wrap items-center gap-4 text-xs text-[#9CA3AF] dark:text-[#6B7280] mb-4">
+            <div className="flex flex-wrap items-center gap-4 caption text-ink opacity-40 mb-6">
               {writing.createdAt && (
                 <span>Diposting: {formatDateTimeDetailed(writing.createdAt)}</span>
               )}
@@ -376,7 +379,7 @@ export function WritingDetail() {
               {writing.tags.map((tag, index) => (
                 <span
                   key={index}
-                  className="inline-flex items-center px-3 py-1.5 rounded-full bg-[#E5E7EB] dark:bg-[#334155] text-[#6B7280] dark:text-[#94A3B8] text-sm font-medium"
+                  className="tag"
                 >
                   <Tag className="w-3 h-3 mr-1.5" />
                   {tag}
@@ -387,7 +390,7 @@ export function WritingDetail() {
         </header>
 
         {/* Divider */}
-        <hr className="border-[#E5E7EB] dark:border-[#334155] mb-10" />
+        <hr className="border-hairline mb-10" />
 
         {/* Writing Content */}
         <article className="prose prose-lg dark:prose-invert max-w-none">
@@ -412,10 +415,10 @@ export function WritingDetail() {
         </article>
 
         {/* Bottom Navigation */}
-        <div className="mt-16 pt-8 border-t border-[#E5E7EB] dark:border-[#334155]">
+        <div className="mt-16 pt-8 border-t border-hairline">
           <Link
             to="/writings"
-            className="inline-flex items-center px-6 py-3 bg-[#1E40AF] text-white rounded-lg hover:bg-[#1E3A8A] transition-colors"
+            className="btn btn-secondary inline-flex items-center"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             View All Writings

@@ -3,6 +3,8 @@ import { Search, Code, Activity, Database, X } from 'lucide-react';
 import { ProjectCard } from '../components/ProjectCard';
 import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
+import { resolveLocalizedText, getExactLocalizedText } from '../lib/localized';
+import { useSiteLanguage } from '../hooks/useSiteLanguage';
 
 interface Project {
   id: string;
@@ -16,10 +18,13 @@ interface Project {
   publishAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  contentLanguage?: 'en' | 'id' | 'bilingual';
+  translationOfId?: string;
 }
 
 export function Engineering() {
   const navigate = useNavigate();
+  const { language } = useSiteLanguage();
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -65,23 +70,36 @@ export function Engineering() {
 
   const filteredProjects = useMemo(() => {
     return allProjects.filter(project => {
-      const matchesSearch = project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           project.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      // Language Filter:
+      if (project.contentLanguage && project.contentLanguage !== 'bilingual' && project.contentLanguage !== language) {
+        return false;
+      }
+
+      // For bilingual content, check if the selected language has actual title text.
+      if (project.contentLanguage === 'bilingual' || !project.contentLanguage) {
+        const titleForLang = getExactLocalizedText(project.title, language);
+        if (!titleForLang) return false;
+      }
+
+      const title = resolveLocalizedText(project.title, language);
+      const description = resolveLocalizedText(project.description, language);
+      const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           description.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            project.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesCategory = selectedCategory === 'all' || project.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [searchTerm, selectedCategory, allProjects]);
+  }, [language, searchTerm, selectedCategory, allProjects]);
 
   return (
-    <div className="min-h-screen py-16">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen py-[96px] bg-canvas">
+      <div className="max-w-[1280px] mx-auto px-6 lg:px-12">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-4">
+        <div className="text-center mb-[48px]">
+          <h1 className="display-lg text-ink mb-4">
             Engineering Projects
           </h1>
-          <p className="text-lg text-[#6B7280] max-w-2xl mx-auto">
+          <p className="subhead text-ink opacity-80 max-w-2xl mx-auto">
             Exploring biomedical engineering through signal processing, medical devices, and data analysis
           </p>
         </div>
@@ -90,13 +108,13 @@ export function Engineering() {
         <div className="mb-8 space-y-4">
           {/* Search Bar */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#6B7280] w-5 h-5" />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-ink opacity-60 w-5 h-5" />
             <input
               type="text"
               placeholder="Search projects by title, description, or tags..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-lg border border-[#E5E7EB] dark:border-[#334155] bg-white dark:bg-[#1E293B] text-[#1A1A1A] dark:text-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF] dark:focus:ring-[#60A5FA] focus:border-transparent"
+              className="w-full pl-12 pr-4 py-4 rounded-[8px] border border-hairline bg-surface-soft text-ink focus:outline-none focus:border-ink transition-colors body"
             />
           </div>
 
@@ -109,10 +127,10 @@ export function Engineering() {
                   key={category.value}
                   onClick={() => setSelectedCategory(category.value)}
                   className={[
-                    'inline-flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-colors',
+                    'inline-flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-[480] transition-colors border',
                     selectedCategory === category.value
-                      ? 'bg-[#1E40AF] text-white'
-                      : 'bg-[#E5E7EB] text-[#6B7280] hover:bg-[#D1D5DB] dark:bg-[#334155] dark:text-[#94A3B8] dark:hover:bg-[#475569]'
+                      ? 'bg-primary text-on-primary border-primary'
+                      : 'bg-canvas text-ink border-hairline hover:border-ink hover:bg-surface-soft'
                   ].join(' ')}
                 >
                   <Icon className="w-4 h-4" />
@@ -126,9 +144,9 @@ export function Engineering() {
         {/* Results Count */}
         <div className="mb-6">
           {loading ? (
-            <p className="text-[#6B7280]">Loading projects...</p>
+            <p className="text-ink opacity-60 body-sm">Loading projects...</p>
           ) : (
-            <p className="text-[#6B7280]">
+            <p className="text-ink opacity-60 body-sm">
               Showing {filteredProjects.length} of {allProjects.length} projects
             </p>
           )}
@@ -147,13 +165,13 @@ export function Engineering() {
         {/* No Results */}
         {filteredProjects.length === 0 && (
           <div className="text-center py-16">
-            <div className="bg-[#E5E7EB] dark:bg-[#334155] rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-              <Search className="w-10 h-10 text-[#6B7280] dark:text-[#94A3B8]" />
+            <div className="bg-surface-soft rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+              <Search className="w-10 h-10 text-ink opacity-40" />
             </div>
-            <h3 className="text-xl font-semibold text-[#1A1A1A] dark:text-[#F8FAFC] mb-2">
+            <h3 className="card-title text-ink mb-2">
               No projects found
             </h3>
-            <p className="text-[#6B7280]">
+            <p className="body-sm text-ink opacity-60">
               Try adjusting your search terms or filters
             </p>
           </div>
@@ -164,39 +182,39 @@ export function Engineering() {
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
               <div
-                className="fixed inset-0 transition-opacity bg-[#1A1A1A] bg-opacity-75"
+                className="fixed inset-0 transition-opacity bg-ink bg-opacity-75"
                 onClick={() => setSelectedProject(null)}
               />
 
-              <div className="inline-block w-full max-w-4xl p-6 my-8 text-left align-middle transition-all transform bg-white dark:bg-[#1E293B] shadow-xl rounded-2xl">
+              <div className="inline-block w-full max-w-4xl p-8 my-8 text-left align-middle transition-all transform bg-canvas border border-hairline shadow-sm rounded-[24px]">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC]">
+                  <h2 className="display-lg text-ink">
                     {selectedProject.title}
                   </h2>
                   <button
                     onClick={() => setSelectedProject(null)}
-                    className="p-2 rounded-lg hover:bg-[#E5E7EB] dark:hover:bg-[#334155] transition-colors"
+                    className="p-2 rounded-full hover:bg-surface-soft transition-colors"
                   >
-                    <X className="w-5 h-5 text-[#6B7280]" />
+                    <X className="w-6 h-6 text-ink" />
                   </button>
                 </div>
 
-                <div className="prose prose-lg dark:prose-invert max-w-none">
-                  <p className="text-[#6B7280] mb-6">{selectedProject.description}</p>
+                <div className="prose max-w-none">
+                  <p className="body text-ink mb-6">{selectedProject.description}</p>
                   
                   <div className="flex flex-wrap gap-2 mb-6">
                     {selectedProject.tags.map((tag, index) => (
                       <span
                         key={index}
-                        className="inline-flex items-center px-3 py-1 rounded-full bg-[#E5E7EB] dark:bg-[#334155] text-[#6B7280] dark:text-[#94A3B8] text-sm font-medium"
+                        className="tag"
                       >
                         {tag}
                       </span>
                     ))}
                   </div>
 
-                  <div className="bg-[#F1F5F9] dark:bg-[#334155] rounded-lg p-4">
-                    <p className="text-sm text-[#6B7280] text-center">
+                  <div className="bg-block-lime rounded-[24px] p-8 mt-8">
+                    <p className="body text-ink text-center">
                       Click "View Project" to see the full project details with LaTeX equations and diagrams
                     </p>
                   </div>

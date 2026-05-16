@@ -118,7 +118,6 @@ const hasMeaningfulHomeData = (value: HomeData): boolean => {
 export function HomeManager() {
   const [data, setData] = useState<HomeData>(defaultData);
   const [loading, setLoading] = useState(true);
-  const [lang, setLang] = useState<Language>('en');
 
   const saveHomeToServer = useCallback(async (nextData: HomeData) => {
     await api.put('/api/home', nextData);
@@ -148,12 +147,16 @@ export function HomeManager() {
       .finally(() => setLoading(false));
   }, []);
 
-  const updateLocalized = (field: keyof Pick<HomeData, 'heroName' | 'heroLastName' | 'heroSubtitle' | 'heroTagline'>, value: string) => {
+  const updateLocalized = (
+    field: keyof Pick<HomeData, 'heroName' | 'heroLastName' | 'heroSubtitle' | 'heroTagline'>,
+    language: Language,
+    value: string,
+  ) => {
     setData(prev => ({
       ...prev,
       [field]: {
         ...prev[field],
-        [lang]: value,
+        [language]: value,
       },
     }));
   };
@@ -161,6 +164,7 @@ export function HomeManager() {
   const updateSectionLocalized = (
     section: keyof HomeData['sections'],
     field: 'title' | 'subtitle',
+    language: Language,
     value: string,
   ) => {
     setData(prev => ({
@@ -171,7 +175,7 @@ export function HomeManager() {
           ...prev.sections[section],
           [field]: {
             ...prev.sections[section][field],
-            [lang]: value,
+            [language]: value,
           },
         },
       },
@@ -188,26 +192,16 @@ export function HomeManager() {
 
   const inputCls = "w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#60A5FA]";
   const labelCls = "block text-sm text-[#94A3B8] mb-1";
+  const languageOptions: Array<{ key: Language; label: string }> = [
+    { key: 'en', label: 'English' },
+    { key: 'id', label: 'Indonesia' },
+  ];
 
   return (
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-[#F8FAFC]">Home Page</h1>
         <div className="flex items-center gap-3">
-          <div className="flex items-center rounded-lg border border-[#334155] overflow-hidden">
-            <button
-              onClick={() => setLang('en')}
-              className={`px-3 py-2 text-xs font-semibold ${lang === 'en' ? 'bg-[#1E40AF] text-white' : 'text-[#94A3B8]'}`}
-            >
-              EN
-            </button>
-            <button
-              onClick={() => setLang('id')}
-              className={`px-3 py-2 text-xs font-semibold ${lang === 'id' ? 'bg-[#1E40AF] text-white' : 'text-[#94A3B8]'}`}
-            >
-              ID
-            </button>
-          </div>
           <button onClick={handleSave} className="flex items-center gap-2 bg-[#1E40AF] text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-[#1E3A8A]">
             {autosaveStatus === 'saving' ? <><Clock className="w-4 h-4 animate-spin" /> Saving...</> : null}
             {autosaveStatus === 'saved' ? <><CheckCircle className="w-4 h-4" /> Saved!</> : null}
@@ -223,14 +217,24 @@ export function HomeManager() {
 
       <div className="space-y-8">
         <section className="bg-[#1E293B] border border-[#334155] rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-[#F8FAFC] mb-4">Hero Section</h2>
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-[#F8FAFC]">Hero Section</h2>
+            <p className="text-xs text-[#94A3B8] mt-1">Kolom EN dan ID dipisah supaya tidak tercampur.</p>
+          </div>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div><label className={labelCls}>First Name ({lang.toUpperCase()})</label><input value={data.heroName[lang]} onChange={e => updateLocalized('heroName', e.target.value)} className={inputCls} /></div>
-              <div><label className={labelCls}>Last Name ({lang.toUpperCase()})</label><input value={data.heroLastName[lang]} onChange={e => updateLocalized('heroLastName', e.target.value)} className={inputCls} /></div>
+            <div className="grid gap-4 md:grid-cols-2">
+              {languageOptions.map(({ key, label }) => (
+                <div key={key} className="rounded-lg border border-[#334155] bg-[#0F172A] p-4 space-y-4">
+                  <h3 className="text-sm font-semibold text-[#60A5FA]">{label}</h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div><label className={labelCls}>First Name</label><input value={data.heroName[key]} onChange={e => updateLocalized('heroName', key, e.target.value)} className={inputCls} /></div>
+                    <div><label className={labelCls}>Last Name</label><input value={data.heroLastName[key]} onChange={e => updateLocalized('heroLastName', key, e.target.value)} className={inputCls} /></div>
+                    <div><label className={labelCls}>Subtitle</label><input value={data.heroSubtitle[key]} onChange={e => updateLocalized('heroSubtitle', key, e.target.value)} className={inputCls} /></div>
+                    <div><label className={labelCls}>Tagline</label><input value={data.heroTagline[key]} onChange={e => updateLocalized('heroTagline', key, e.target.value)} className={inputCls} /></div>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div><label className={labelCls}>Subtitle ({lang.toUpperCase()})</label><input value={data.heroSubtitle[lang]} onChange={e => updateLocalized('heroSubtitle', e.target.value)} className={inputCls} /></div>
-            <div><label className={labelCls}>Tagline ({lang.toUpperCase()})</label><input value={data.heroTagline[lang]} onChange={e => updateLocalized('heroTagline', e.target.value)} className={inputCls} /></div>
           </div>
         </section>
 
@@ -249,9 +253,14 @@ export function HomeManager() {
             {(['recentProjects', 'recentWritings', 'featuredBooks'] as const).map(key => (
               <div key={key} className="bg-[#0F172A] rounded-lg p-4">
                 <h3 className="text-sm font-medium text-[#60A5FA] mb-3">{key === 'recentProjects' ? 'Recent Projects' : key === 'recentWritings' ? 'Recent Writings' : 'Featured Books'}</h3>
-                <div className="space-y-3">
-                  <div><label className={labelCls}>Title ({lang.toUpperCase()})</label><input value={data.sections[key].title[lang]} onChange={e => updateSectionLocalized(key, 'title', e.target.value)} className={inputCls} /></div>
-                  <div><label className={labelCls}>Subtitle ({lang.toUpperCase()})</label><input value={data.sections[key].subtitle[lang]} onChange={e => updateSectionLocalized(key, 'subtitle', e.target.value)} className={inputCls} /></div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {languageOptions.map(({ key: languageKey, label }) => (
+                    <div key={languageKey} className="rounded-lg border border-[#334155] bg-[#1E293B] p-4 space-y-3">
+                      <h4 className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wide">{label}</h4>
+                      <div><label className={labelCls}>Title</label><input value={data.sections[key].title[languageKey]} onChange={e => updateSectionLocalized(key, 'title', languageKey, e.target.value)} className={inputCls} /></div>
+                      <div><label className={labelCls}>Subtitle</label><input value={data.sections[key].subtitle[languageKey]} onChange={e => updateSectionLocalized(key, 'subtitle', languageKey, e.target.value)} className={inputCls} /></div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}

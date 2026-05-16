@@ -1,12 +1,17 @@
+import type { LocalizedTextValue } from '../lib/localized';
+
 export interface Writing {
   id: string;
-  title: string;
-  excerpt: string;
+  title: LocalizedTextValue;
+  excerpt: LocalizedTextValue;
   date: string;
   readTime: string;
   category: 'reflections' | 'stories' | 'fiction';
   tags?: string[];
-  content: string;
+  content: LocalizedTextValue;
+  translationGroupId?: string;
+  translationOfId?: string;
+  contentLanguage?: 'en' | 'id' | 'bilingual';
 }
 
 export const writings: Writing[] = [

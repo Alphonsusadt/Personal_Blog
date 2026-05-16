@@ -47,35 +47,35 @@ export function Footer() {
   ].filter((l) => l.enabled !== false);
 
   return (
-    <footer className="bg-white dark:bg-[#0F172A] border-t border-[#E5E7EB] dark:border-[#334155] mt-20">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <footer className="bg-inverse-canvas text-inverse-ink mt-20 rounded-t-xl">
+      <div className="max-w-[1280px] mx-auto px-6 lg:px-12 py-[96px]">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* About */}
           <div className="md:col-span-2">
-            <h3 className="text-lg font-semibold mb-4 text-[#1A1A1A] dark:text-[#F8FAFC]">
-              {settings.footerName || 'Alphonsus Aditya'}
+            <h3 className="display-lg text-inverse-ink mb-4">
+              {settings.footerName || 'Alphonsus'}
             </h3>
-            <p className="text-[#6B7280] mb-4 max-w-md">
+            <p className="body-sm text-inverse-ink opacity-80 mb-4 max-w-md">
               {settings.footerBio}
             </p>
             <div className="flex items-center space-x-4">
               <a 
                 href="https://github.com/alphonsusadt" 
-                className="text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors"
+                className="text-inverse-ink opacity-60 hover:opacity-100 transition-opacity"
                 aria-label="GitHub"
               >
                 <Github className="w-5 h-5" />
               </a>
               <a 
                 href="https://linkedin.com/in/alphonsusadt" 
-                className="text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors"
+                className="text-inverse-ink opacity-60 hover:opacity-100 transition-opacity"
                 aria-label="LinkedIn"
               >
                 <Linkedin className="w-5 h-5" />
               </a>
               <a 
                 href="mailto:alphonsus@example.com" 
-                className="text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors"
+                className="text-inverse-ink opacity-60 hover:opacity-100 transition-opacity"
                 aria-label="Email"
               >
                 <Mail className="w-5 h-5" />
@@ -85,15 +85,15 @@ export function Footer() {
 
           {/* Quick Links */}
           <div>
-            <h4 className="text-sm font-semibold mb-4 text-[#1A1A1A] dark:text-[#F8FAFC] uppercase tracking-wider">
+            <h4 className="caption text-inverse-ink opacity-60 mb-6">
               Quick Links
             </h4>
-            <ul className="space-y-2">
+            <ul className="space-y-4">
               {quickLinks.map((link) => (
                 <li key={link.to}>
                   <Link
                     to={link.to}
-                    className="text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors text-sm"
+                    className="caption text-inverse-ink hover:opacity-70 transition-opacity"
                   >
                     {link.label}
                   </Link>
@@ -104,14 +104,14 @@ export function Footer() {
 
           {/* Contact */}
           <div>
-            <h4 className="text-sm font-semibold mb-4 text-[#1A1A1A] dark:text-[#F8FAFC] uppercase tracking-wider">
+            <h4 className="caption text-inverse-ink opacity-60 mb-6">
               Connect
             </h4>
-            <ul className="space-y-2">
+            <ul className="space-y-4">
               <li>
                 <a 
                   href="https://linkedin.com/in/alphonsusadt" 
-                  className="text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors text-sm flex items-center"
+                  className="caption text-inverse-ink hover:opacity-70 transition-opacity flex items-center"
                 >
                   <Linkedin className="w-4 h-4 mr-2" />
                   LinkedIn
@@ -120,7 +120,7 @@ export function Footer() {
               <li>
                 <a 
                   href="https://github.com/alphonsusadt" 
-                  className="text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors text-sm flex items-center"
+                  className="caption text-inverse-ink hover:opacity-70 transition-opacity flex items-center"
                 >
                   <Github className="w-4 h-4 mr-2" />
                   GitHub
@@ -129,7 +129,7 @@ export function Footer() {
               <li>
                 <a 
                   href="mailto:alphonsus@example.com" 
-                  className="text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors text-sm flex items-center"
+                  className="caption text-inverse-ink hover:opacity-70 transition-opacity flex items-center"
                 >
                   <Mail className="w-4 h-4 mr-2" />
                   Email
@@ -139,14 +139,14 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-[#E5E7EB] dark:border-[#334155] mt-8 pt-8">
+        <div className="border-t border-inverse-ink border-opacity-20 mt-16 pt-8">
           <div className="flex flex-col md:flex-row items-center justify-between">
-            <p className="text-sm text-[#6B7280] text-center md:text-left">
+            <p className="caption text-inverse-ink opacity-60 text-center md:text-left">
               © {currentYear} Alphonsus Aditya. All rights reserved.
             </p>
-            <p className="text-sm text-[#6B7280] mt-2 md:mt-0 flex items-center">
+            <p className="caption text-inverse-ink opacity-60 mt-4 md:mt-0 flex items-center">
               Built with 
-              <Heart className="w-4 h-4 mx-1 text-red-500" fill="currentColor" /> 
+              <Heart className="w-4 h-4 mx-2 text-inverse-ink" fill="currentColor" /> 
               and biomedical curiosity
             </p>
           </div>

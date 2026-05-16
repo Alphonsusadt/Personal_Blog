@@ -1,16 +1,36 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import 'katex/dist/katex.min.css';
 @import 'prismjs/themes/prism-tomorrow.css';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-background: #FAFAFA;
-  --color-primary-text: #1A1A1A;
-  --color-secondary-text: #6B7280;
-  --color-accent: #1E40AF;
-  --color-border: #E5E7EB;
+  --color-primary: #000000;
+  --color-on-primary: #ffffff;
+  --color-ink: #000000;
+  --color-canvas: #ffffff;
+  --color-inverse-canvas: #000000;
+  --color-inverse-ink: #ffffff;
+  --color-on-inverse-soft: rgba(255, 255, 255, 0.16);
+  --color-hairline: #e6e6e6;
+  --color-hairline-soft: #f1f1f1;
+  --color-surface-soft: #f7f7f5;
+  --color-block-lime: #dceeb1;
+  --color-block-lilac: #c5b0f4;
+  --color-block-cream: #f4ecd6;
+  --color-block-pink: #efd4d4;
+  --color-block-mint: #c8e6cd;
+  --color-block-coral: #f3c9b6;
+  --color-block-navy: #1f1d3d;
+  --color-accent-magenta: #ff3d8b;
+  --color-semantic-success: #1ea64a;
+  
+  /* Fallbacks for existing Tailwind utilities where needed */
+  --color-background: var(--color-canvas);
+  --color-primary-text: var(--color-ink);
+  --color-secondary-text: var(--color-ink);
+  --color-accent: var(--color-primary);
+  --color-border: var(--color-hairline);
 }
 
 @layer base {
@@ -19,7 +39,7 @@
   }
   
   body {
-    @apply bg-[#FAFAFA] text-[#1A1A1A] antialiased;
+    @apply bg-canvas text-ink antialiased font-[320] leading-[1.45] tracking-[-0.26px];
   }
   
   .serif-font {
@@ -29,31 +49,56 @@
   .mono-font {
     font-family: 'JetBrains Mono', monospace;
   }
+  
+  /* Typography Scale */
+  .display-xl { @apply font-[340] text-[86px] leading-[1.00] tracking-[-1.72px]; }
+  .display-lg { @apply font-[340] text-[64px] leading-[1.10] tracking-[-0.96px]; }
+  .headline   { @apply font-[540] text-[26px] leading-[1.35] tracking-[-0.26px]; }
+  .subhead    { @apply font-[340] text-[26px] leading-[1.35] tracking-[-0.26px]; }
+  .card-title { @apply font-[700] text-[24px] leading-[1.45] tracking-normal; }
+  .body-lg    { @apply font-[330] text-[20px] leading-[1.40] tracking-[-0.14px]; }
+  .body       { @apply font-[320] text-[18px] leading-[1.45] tracking-[-0.26px]; }
+  .body-sm    { @apply font-[330] text-[16px] leading-[1.45] tracking-[-0.14px]; }
+  .link       { @apply font-[480] text-[20px] leading-[1.40] tracking-[-0.10px]; }
+  
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    @apply font-[400] text-[18px] leading-[1.30] tracking-[0.54px] uppercase;
+  }
+  
+  .caption {
+    font-family: 'JetBrains Mono', monospace;
+    @apply font-[400] text-[12px] leading-[1.00] tracking-[0.60px] uppercase;
+  }
 }
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors;
+    @apply inline-flex items-center justify-center font-[480] text-[20px] leading-[1.40] tracking-[-0.10px] transition-transform active:scale-95;
   }
   
   .btn-primary {
-    @apply bg-[#1E40AF] text-white hover:bg-[#1E3A8A];
+    @apply bg-primary text-on-primary rounded-full px-[20px] py-[10px];
   }
   
   .btn-secondary {
-    @apply bg-transparent text-[#1E40AF] border border-[#1E40AF] hover:bg-[#1E40AF] hover:text-white;
+    @apply bg-canvas text-ink rounded-full px-[18px] pt-[8px] pb-[10px];
   }
   
   .nav-link {
-    @apply text-[#6B7280] hover:text-[#1E40AF] transition-colors text-sm font-medium;
+    @apply text-ink hover:opacity-70 transition-opacity font-[330] text-[16px] leading-[1.45] tracking-[-0.14px];
   }
   
   .card {
-    @apply bg-white rounded-xl border border-[#E5E7EB] shadow-sm hover:shadow-md transition-shadow;
+    @apply bg-canvas text-ink rounded-[24px] border border-hairline;
   }
   
   .tag {
-    @apply inline-flex items-center rounded-full bg-[#E5E7EB] text-[#6B7280] px-2.5 py-1 text-xs font-medium;
+    @apply inline-flex items-center rounded-[6px] bg-surface-soft text-ink px-2.5 py-1 text-xs border border-hairline;
+  }
+  
+  .color-block-section {
+    @apply w-full rounded-[24px] px-[48px] py-[48px];
   }
 }
 
@@ -98,23 +143,39 @@
 }
 
 .dark {
-  --color-background: #0F172A;
-  --color-primary-text: #F8FAFC;
-  --color-secondary-text: #94A3B8;
-  --color-accent: #60A5FA;
-  --color-border: #334155;
+  --color-background: var(--color-block-navy);
+  --color-primary-text: var(--color-inverse-ink);
+  --color-secondary-text: var(--color-inverse-ink);
+  --color-canvas: var(--color-block-navy);
+  --color-ink: var(--color-inverse-ink);
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-surface-soft: rgba(255, 255, 255, 0.05);
+  --color-hairline: rgba(255, 255, 255, 0.1);
+  --color-hairline-soft: rgba(255, 255, 255, 0.05);
+
+  /* Invert primary colors for dark mode contrast */
+  --color-primary: #ffffff;
+  --color-on-primary: #000000;
+
+  /* Dark mode variants for block colors to ensure text-ink (white) is readable */
+  --color-block-lime: #2d381c;
+  --color-block-lilac: #2a213f;
+  --color-block-cream: #362e1c;
+  --color-block-pink: #3d2323;
+  --color-block-mint: #1d3625;
+  --color-block-coral: #422317;
 }
 
 .dark body {
-  @apply bg-[#0F172A] text-[#F8FAFC];
+  @apply bg-block-navy text-inverse-ink;
 }
 
 .dark .card {
-  @apply bg-[#1E293B] border-[#334155];
+  @apply bg-block-navy border-hairline;
 }
 
 .dark .tag {
-  @apply bg-[#334155] text-[#94A3B8];
+  @apply bg-surface-soft text-inverse-ink border-hairline;
 }
 
 /* Custom scrollbar for dark preview sections */

@@ -4,15 +4,16 @@ import React, { useCallback, useRef } from 'react';
 import { generateSlug, isValidSlug } from '../utils/slugify';
 import { IsolatedInput, IsolatedTextarea, IsolatedTagInput } from './IsolatedInput';
 import { useAutoFixLanguage } from '../hooks/useAutoFixLanguage';
+import { resolveLocalizedText, setLocalizedText, type LocalizedTextValue } from '../lib/localized';
 
 interface Project {
   _id?: string;
   id: string;
-  title: string;
-  description: string;
+  title: LocalizedTextValue;
+  description: LocalizedTextValue;
   tags: string[];
   category: string;
-  content: string;
+  content: LocalizedTextValue;
   status?: 'draft' | 'published' | 'scheduled';
   devStatus?: 'planning' | 'ongoing' | 'completed';
   date?: string;
@@ -27,6 +28,8 @@ interface Project {
   ogImage?: string;
   keywords?: string;
   metaTitle?: string;
+  contentLanguage?: 'en' | 'id' | 'bilingual';
+  translationOfId?: string;
 }
 
 interface ProjectSidebarProps {
@@ -76,6 +79,8 @@ function SidebarCard({
 export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, sectionEnabled = true }: ProjectSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const { language, setLanguage } = useAutoFixLanguage();
+  void onSave;
+  void isSaving;
   
   // Use ref to always have latest project without causing re-renders  
   const projectRef = useRef(project);
@@ -83,8 +88,8 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
 
   // Stable callbacks - use ref to get latest project
   const handleDescriptionCommit = useCallback((value: string) => {
-    onUpdate({ ...projectRef.current, description: value });
-  }, [onUpdate]);
+    onUpdate({ ...projectRef.current, description: setLocalizedText(projectRef.current.description, language, value) });
+  }, [language, onUpdate]);
 
   const handleGithubUrlCommit = useCallback((value: string) => {
     onUpdate({ ...projectRef.current, githubUrl: value });
@@ -134,7 +139,7 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
   };
 
   const handleRegenerateSlug = () => {
-    const autoSlug = generateSlug(project.title);
+    const autoSlug = generateSlug(resolveLocalizedText(project.title, language));
     if (autoSlug) {
       onUpdate({ ...project, id: autoSlug });
     }
@@ -164,22 +169,57 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
 
 
   const currentDevStatus = devStatuses.find(s => s.value === project.devStatus) || devStatuses[0];
+  const localizedTitle = resolveLocalizedText(project.title, language);
+  const localizedDescription = resolveLocalizedText(project.description, language);
 
   return (
     <aside className="space-y-4">
-      {/* Auto Fix Language */}
-      <SidebarCard title="Auto Fix" cardKey="autofix" collapsed={collapsed} onToggle={toggleCard}>
+      {/* Editor Language (Replaces Auto Fix Label) */}
+      <SidebarCard title="Editor Language / Bahasa Editor" cardKey="autofix" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-2">
-          <label className="block text-xs text-[#94A3B8]">Language</label>
+          <label className="block text-xs text-[#94A3B8]">Pilih tab bahasa yang sedang diedit:</label>
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value as 'id' | 'en')}
             className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
           >
-            <option value="id">Indonesia</option>
-            <option value="en">English</option>
+            <option value="id">🇮🇩 Indonesia (ID)</option>
+            <option value="en">🇬🇧 English (EN)</option>
           </select>
-          <p className="text-[11px] text-[#94A3B8]">Mempengaruhi Auto Fix + spellcheck di editor.</p>
+          <p className="text-[11px] text-[#94A3B8]">Mengganti ini akan mengubah isi Title, Description, dan Content di editor sesuai bahasa yang dipilih.</p>
+        </div>
+      </SidebarCard>
+
+      {/* Content Mode & Translation Link */}
+      <SidebarCard title="Content Mode & Linking" cardKey="contentMode" collapsed={collapsed} onToggle={toggleCard}>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs text-[#94A3B8] mb-1">Mode Konten (Content Language)</label>
+            <select
+              value={project.contentLanguage || 'bilingual'}
+              onChange={e => onUpdate({ ...project, contentLanguage: e.target.value as 'en' | 'id' | 'bilingual' })}
+              className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+            >
+              <option value="bilingual">Bilingual (Satu post, dua bahasa)</option>
+              <option value="id">Hanya Indonesia</option>
+              <option value="en">Hanya English</option>
+            </select>
+            <p className="text-[11px] text-[#94A3B8] mt-1">Pilih 'Hanya Indonesia' jika kamu membuat post terpisah dan ingin dihubungkan secara manual.</p>
+          </div>
+
+          {project.contentLanguage !== 'bilingual' && (
+            <div>
+              <label className="block text-xs text-[#94A3B8] mb-1">Link to Translation (ID Project)</label>
+              <IsolatedInput
+                id={project.id + '-translation-of'}
+                initialValue={project.translationOfId || ''}
+                onCommit={(val) => onUpdate({ ...project, translationOfId: val })}
+                placeholder="Masukkan ID project terjemahannya..."
+                className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+              />
+              <p className="text-[11px] text-[#94A3B8] mt-1">Jika ini post bahasa ID, masukkan ID post bahasa EN-nya agar terhubung di website.</p>
+            </div>
+          )}
         </div>
       </SidebarCard>
 
@@ -282,7 +322,7 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
       <SidebarCard title="Short Description" cardKey="description" collapsed={collapsed} onToggle={toggleCard}>
         <IsolatedTextarea
           id={project.id}
-          initialValue={project.description}
+          initialValue={localizedDescription}
           onCommit={handleDescriptionCommit}
           rows={3}
           placeholder="Brief summary of your project..."
@@ -425,12 +465,12 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
             <label className="block text-xs text-[#94A3B8] mb-1">Meta Title</label>
             <IsolatedInput
               id={project.id + '-meta-title'}
-              initialValue={project.metaTitle || project.title}
+              initialValue={project.metaTitle || localizedTitle}
               onCommit={handleMetaTitleCommit}
               placeholder="Auto-filled from title"
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />
-            <p className="text-xs text-[#64748B] mt-1">{(project.metaTitle || project.title).length}/60 chars</p>
+            <p className="text-xs text-[#64748B] mt-1">{(project.metaTitle || localizedTitle).length}/60 chars</p>
           </div>
 
           {/* Meta Description */}
@@ -438,13 +478,13 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
             <label className="block text-xs text-[#94A3B8] mb-1">Meta Description</label>
             <IsolatedTextarea
               id={project.id + '-meta-desc'}
-              initialValue={project.metaDescription || project.description}
+              initialValue={project.metaDescription || localizedDescription}
               onCommit={handleMetaDescriptionCommit}
               placeholder="Auto-filled from description"
               rows={3}
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] resize-none"
             />
-            <p className="text-xs text-[#64748B] mt-1">{(project.metaDescription || project.description).length}/160 chars</p>
+            <p className="text-xs text-[#64748B] mt-1">{(project.metaDescription || localizedDescription).length}/160 chars</p>
           </div>
 
           {/* Keywords */}
@@ -477,10 +517,10 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
       {/* Image Gallery Card */}
       <SidebarCard title="Images" cardKey="images" collapsed={collapsed} onToggle={toggleCard}>
         <ImageGallery
-          content={project.content}
+          content={resolveLocalizedText(project.content, language)}
           onRemoveImage={(markdown) => {
-            const updatedContent = project.content.replace(markdown, '');
-            onUpdate({ ...project, content: updatedContent });
+            const updatedContent = resolveLocalizedText(project.content, language).replace(markdown, '');
+            onUpdate({ ...project, content: setLocalizedText(project.content, language, updatedContent) });
           }}
         />
       </SidebarCard>

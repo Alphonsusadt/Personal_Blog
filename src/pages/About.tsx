@@ -263,17 +263,17 @@ export function About() {
   const hasQuote = hasText(data.quote[language]);
 
   return (
-    <div className="min-h-screen py-16">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen py-[96px] bg-canvas">
+      <div className="max-w-[1280px] mx-auto px-6 lg:px-12">
         {hasHeader ? (
           <div className="text-center mb-16">
             {hasText(data.title[language]) ? (
-              <h1 className="text-4xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-4">
+              <h1 className="display-lg text-ink mb-4">
                 {data.title[language]}
               </h1>
             ) : null}
             {hasText(data.subtitle[language]) ? (
-              <p className="text-lg text-[#6B7280] max-w-2xl mx-auto">
+              <p className="subhead text-ink opacity-80 max-w-2xl mx-auto">
                 {data.subtitle[language]}
               </p>
             ) : null}
@@ -281,12 +281,12 @@ export function About() {
         ) : null}
 
         {hasHeroCard ? (
-        <div className="mb-16">
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 rounded-2xl p-8 lg:p-12">
+        <div className="mb-[96px]">
+          <div className="bg-block-cream rounded-[24px] p-8 lg:p-12 color-block-section">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-              <div>
-                <div className="bg-white dark:bg-[#1E293B] rounded-xl p-6 shadow-lg">
-                  <div className="bg-[#E5E7EB] dark:bg-[#334155] border-2 border-dashed border-[#9CA3AF] dark:border-[#6B7280] rounded-lg w-full h-64 overflow-hidden flex items-center justify-center">
+              <div className="flex justify-center">
+                <div className="bg-canvas rounded-[24px] p-4 shadow-sm border border-hairline w-full max-w-[360px]">
+                  <div className="bg-surface-soft border border-hairline rounded-[16px] w-full aspect-[4/5] overflow-hidden flex items-center justify-center">
                     {data.profileImage ? (
                       <img
                         src={data.profileImage}
@@ -295,36 +295,36 @@ export function About() {
                       />
                     ) : (
                       <div className="text-center px-4">
-                        <div className="bg-[#1E40AF] dark:bg-[#60A5FA] rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                          <Users className="w-8 h-8 text-white" />
+                        <div className="bg-ink rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                          <Users className="w-8 h-8 text-canvas" />
                         </div>
-                        <p className="text-[#6B7280] text-sm">Professional Photo</p>
+                        <p className="caption text-ink opacity-60">Professional Photo</p>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-4">
+                <h2 className="display-sm text-ink mb-4">
                   Biomedical Engineering Student
                 </h2>
                 {hasText(data.bio[language]) ? (
-                  <p className="text-[#6B7280] mb-6 leading-relaxed">
+                  <p className="body text-ink opacity-80 mb-6 leading-relaxed">
                     {data.bio[language]}
                   </p>
                 ) : null}
                 {(hasText(data.gpa) || hasText(data.projectsCount)) ? (
                   <div className="grid grid-cols-2 gap-4">
                     {hasText(data.gpa) ? (
-                      <div className="bg-white dark:bg-[#1E293B] rounded-lg p-4 text-center shadow-sm">
-                        <div className="text-2xl font-bold text-[#1E40AF] dark:text-[#60A5FA]">{data.gpa}</div>
-                        <div className="text-sm text-[#6B7280]">GPA</div>
+                      <div className="bg-canvas rounded-[16px] border border-hairline p-4 text-center shadow-sm">
+                        <div className="display-sm text-primary">{data.gpa}</div>
+                        <div className="caption text-ink opacity-60">GPA</div>
                       </div>
                     ) : null}
                     {hasText(data.projectsCount) ? (
-                      <div className="bg-white dark:bg-[#1E293B] rounded-lg p-4 text-center shadow-sm">
-                        <div className="text-2xl font-bold text-[#1E40AF] dark:text-[#60A5FA]">{data.projectsCount}</div>
-                        <div className="text-sm text-[#6B7280]">Projects</div>
+                      <div className="bg-canvas rounded-[16px] border border-hairline p-4 text-center shadow-sm">
+                        <div className="display-sm text-primary">{data.projectsCount}</div>
+                        <div className="caption text-ink opacity-60">Projects</div>
                       </div>
                     ) : null}
                   </div>
@@ -336,18 +336,18 @@ export function About() {
         ) : null}
 
         {storyItems.length > 0 ? (
-        <div className="mb-16">
-          <h2 className="text-3xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-8">
+        <div className="mb-[96px]">
+          <h2 className="display-md text-ink mb-8">
             My Story
           </h2>
 
-          <div className="space-y-8">
+          <div className="space-y-12">
             {storyItems.map((item) => (
               <section key={item.key}>
-                <h3 className="text-xl font-semibold text-[#1A1A1A] dark:text-[#F8FAFC] mb-4">
+                <h3 className="card-title text-ink mb-4">
                   {item.title}
                 </h3>
-                <p className="text-[#6B7280] leading-relaxed serif-font">
+                <p className="body-lg text-ink opacity-80 leading-relaxed serif-font">
                   {item.content}
                 </p>
               </section>
@@ -357,29 +357,29 @@ export function About() {
         ) : null}
 
         {hasSkillsSection ? (
-        <div className="mb-16">
-          <h2 className="text-3xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-8">
+        <div className="mb-[96px]">
+          <h2 className="display-md text-ink mb-8">
             Skills & Interests
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {technicalGroups.length > 0 ? (
-            <div className="bg-white dark:bg-[#1E293B] rounded-xl p-6 shadow-sm border border-[#E5E7EB] dark:border-[#334155]">
-              <div className="flex items-center mb-4">
-                <div className="bg-[#1E40AF] dark:bg-[#60A5FA] p-2 rounded-lg mr-3">
-                  <Code className="w-5 h-5 text-white" />
+            <div className="bg-block-lime rounded-[24px] p-8 shadow-sm border border-hairline color-block-section">
+              <div className="flex items-center mb-6">
+                <div className="bg-canvas p-3 rounded-[12px] mr-4 shadow-sm border border-hairline">
+                  <Code className="w-6 h-6 text-ink" />
                 </div>
-                <h3 className="text-lg font-semibold text-[#1A1A1A] dark:text-[#F8FAFC]">
+                <h3 className="card-title text-ink">
                   Technical Skills
                 </h3>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-6">
                 {technicalGroups.map((group) => (
                   <div key={group.label}>
-                    <h4 className="font-medium text-[#1A1A1A] dark:text-[#F8FAFC] mb-2">{group.label}</h4>
+                    <h4 className="body-sm text-ink mb-3">{group.label}</h4>
                     <div className="flex flex-wrap gap-2">
                       {group.values.map(skill => (
-                        <span key={skill} className="tag">
+                        <span key={skill} className="tag bg-canvas border border-hairline">
                           {skill}
                         </span>
                       ))}
@@ -391,22 +391,22 @@ export function About() {
             ) : null}
 
             {interestGroups.length > 0 ? (
-            <div className="bg-white dark:bg-[#1E293B] rounded-xl p-6 shadow-sm border border-[#E5E7EB] dark:border-[#334155]">
-              <div className="flex items-center mb-4">
-                <div className="bg-[#1E40AF] dark:bg-[#60A5FA] p-2 rounded-lg mr-3">
-                  <Heart className="w-5 h-5 text-white" />
+            <div className="bg-block-lilac rounded-[24px] p-8 shadow-sm border border-hairline color-block-section">
+              <div className="flex items-center mb-6">
+                <div className="bg-canvas p-3 rounded-[12px] mr-4 shadow-sm border border-hairline">
+                  <Heart className="w-6 h-6 text-ink" />
                 </div>
-                <h3 className="text-lg font-semibold text-[#1A1A1A] dark:text-[#F8FAFC]">
+                <h3 className="card-title text-ink">
                   Interests
                 </h3>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-6">
                 {interestGroups.map((group) => (
                   <div key={group.label}>
-                    <h4 className="font-medium text-[#1A1A1A] dark:text-[#F8FAFC] mb-2">{group.label}</h4>
+                    <h4 className="body-sm text-ink mb-3">{group.label}</h4>
                     <div className="flex flex-wrap gap-2">
                       {group.values.map(skill => (
-                        <span key={skill} className="tag">
+                        <span key={skill} className="tag bg-canvas border border-hairline">
                           {skill}
                         </span>
                       ))}
@@ -421,24 +421,24 @@ export function About() {
         ) : null}
 
         {educationItems.length > 0 ? (
-        <div className="mb-16">
-          <h2 className="text-3xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-8">
+        <div className="mb-[96px]">
+          <h2 className="display-md text-ink mb-8">
             Education & Achievements
           </h2>
 
           <div className="space-y-6">
             {educationItems.map((item, index) => (
-              <div key={`${item.title[language]}-${item.year}-${index}`} className="bg-white dark:bg-[#1E293B] rounded-xl p-6 shadow-sm border border-[#E5E7EB] dark:border-[#334155]">
+              <div key={`${item.title[language]}-${item.year}-${index}`} className="bg-canvas rounded-[24px] p-6 shadow-sm border border-hairline">
                 <div className="flex items-start space-x-4">
-                  <div className="bg-[#1E40AF] dark:bg-[#60A5FA] p-3 rounded-lg">
-                    <GraduationCap className="w-6 h-6 text-white" />
+                  <div className="bg-surface-soft border border-hairline p-3 rounded-[12px]">
+                    <GraduationCap className="w-6 h-6 text-ink" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-[#1A1A1A] dark:text-[#F8FAFC] mb-1">
+                    <h3 className="card-title text-ink mb-1">
                       {item.title[language]}
                     </h3>
-                    <p className="text-[#6B7280] mb-2">{item.institution[language]} • {item.year}</p>
-                    <p className="text-[#6B7280] text-sm serif-font">
+                    <p className="body-sm text-ink opacity-60 mb-2">{item.institution[language]} • {item.year}</p>
+                    <p className="body-sm text-ink opacity-80 serif-font">
                       {item.description[language]}
                     </p>
                   </div>
@@ -450,13 +450,13 @@ export function About() {
         ) : null}
 
         {timelineItems.length > 0 ? (
-        <div className="mb-16">
-          <h2 className="text-3xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-8">
+        <div className="mb-[96px]">
+          <h2 className="display-md text-ink mb-8">
             Engineering Project Timeline
           </h2>
 
           <div className="relative">
-            <div className="hidden md:block absolute left-1/2 top-0 bottom-0 w-0.5 -translate-x-1/2 bg-gradient-to-b from-[#1E40AF] via-[#60A5FA] to-[#93C5FD]" />
+            <div className="hidden md:block absolute left-1/2 top-0 bottom-0 w-0.5 -translate-x-1/2 bg-hairline" />
 
             <div className="space-y-8 md:space-y-10">
               {timelineItems.map((item, index) => {
@@ -464,12 +464,12 @@ export function About() {
 
                 return (
                   <div key={item.id || `${item.title[language]}-${index}`} className="relative md:grid md:grid-cols-2 md:gap-10 items-start">
-                    <div className={`${isLeft ? 'md:col-start-1' : 'md:col-start-2'} bg-white dark:bg-[#1E293B] rounded-xl p-5 shadow-sm border border-[#E5E7EB] dark:border-[#334155]`}>
-                      <div className="flex items-center justify-between gap-3 mb-3">
-                        <h3 className="text-lg font-semibold text-[#1A1A1A] dark:text-[#F8FAFC] leading-tight">
+                    <div className={`${isLeft ? 'md:col-start-1' : 'md:col-start-2'} bg-canvas rounded-[24px] p-6 shadow-sm border border-hairline`}>
+                      <div className="flex items-center justify-between gap-3 mb-4">
+                        <h3 className="card-title text-ink leading-tight">
                           {item.title[language]}
                         </h3>
-                        <span className="shrink-0 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                        <span className="shrink-0 tag bg-surface-soft border border-hairline">
                           {formatEngineeringDate(item.date)}
                         </span>
                       </div>
@@ -478,16 +478,16 @@ export function About() {
                         <img
                           src={item.image}
                           alt={item.title[language]}
-                          className="w-full h-44 object-cover rounded-lg mb-3 border border-[#E5E7EB] dark:border-[#334155]"
+                          className="w-full h-44 object-cover rounded-[16px] mb-4 border border-hairline"
                         />
                       ) : null}
 
-                      <p className="text-[#6B7280] leading-relaxed serif-font text-sm">
+                      <p className="body-sm text-ink opacity-80 leading-relaxed serif-font">
                         {item.description[language]}
                       </p>
                     </div>
 
-                    <div className="hidden md:flex absolute left-1/2 top-7 -translate-x-1/2 h-4 w-4 rounded-full bg-[#1E40AF] ring-4 ring-blue-100 dark:ring-blue-900/40" />
+                    <div className="hidden md:flex absolute left-1/2 top-7 -translate-x-1/2 h-4 w-4 rounded-full bg-ink border-2 border-canvas" />
                   </div>
                 );
               })}
@@ -497,16 +497,16 @@ export function About() {
         ) : null}
 
         {hasContactSection ? (
-        <div className="mb-16">
+        <div className="mb-[96px]">
           {hasText(data.contactHeading[language]) ? (
-            <h2 className="text-3xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-8">
+            <h2 className="display-md text-ink mb-8">
               {data.contactHeading[language]}
             </h2>
           ) : null}
 
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 rounded-2xl p-8">
+          <div className="bg-block-pink color-block-section rounded-[24px] p-8 lg:p-12">
             {hasContactMessage ? (
-              <p className="text-lg text-[#6B7280] mb-6 leading-relaxed serif-font text-center max-w-2xl mx-auto">
+              <p className="display-sm text-ink mb-8 leading-relaxed serif-font text-center max-w-2xl mx-auto">
                 {data.contactMessage[language]}
               </p>
             ) : null}
@@ -515,30 +515,30 @@ export function About() {
               {hasLinkedin ? (
                 <a
                   href={data.socialLinks.linkedin}
-                  className="flex items-center space-x-3 bg-white dark:bg-[#1E293B] px-6 py-3 rounded-lg shadow-sm hover:shadow-md transition-shadow"
+                  className="flex items-center space-x-3 bg-canvas px-6 py-4 rounded-full border border-hairline shadow-sm hover:border-ink transition-colors"
                 >
-                  <Linkedin className="w-5 h-5 text-[#1E40AF] dark:text-[#60A5FA]" />
-                  <span className="font-medium text-[#1A1A1A] dark:text-[#F8FAFC]">LinkedIn</span>
+                  <Linkedin className="w-5 h-5 text-ink" />
+                  <span className="card-title text-ink">LinkedIn</span>
                 </a>
               ) : null}
 
               {hasGithub ? (
                 <a
                   href={data.socialLinks.github}
-                  className="flex items-center space-x-3 bg-white dark:bg-[#1E293B] px-6 py-3 rounded-lg shadow-sm hover:shadow-md transition-shadow"
+                  className="flex items-center space-x-3 bg-canvas px-6 py-4 rounded-full border border-hairline shadow-sm hover:border-ink transition-colors"
                 >
-                  <Github className="w-5 h-5 text-[#1A1A1A] dark:text-[#F8FAFC]" />
-                  <span className="font-medium text-[#1A1A1A] dark:text-[#F8FAFC]">GitHub</span>
+                  <Github className="w-5 h-5 text-ink" />
+                  <span className="card-title text-ink">GitHub</span>
                 </a>
               ) : null}
 
               {hasEmail ? (
                 <a
                   href={`mailto:${data.socialLinks.email}`}
-                  className="flex items-center space-x-3 bg-white dark:bg-[#1E293B] px-6 py-3 rounded-lg shadow-sm hover:shadow-md transition-shadow"
+                  className="flex items-center space-x-3 bg-canvas px-6 py-4 rounded-full border border-hairline shadow-sm hover:border-ink transition-colors"
                 >
-                  <Mail className="w-5 h-5 text-[#1E40AF] dark:text-[#60A5FA]" />
-                  <span className="font-medium text-[#1A1A1A] dark:text-[#F8FAFC]">Email</span>
+                  <Mail className="w-5 h-5 text-ink" />
+                  <span className="card-title text-ink">Email</span>
                 </a>
               ) : null}
             </div>
@@ -547,13 +547,13 @@ export function About() {
         ) : null}
 
         {hasQuote ? (
-        <div className="mb-16">
-          <div className="bg-white dark:bg-[#1E293B] rounded-2xl p-8 shadow-sm border border-[#E5E7EB] dark:border-[#334155]">
+        <div className="mb-[96px]">
+          <div className="bg-canvas rounded-[24px] p-8 lg:p-12 shadow-sm border border-hairline">
             <blockquote className="text-center">
-              <p className="text-xl text-[#6B7280] mb-6 leading-relaxed serif-font">
+              <p className="display-sm text-ink opacity-80 mb-6 leading-relaxed serif-font">
                 {data.quote[language]}
               </p>
-              <footer className="text-[#1E40AF] dark:text-[#60A5FA] font-medium">
+              <footer className="card-title text-primary">
                 © Alphonsus Aditya
               </footer>
             </blockquote>

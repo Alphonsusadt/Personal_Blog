@@ -4,17 +4,18 @@ import React, { useCallback, useRef } from 'react';
 import { generateSlug, isValidSlug } from '../utils/slugify';
 import { IsolatedInput, IsolatedTextarea, IsolatedTagInput } from './IsolatedInput';
 import { useAutoFixLanguage } from '../hooks/useAutoFixLanguage';
+import { resolveLocalizedText, setLocalizedText, type LocalizedTextValue } from '../lib/localized';
 
 interface Book {
   _id?: string;
   id: string;
-  title: string;
-  author: string;
+  title: LocalizedTextValue;
+  author: LocalizedTextValue;
   cover: string;
   rating: number;
   category: string;
   takeaways: string[];
-  review: string;
+  review: LocalizedTextValue;
   status?: 'draft' | 'published' | 'scheduled';
   publishAt?: string;
   createdAt?: string;
@@ -24,6 +25,8 @@ interface Book {
   ogImage?: string;
   keywords?: string;
   metaTitle?: string;
+  contentLanguage?: 'en' | 'id' | 'bilingual';
+  translationOfId?: string;
 }
 
 interface BookSidebarProps {
@@ -68,6 +71,8 @@ function SidebarCard({
 export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, sectionEnabled = true }: BookSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const { language, setLanguage } = useAutoFixLanguage();
+  void onSave;
+  void isSaving;
   
   // Use ref to always have latest book without causing re-renders
   const bookRef = useRef(book);
@@ -110,7 +115,7 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, c
   };
 
   const handleRegenerateSlug = () => {
-    const autoSlug = generateSlug(book.title);
+    const autoSlug = generateSlug(resolveLocalizedText(book.title, language));
     if (autoSlug) {
       onUpdate({ ...book, id: autoSlug });
     }
@@ -133,6 +138,9 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, c
     setCollapsed(prev => ({ ...prev, [cardName]: !prev[cardName] }));
   };
 
+  const localizedTitle = resolveLocalizedText(book.title, language);
+  const localizedAuthor = resolveLocalizedText(book.author, language);
+
   const removeTakeaway = (index: number) => {
     onUpdate({ ...book, takeaways: book.takeaways.filter((_, i) => i !== index) });
   };
@@ -141,19 +149,52 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, c
 
   return (
     <aside className="space-y-4">
-      {/* Auto Fix Language */}
-      <SidebarCard title="Auto Fix" cardKey="autofix" collapsed={collapsed} onToggle={toggleCard}>
+      {/* Editor Language (Replaces Auto Fix Label) */}
+      <SidebarCard title="Editor Language / Bahasa Editor" cardKey="autofix" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-2">
-          <label className="block text-xs text-[#94A3B8]">Language</label>
+          <label className="block text-xs text-[#94A3B8]">Pilih tab bahasa yang sedang diedit:</label>
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value as 'id' | 'en')}
             className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
           >
-            <option value="id">Indonesia</option>
-            <option value="en">English</option>
+            <option value="id">🇮🇩 Indonesia (ID)</option>
+            <option value="en">🇬🇧 English (EN)</option>
           </select>
-          <p className="text-[11px] text-[#94A3B8]">Mempengaruhi Auto Fix + spellcheck di editor.</p>
+          <p className="text-[11px] text-[#94A3B8]">Mengganti ini akan mengubah isi Title, Author, dan Review di editor sesuai bahasa yang dipilih.</p>
+        </div>
+      </SidebarCard>
+
+      {/* Content Mode & Translation Link */}
+      <SidebarCard title="Content Mode & Linking" cardKey="contentMode" collapsed={collapsed} onToggle={toggleCard}>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs text-[#94A3B8] mb-1">Mode Konten (Content Language)</label>
+            <select
+              value={book.contentLanguage || 'bilingual'}
+              onChange={e => onUpdate({ ...book, contentLanguage: e.target.value as 'en' | 'id' | 'bilingual' })}
+              className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+            >
+              <option value="bilingual">Bilingual (Satu post, dua bahasa)</option>
+              <option value="id">Hanya Indonesia</option>
+              <option value="en">Hanya English</option>
+            </select>
+            <p className="text-[11px] text-[#94A3B8] mt-1">Pilih 'Hanya Indonesia' jika kamu membuat post terpisah dan ingin dihubungkan secara manual.</p>
+          </div>
+
+          {book.contentLanguage !== 'bilingual' && (
+            <div>
+              <label className="block text-xs text-[#94A3B8] mb-1">Link to Translation (ID Book)</label>
+              <IsolatedInput
+                id={book.id + '-translation-of'}
+                initialValue={book.translationOfId || ''}
+                onCommit={(val) => onUpdate({ ...book, translationOfId: val })}
+                placeholder="Masukkan ID buku terjemahannya..."
+                className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+              />
+              <p className="text-[11px] text-[#94A3B8] mt-1">Jika ini buku bahasa ID, masukkan ID buku bahasa EN-nya agar terhubung di website.</p>
+            </div>
+          )}
         </div>
       </SidebarCard>
 
@@ -285,10 +326,10 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, c
       {/* Image Gallery Card */}
       <SidebarCard title="Images" cardKey="images" collapsed={collapsed} onToggle={toggleCard}>
         <ImageGallery
-          content={book.review}
+          content={resolveLocalizedText(book.review, language)}
           onRemoveImage={(markdown) => {
-            const updatedReview = book.review.replace(markdown, '');
-            onUpdate({ ...book, review: updatedReview });
+            const updatedReview = resolveLocalizedText(book.review, language).replace(markdown, '');
+            onUpdate({ ...book, review: setLocalizedText(book.review, language, updatedReview) });
           }}
         />
       </SidebarCard>
@@ -309,7 +350,7 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, c
             <button
               type="button"
               onClick={handleRegenerateSlug}
-              disabled={!book.title}
+              disabled={!localizedTitle}
               className="p-2 text-[#94A3B8] hover:text-[#60A5FA] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               title="Generate from title"
             >
@@ -342,12 +383,12 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, c
             <label className="block text-xs text-[#94A3B8] mb-1">Meta Title</label>
             <IsolatedInput
               id={book.id + '-meta-title'}
-              initialValue={book.metaTitle || `${book.title} by ${book.author}`}
+              initialValue={book.metaTitle || `${localizedTitle} by ${localizedAuthor}`}
               onCommit={handleMetaTitleCommit}
               placeholder="Auto-filled from title and author"
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />
-            <p className="text-xs text-[#64748B] mt-1">{(book.metaTitle || `${book.title} by ${book.author}`).length}/60 chars</p>
+            <p className="text-xs text-[#64748B] mt-1">{(book.metaTitle || `${localizedTitle} by ${localizedAuthor}`).length}/60 chars</p>
           </div>
 
           {/* Meta Description */}
@@ -355,13 +396,13 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, c
             <label className="block text-xs text-[#94A3B8] mb-1">Meta Description</label>
             <IsolatedTextarea
               id={book.id + '-meta-desc'}
-              initialValue={book.metaDescription || `Book review: ${book.title} by ${book.author}. Rating: ${book.rating}/5 stars.`}
+              initialValue={book.metaDescription || `Book review: ${localizedTitle} by ${localizedAuthor}. Rating: ${book.rating}/5 stars.`}
               onCommit={handleMetaDescriptionCommit}
               placeholder="Auto-generated from book info"
               rows={3}
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] resize-none"
             />
-            <p className="text-xs text-[#64748B] mt-1">{(book.metaDescription || `Book review: ${book.title} by ${book.author}. Rating: ${book.rating}/5 stars.`).length}/160 chars</p>
+            <p className="text-xs text-[#64748B] mt-1">{(book.metaDescription || `Book review: ${localizedTitle} by ${localizedAuthor}. Rating: ${book.rating}/5 stars.`).length}/160 chars</p>
           </div>
 
           {/* Keywords */}

@@ -52,31 +52,31 @@ export function Navigation() {
   }, [sections.books, sections.projects, sections.writings]);
 
   return (
-    <header className="sticky top-0 z-50 bg-white/80 dark:bg-[#0F172A]/80 backdrop-blur-sm border-b border-[#E5E7EB] dark:border-[#334155]">
-      <nav className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+    <header className="sticky top-0 z-50 bg-canvas border-b border-hairline dark:border-hairline-soft">
+      <nav className="max-w-[1280px] mx-auto px-6 lg:px-12">
+        <div className="flex items-center justify-between h-[56px]">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3">
             {/* ALP monogram */}
-            <span className="text-2xl font-bold tracking-tight text-[#1A1A1A] dark:text-[#F8FAFC] font-serif">ALP</span>
+            <span className="text-[20px] font-bold tracking-[-1.0px] text-ink">ALP</span>
             {/* Divider */}
-            <span className="w-px h-8 bg-[#D1D5DB] dark:bg-[#475569]" />
+            <span className="w-px h-5 bg-hairline" />
             {/* Name */}
-            <div className="flex flex-col leading-snug">
-              <span className="text-sm font-medium text-[#374151] dark:text-[#D1D5DB]">Alphonsus</span>
-              <span className="text-sm font-medium text-[#374151] dark:text-[#D1D5DB]">Aditya PW</span>
+            <div className="flex flex-col leading-none">
+              <span className="caption text-ink">Alphonsus</span>
+              <span className="caption text-ink">Aditya PW</span>
             </div>
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center space-x-6">
             {navItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
                 className={cn(
                   'nav-link',
-                  location.pathname === item.path && 'text-[#1E40AF] dark:text-[#60A5FA] font-semibold'
+                  location.pathname === item.path && 'text-primary font-[540]'
                 )}
                 onClick={scrollPageToTop}
               >
@@ -84,14 +84,14 @@ export function Navigation() {
               </Link>
             ))}
 
-            <div className="flex items-center rounded-lg border border-[#E5E7EB] dark:border-[#334155] overflow-hidden">
+            <div className="flex items-center rounded-full bg-surface-soft p-1">
               <button
                 onClick={() => setLanguage('en')}
                 className={cn(
-                  'px-2.5 py-1.5 text-xs font-semibold transition-colors',
+                  'px-3 py-1 text-[14px] font-[480] transition-colors rounded-full',
                   language === 'en'
-                    ? 'bg-[#1E40AF] text-white'
-                    : 'bg-transparent text-[#6B7280] hover:bg-[#E5E7EB] dark:hover:bg-[#334155]'
+                    ? 'bg-canvas text-ink shadow-sm'
+                    : 'text-ink opacity-60 hover:opacity-100'
                 )}
               >
                 EN
@@ -99,10 +99,10 @@ export function Navigation() {
               <button
                 onClick={() => setLanguage('id')}
                 className={cn(
-                  'px-2.5 py-1.5 text-xs font-semibold transition-colors',
+                  'px-3 py-1 text-[14px] font-[480] transition-colors rounded-full',
                   language === 'id'
-                    ? 'bg-[#1E40AF] text-white'
-                    : 'bg-transparent text-[#6B7280] hover:bg-[#E5E7EB] dark:hover:bg-[#334155]'
+                    ? 'bg-canvas text-ink shadow-sm'
+                    : 'text-ink opacity-60 hover:opacity-100'
                 )}
               >
                 ID
@@ -112,13 +112,13 @@ export function Navigation() {
             {/* Dark Mode Toggle */}
             <button
               onClick={toggleDarkMode}
-              className="p-2 rounded-lg hover:bg-[#E5E7EB] dark:hover:bg-[#334155] transition-colors"
+              className="p-2 rounded-full hover:bg-surface-soft transition-colors"
               aria-label="Toggle dark mode"
             >
               {isDarkMode ? (
-                <Sun className="w-5 h-5 text-[#F8FAFC]" />
+                <Sun className="w-5 h-5 text-ink" />
               ) : (
-                <Moon className="w-5 h-5 text-[#1A1A1A]" />
+                <Moon className="w-5 h-5 text-ink" />
               )}
             </button>
           </div>
@@ -127,24 +127,24 @@ export function Navigation() {
           <div className="md:hidden flex items-center space-x-2">
             <button
               onClick={toggleDarkMode}
-              className="p-2 rounded-lg hover:bg-[#E5E7EB] dark:hover:bg-[#334155] transition-colors"
+              className="p-2 rounded-full hover:bg-surface-soft transition-colors"
               aria-label="Toggle dark mode"
             >
               {isDarkMode ? (
-                <Sun className="w-5 h-5 text-[#F8FAFC]" />
+                <Sun className="w-5 h-5 text-ink" />
               ) : (
-                <Moon className="w-5 h-5 text-[#1A1A1A]" />
+                <Moon className="w-5 h-5 text-ink" />
               )}
             </button>
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="p-2 rounded-lg hover:bg-[#E5E7EB] dark:hover:bg-[#334155] transition-colors"
+              className="p-2 rounded-full hover:bg-surface-soft transition-colors"
               aria-label="Toggle menu"
             >
               {isMenuOpen ? (
-                <X className="w-6 h-6 text-[#1A1A1A] dark:text-[#F8FAFC]" />
+                <X className="w-6 h-6 text-ink" />
               ) : (
-                <Menu className="w-6 h-6 text-[#1A1A1A] dark:text-[#F8FAFC]" />
+                <Menu className="w-6 h-6 text-ink" />
               )}
             </button>
           </div>
@@ -152,18 +152,18 @@ export function Navigation() {
 
         {/* Mobile Menu */}
         {isMenuOpen && (
-          <div className="md:hidden py-4 border-t border-[#E5E7EB] dark:border-[#334155]">
-            <div className="flex flex-col space-y-4">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-[#94A3B8]">Language</span>
-                <div className="flex items-center rounded-lg border border-[#334155] overflow-hidden">
+          <div className="md:hidden py-4 border-t border-hairline bg-canvas">
+            <div className="flex flex-col space-y-4 px-6">
+              <div className="flex items-center justify-between">
+                <span className="caption text-ink opacity-60">Language</span>
+                <div className="flex items-center rounded-full bg-surface-soft p-1">
                   <button
                     onClick={() => setLanguage('en')}
                     className={cn(
-                      'px-2.5 py-1.5 text-xs font-semibold transition-colors',
+                      'px-3 py-1 text-[14px] font-[480] transition-colors rounded-full',
                       language === 'en'
-                        ? 'bg-[#1E40AF] text-white'
-                        : 'bg-transparent text-[#94A3B8]'
+                        ? 'bg-canvas text-ink shadow-sm'
+                        : 'text-ink opacity-60'
                     )}
                   >
                     EN
@@ -171,10 +171,10 @@ export function Navigation() {
                   <button
                     onClick={() => setLanguage('id')}
                     className={cn(
-                      'px-2.5 py-1.5 text-xs font-semibold transition-colors',
+                      'px-3 py-1 text-[14px] font-[480] transition-colors rounded-full',
                       language === 'id'
-                        ? 'bg-[#1E40AF] text-white'
-                        : 'bg-transparent text-[#94A3B8]'
+                        ? 'bg-canvas text-ink shadow-sm'
+                        : 'text-ink opacity-60'
                     )}
                   >
                     ID
@@ -187,8 +187,8 @@ export function Navigation() {
                   key={item.path}
                   to={item.path}
                   className={cn(
-                    'nav-link py-2',
-                    location.pathname === item.path && 'text-[#1E40AF] dark:text-[#60A5FA] font-semibold'
+                    'nav-link py-2 text-[20px]',
+                    location.pathname === item.path && 'text-primary font-[540]'
                   )}
                   onClick={() => {
                     scrollPageToTop();
@@ -200,15 +200,15 @@ export function Navigation() {
               ))}
               
               {/* Social Links */}
-              <div className="flex items-center space-x-4 pt-4 border-t border-[#E5E7EB] dark:border-[#334155]">
-                <a href="https://github.com" className="text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors">
-                  <Github className="w-5 h-5" />
+              <div className="flex items-center space-x-4 pt-4 border-t border-hairline">
+                <a href="https://github.com" className="text-ink opacity-60 hover:opacity-100 transition-opacity">
+                  <Github className="w-6 h-6" />
                 </a>
-                <a href="https://linkedin.com" className="text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors">
-                  <Linkedin className="w-5 h-5" />
+                <a href="https://linkedin.com" className="text-ink opacity-60 hover:opacity-100 transition-opacity">
+                  <Linkedin className="w-6 h-6" />
                 </a>
-                <a href="mailto:alphonsus@example.com" className="text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors">
-                  <Mail className="w-5 h-5" />
+                <a href="mailto:alphonsus@example.com" className="text-ink opacity-60 hover:opacity-100 transition-opacity">
+                  <Mail className="w-6 h-6" />
                 </a>
               </div>
             </div>

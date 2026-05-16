@@ -4,17 +4,18 @@ import { ImageGallery } from './ImageGallery';
 import { generateSlug, isValidSlug } from '../utils/slugify';
 import { IsolatedInput, IsolatedTextarea, IsolatedTagInput } from './IsolatedInput';
 import { useAutoFixLanguage } from '../hooks/useAutoFixLanguage';
+import { resolveLocalizedText, setLocalizedText, type LocalizedTextValue } from '../lib/localized';
 
 interface Writing {
   _id?: string;
   id: string;
-  title: string;
-  excerpt: string;
+  title: LocalizedTextValue;
+  excerpt: LocalizedTextValue;
   date: string;
   readTime: string;
   category: string;
   tags: string[];
-  content: string;
+  content: LocalizedTextValue;
   status?: 'draft' | 'published' | 'scheduled';
   publishAt?: string;
   createdAt?: string;
@@ -24,6 +25,8 @@ interface Writing {
   ogImage?: string;
   keywords?: string;
   metaTitle?: string;
+  contentLanguage?: 'en' | 'id' | 'bilingual';
+  translationOfId?: string;
 }
 
 interface WritingSidebarProps {
@@ -68,6 +71,8 @@ function SidebarCard({
 export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, sectionEnabled = true }: WritingSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const { language, setLanguage } = useAutoFixLanguage();
+  void onSave;
+  void isSaving;
   
   // Use ref to always have latest writing without causing re-renders
   const writingRef = useRef(writing);
@@ -75,8 +80,8 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
 
   // Stable callbacks - use ref to get latest writing
   const handleExcerptCommit = useCallback((value: string) => {
-    onUpdate({ ...writingRef.current, excerpt: value });
-  }, [onUpdate]);
+    onUpdate({ ...writingRef.current, excerpt: setLocalizedText(writingRef.current.excerpt, language, value) });
+  }, [language, onUpdate]);
 
   const handleReadTimeCommit = useCallback((value: string) => {
     onUpdate({ ...writingRef.current, readTime: value });
@@ -118,7 +123,7 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
   };
 
   const handleRegenerateSlug = () => {
-    const autoSlug = generateSlug(writing.title);
+    const autoSlug = generateSlug(resolveLocalizedText(writing.title, language));
     if (autoSlug) {
       onUpdate({ ...writing, id: autoSlug });
     }
@@ -141,6 +146,9 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
     setCollapsed(prev => ({ ...prev, [cardName]: !prev[cardName] }));
   };
 
+  const localizedTitle = resolveLocalizedText(writing.title, language);
+  const localizedExcerpt = resolveLocalizedText(writing.excerpt, language);
+
   const removeTag = (index: number) => {
     onUpdate({ ...writing, tags: writing.tags.filter((_, i) => i !== index) });
   };
@@ -149,19 +157,52 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
 
   return (
     <aside className="space-y-4">
-      {/* Auto Fix Language */}
-      <SidebarCard title="Auto Fix" cardKey="autofix" collapsed={collapsed} onToggle={toggleCard}>
+      {/* Editor Language (Replaces Auto Fix Label) */}
+      <SidebarCard title="Editor Language / Bahasa Editor" cardKey="autofix" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-2">
-          <label className="block text-xs text-[#94A3B8]">Language</label>
+          <label className="block text-xs text-[#94A3B8]">Pilih tab bahasa yang sedang diedit:</label>
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value as 'id' | 'en')}
             className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
           >
-            <option value="id">Indonesia</option>
-            <option value="en">English</option>
+            <option value="id">🇮🇩 Indonesia (ID)</option>
+            <option value="en">🇬🇧 English (EN)</option>
           </select>
-          <p className="text-[11px] text-[#94A3B8]">Mempengaruhi Auto Fix + spellcheck di editor.</p>
+          <p className="text-[11px] text-[#94A3B8]">Mengganti ini akan mengubah isi Title, Excerpt, dan Content di editor sesuai bahasa yang dipilih.</p>
+        </div>
+      </SidebarCard>
+
+      {/* Content Mode & Translation Link */}
+      <SidebarCard title="Content Mode & Linking" cardKey="contentMode" collapsed={collapsed} onToggle={toggleCard}>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs text-[#94A3B8] mb-1">Mode Konten (Content Language)</label>
+            <select
+              value={writing.contentLanguage || 'bilingual'}
+              onChange={e => onUpdate({ ...writing, contentLanguage: e.target.value as 'en' | 'id' | 'bilingual' })}
+              className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+            >
+              <option value="bilingual">Bilingual (Satu post, dua bahasa)</option>
+              <option value="id">Hanya Indonesia</option>
+              <option value="en">Hanya English</option>
+            </select>
+            <p className="text-[11px] text-[#94A3B8] mt-1">Pilih 'Hanya Indonesia' jika kamu membuat post terpisah dan ingin dihubungkan secara manual.</p>
+          </div>
+
+          {writing.contentLanguage !== 'bilingual' && (
+            <div>
+              <label className="block text-xs text-[#94A3B8] mb-1">Link to Translation (ID Writing)</label>
+              <IsolatedInput
+                id={writing.id + '-translation-of'}
+                initialValue={writing.translationOfId || ''}
+                onCommit={(val) => onUpdate({ ...writing, translationOfId: val })}
+                placeholder="Masukkan ID writing terjemahannya..."
+                className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+              />
+              <p className="text-[11px] text-[#94A3B8] mt-1">Jika ini post bahasa ID, masukkan ID post bahasa EN-nya agar terhubung di website.</p>
+            </div>
+          )}
         </div>
       </SidebarCard>
 
@@ -234,10 +275,10 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
       {/* Image Gallery */}
       {writing.content && (
         <ImageGallery
-          content={writing.content}
+          content={resolveLocalizedText(writing.content, language)}
           onRemoveImage={(markdown) => {
-            const newContent = writing.content.replace(markdown, '');
-            onUpdate({ ...writing, content: newContent });
+            const newContent = resolveLocalizedText(writing.content, language).replace(markdown, '');
+            onUpdate({ ...writing, content: setLocalizedText(writing.content, language, newContent) });
           }}
         />
       )}
@@ -280,7 +321,7 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
       <SidebarCard title="Excerpt" cardKey="excerpt" collapsed={collapsed} onToggle={toggleCard}>
         <IsolatedTextarea
           id={writing.id}
-          initialValue={writing.excerpt}
+          initialValue={localizedExcerpt}
           onCommit={handleExcerptCommit}
           rows={3}
           placeholder="Brief summary of your writing..."
@@ -351,12 +392,12 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
             <label className="block text-xs text-[#94A3B8] mb-1">Meta Title</label>
             <IsolatedInput
               id={writing.id + '-meta-title'}
-              initialValue={writing.metaTitle || writing.title}
+              initialValue={writing.metaTitle || localizedTitle}
               onCommit={handleMetaTitleCommit}
               placeholder="Auto-filled from title"
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />
-            <p className="text-xs text-[#64748B] mt-1">{(writing.metaTitle || writing.title).length}/60 chars</p>
+            <p className="text-xs text-[#64748B] mt-1">{(writing.metaTitle || localizedTitle).length}/60 chars</p>
           </div>
 
           {/* Meta Description */}
@@ -364,13 +405,13 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
             <label className="block text-xs text-[#94A3B8] mb-1">Meta Description</label>
             <IsolatedTextarea
               id={writing.id + '-meta-desc'}
-              initialValue={writing.metaDescription || writing.excerpt}
+              initialValue={writing.metaDescription || localizedExcerpt}
               onCommit={handleMetaDescriptionCommit}
               placeholder="Auto-filled from excerpt"
               rows={3}
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA] resize-none"
             />
-            <p className="text-xs text-[#64748B] mt-1">{(writing.metaDescription || writing.excerpt).length}/160 chars</p>
+            <p className="text-xs text-[#64748B] mt-1">{(writing.metaDescription || localizedExcerpt).length}/160 chars</p>
           </div>
 
           {/* Keywords */}

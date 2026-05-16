@@ -1,16 +1,21 @@
+import type { LocalizedTextValue } from '../lib/localized';
+
 export interface Book {
   id: string;
-  title: string;
-  author: string;
+  title: LocalizedTextValue;
+  author: LocalizedTextValue;
   cover: string;
   rating: number;
   category: 'technical' | 'biography' | 'spiritual' | 'philosophy';
   takeaways: string[];
-  review: string;
+  review: LocalizedTextValue;
   status?: 'draft' | 'published' | 'scheduled';
   publishAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  translationGroupId?: string;
+  translationOfId?: string;
+  contentLanguage?: 'en' | 'id' | 'bilingual';
 }
 
 export const books: Book[] = [

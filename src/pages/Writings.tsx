@@ -3,6 +3,8 @@ import { Search, BookOpen, Edit3, PenTool } from 'lucide-react';
 import { WritingCard } from '../components/WritingCard';
 import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
+import { resolveLocalizedText, getExactLocalizedText } from '../lib/localized';
+import { useSiteLanguage } from '../hooks/useSiteLanguage';
 
 interface Writing {
   id: string;
@@ -14,10 +16,13 @@ interface Writing {
   tags?: string[];
   content: string;
   status?: 'draft' | 'published';
+  contentLanguage?: 'en' | 'id' | 'bilingual';
+  translationOfId?: string;
 }
 
 export function Writings() {
   const navigate = useNavigate();
+  const { language } = useSiteLanguage();
   const [allWritings, setAllWritings] = useState<Writing[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -61,23 +66,38 @@ export function Writings() {
 
   const filteredWritings = useMemo(() => {
     return allWritings.filter(writing => {
-      const matchesSearch = writing.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           writing.excerpt.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      // Language Filter:
+      // If contentLanguage is strictly set to 'en' or 'id', only show it on the corresponding site language.
+      if (writing.contentLanguage && writing.contentLanguage !== 'bilingual' && writing.contentLanguage !== language) {
+        return false;
+      }
+
+      // For bilingual content, check if the selected language has actual title text.
+      // If not, don't show it (avoids showing Indonesian content when user switched to English).
+      if (writing.contentLanguage === 'bilingual' || !writing.contentLanguage) {
+        const titleForLang = getExactLocalizedText(writing.title, language);
+        if (!titleForLang) return false;
+      }
+
+      const title = resolveLocalizedText(writing.title, language);
+      const excerpt = resolveLocalizedText(writing.excerpt, language);
+      const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           excerpt.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            writing.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesCategory = selectedCategory === 'all' || writing.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [searchTerm, selectedCategory, allWritings]);
+  }, [language, searchTerm, selectedCategory, allWritings]);
 
   return (
-    <div className="min-h-screen py-16">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen py-[96px] bg-canvas">
+      <div className="max-w-[1280px] mx-auto px-6 lg:px-12">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-4">
+        <div className="text-center mb-[48px]">
+          <h1 className="display-lg text-ink mb-4">
             Writings
           </h1>
-          <p className="text-lg text-[#6B7280] max-w-2xl mx-auto">
+          <p className="subhead text-ink opacity-80 max-w-2xl mx-auto">
             Reflections on faith, engineering, and the human experience
           </p>
         </div>
@@ -91,10 +111,10 @@ export function Writings() {
                 key={category.value}
                 onClick={() => setSelectedCategory(category.value)}
                 className={[
-                  'inline-flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-colors',
+                  'inline-flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-[480] transition-colors border',
                   selectedCategory === category.value
-                    ? 'bg-[#1E40AF] text-white'
-                    : 'bg-[#E5E7EB] text-[#6B7280] hover:bg-[#D1D5DB] dark:bg-[#334155] dark:text-[#94A3B8] dark:hover:bg-[#475569]'
+                    ? 'bg-primary text-on-primary border-primary'
+                    : 'bg-canvas text-ink border-hairline hover:border-ink hover:bg-surface-soft'
                 ].join(' ')}
               >
                 <Icon className="w-4 h-4" />
@@ -107,13 +127,13 @@ export function Writings() {
         {/* Search Bar */}
         <div className="mb-8">
           <div className="relative max-w-2xl mx-auto">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#6B7280] w-5 h-5" />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-ink opacity-60 w-5 h-5" />
             <input
               type="text"
               placeholder="Search writings by title, excerpt, or tags..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-lg border border-[#E5E7EB] dark:border-[#334155] bg-white dark:bg-[#1E293B] text-[#1A1A1A] dark:text-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF] dark:focus:ring-[#60A5FA] focus:border-transparent"
+              className="w-full pl-12 pr-4 py-4 rounded-[8px] border border-hairline bg-surface-soft text-ink focus:outline-none focus:border-ink transition-colors body"
             />
           </div>
         </div>
@@ -121,9 +141,9 @@ export function Writings() {
         {/* Results Count */}
         <div className="mb-8 text-center">
           {loading ? (
-            <p className="text-[#6B7280]">Loading writings...</p>
+            <p className="text-ink opacity-60 body-sm">Loading writings...</p>
           ) : (
-            <p className="text-[#6B7280]">
+            <p className="text-ink opacity-60 body-sm">
               {selectedCategory === 'all'
                 ? `Showing ${filteredWritings.length} writings`
                 : `Showing ${filteredWritings.length} ${selectedCategory} writings`
@@ -142,13 +162,13 @@ export function Writings() {
         {/* No Results */}
         {filteredWritings.length === 0 && (
           <div className="text-center py-16">
-            <div className="bg-[#E5E7EB] dark:bg-[#334155] rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-              <Search className="w-10 h-10 text-[#6B7280] dark:text-[#94A3B8]" />
+            <div className="bg-surface-soft rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+              <Search className="w-10 h-10 text-ink opacity-40" />
             </div>
-            <h3 className="text-xl font-semibold text-[#1A1A1A] dark:text-[#F8FAFC] mb-2">
+            <h3 className="card-title text-ink mb-2">
               No writings found
             </h3>
-            <p className="text-[#6B7280]">
+            <p className="body-sm text-ink opacity-60">
               Try adjusting your search terms or category filter
             </p>
           </div>

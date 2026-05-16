@@ -13,29 +13,33 @@ import { useRenderedMarkdown } from '../../hooks/useRenderedMarkdown';
 import { formatDraftTime } from '../../hooks/useLocalDraft';
 import { IsolatedContentEditor } from '../../components/IsolatedInput';
 import { AutoFixButton } from '../../components/AutoFixButton';
+import { AssetReuserDialog } from '../../components/AssetReuserDialog';
 import { useAutoFixLanguage } from '../../hooks/useAutoFixLanguage';
 import { getAutoFixSuggestionsForWord } from '../../utils/textAutoFix';
 import { getSpellSuggestions } from '../../utils/spellSuggester';
+import { resolveLocalizedText, getExactLocalizedText, setLocalizedText, type LocalizedTextValue } from '../../lib/localized';
+import { useAdminAutosave } from '../../hooks/useAdminAutosave';
 
 interface Book {
   _id?: string;
   id: string;
-  title: string;
-  author: string;
+  title: LocalizedTextValue;
+  author: LocalizedTextValue;
   cover: string;
   rating: number;
   category: string;
   takeaways: string[];
-  review: string;
+  review: LocalizedTextValue;
   status?: 'draft' | 'published' | 'scheduled';
   publishAt?: string;
   createdAt?: string;
   updatedAt?: string;
-  // SEO Fields
   metaDescription?: string;
   ogImage?: string;
   keywords?: string;
   metaTitle?: string;
+  contentLanguage?: 'en' | 'id' | 'bilingual';
+  translationOfId?: string;
 }
 
 const emptyBook: Book = {
@@ -52,10 +56,10 @@ const emptyBook: Book = {
 
 function hasMeaningfulBookDraft(data: Book): boolean {
   return Boolean(
-    data.title?.trim() ||
-    data.author?.trim() ||
+    resolveLocalizedText(data.title, 'en').trim() ||
+    resolveLocalizedText(data.author, 'en').trim() ||
     data.cover?.trim() ||
-    data.review?.trim() ||
+    resolveLocalizedText(data.review, 'en').trim() ||
     data.takeaways?.length ||
     data.metaDescription?.trim() ||
     data.ogImage?.trim() ||
@@ -104,26 +108,23 @@ export function BookEditor() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
-  const localDraftStatusTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
-  const pendingCreateRef = useRef(false);
-
   const [book, setBook] = useState<Book>(emptyBook);
   const [localTitle, setLocalTitle] = useState(''); // Local state for smooth title typing
   const [loading, setLoading] = useState(!!slug);
   const [isSaving, setIsSaving] = useState(false);
   const [booksSectionEnabled, setBooksSectionEnabled] = useState(true);
-  const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showPreview, setShowPreview] = useState(false);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [showFullPreview, setShowFullPreview] = useState(false);
-  const [localDraftStatus, setLocalDraftStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showDraftRecovery, setShowDraftRecovery] = useState(false);
-  const previewHtml = useRenderedMarkdown(book.review || '*Start writing to see preview...*');
-  const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null);
+  const [assetReuserOpen, setAssetReuserOpen] = useState(false);
 
-  const { language: autoFixLanguage } = useAutoFixLanguage();
+  const { language: autoFixLanguage, setLanguage: setAutoFixLanguage } = useAutoFixLanguage();
+  const exactLocalizedTitle = getExactLocalizedText(book.title, autoFixLanguage);
+  const exactLocalizedAuthor = getExactLocalizedText(book.author, autoFixLanguage);
+  const exactLocalizedReview = getExactLocalizedText(book.review, autoFixLanguage);
+  const previewHtml = useRenderedMarkdown(exactLocalizedReview || '*Start writing to see preview...*');
 
   const [caretWord, setCaretWord] = useState<{ word: string; start: number; end: number } | null>(null);
   const [caretSuggestions, setCaretSuggestions] = useState<string[]>([]);
@@ -192,34 +193,44 @@ export function BookEditor() {
 
   const draftKey = `book_draft_${slug || 'new'}`;
 
-  const persistDraftNow = useCallback((nextBook: Book) => {
-    try {
-      setLocalDraftStatus('saving');
-      localStorage.setItem(draftKey, JSON.stringify({ data: nextBook, timestamp: Date.now() }));
-      setLocalDraftStatus('saved');
-      clearTimeout(localDraftStatusTimeoutRef.current);
-      localDraftStatusTimeoutRef.current = setTimeout(() => setLocalDraftStatus('idle'), 900);
-    } catch (e) {
-      console.error('Local draft error:', e);
-    }
-  }, [draftKey]);
+  // ── useAdminAutosave: all 6 principles in one hook ────────────────────────
+  const autosave = useAdminAutosave<Book>({
+    storageKey: draftKey,
+    data: book,
+    enabled: !loading,
+    hasMeaningfulData: hasMeaningfulBookDraft,
+    saveToServer: async (snapshot) => {
+      if (snapshot._id) {
+        await api.put(`/api/books/${snapshot._id}`, snapshot);
+      } else {
+        const autoSlug = snapshot.id || createAutosaveDraftId(
+          resolveLocalizedText(snapshot.title, autoFixLanguage), 
+          resolveLocalizedText(snapshot.review, autoFixLanguage), 
+          'book'
+        );
+        const response = await api.post('/api/books', { ...snapshot, id: autoSlug });
+        setBook(prev => ({ ...prev, _id: response._id }));
+      }
+    },
+    localDebounceMs: 800,
+    serverDebounceMs: 3000,
+    periodicIntervalMs: 30_000,
+    resetStatusMs: 1500,
+    maxRetries: 3,
+  });
 
   // Sync localTitle when book changes from external source
   useEffect(() => {
-    setLocalTitle(book.title);
-  }, [book.title]);
+    setLocalTitle(exactLocalizedTitle);
+  }, [exactLocalizedTitle, autoFixLanguage]);
 
   // Title is persisted immediately so fast navigation cannot lose edits.
   const handleTitleChange = (value: string) => {
     setLocalTitle(value);
-    setBook(prev => {
-      const nextBook = { ...prev, title: value };
-      persistDraftNow(nextBook);
-      return nextBook;
-    });
+    setBook(prev => ({ ...prev, title: setLocalizedText(prev.title, autoFixLanguage, value) }));
   };
 
-  const plainContent = book.review
+  const plainContent = exactLocalizedReview
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`[^`]*`/g, ' ')
     .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')
@@ -232,18 +243,11 @@ export function BookEditor() {
 
   // Check for local draft on mount
   useEffect(() => {
-    try {
-      const savedDraft = localStorage.getItem(draftKey);
-      if (savedDraft) {
-        const parsed = JSON.parse(savedDraft);
-        setDraftTimestamp(parsed.timestamp);
-        if (hasMeaningfulBookDraft(parsed.data) && (Date.now() - parsed.timestamp) < 86400000) {
-          setShowDraftRecovery(true);
-        }
-      }
-    } catch (e) {
-      console.error('Failed to check draft:', e);
+    const draft = autosave.readDraft();
+    if (draft && hasMeaningfulBookDraft(draft.data) && (Date.now() - draft.timestamp) < 86_400_000) {
+      setShowDraftRecovery(true);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey]);
 
   // Load book if editing existing one — use single-item endpoint with fallback
@@ -294,75 +298,11 @@ export function BookEditor() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // Periodic backup write without touching indicator state.
-  useEffect(() => {
-    if (loading) return;
-    const timeout = setTimeout(() => {
-      try {
-        localStorage.setItem(draftKey, JSON.stringify({ data: book, timestamp: Date.now() }));
-      } catch (e) { console.error('Local draft error:', e); }
-    }, 1000);
-    return () => clearTimeout(timeout);
-  }, [book, loading, draftKey]);
-
-  useEffect(() => {
-    return () => clearTimeout(localDraftStatusTimeoutRef.current);
-  }, []);
-
-  // Server autosave - 3s (FASTER!)
-  useEffect(() => {
-    const canAutosaveToServer = Boolean(book.title.trim() || getWordCount(book.review) >= 50);
-
-    if (loading || !canAutosaveToServer) return;
-    clearTimeout(autoSaveTimeoutRef.current);
-    autoSaveTimeoutRef.current = setTimeout(async () => {
-      setAutosaveStatus('saving');
-      try {
-        if (book._id) {
-          await api.put(`/api/books/${book._id}`, book);
-        } else if (!pendingCreateRef.current) {
-          pendingCreateRef.current = true;
-          const draftId = book.id || createAutosaveDraftId(book.title, book.review, 'book');
-          const response = await api.post('/api/books', { ...book, id: draftId });
-          setBook(prev => ({ ...prev, _id: response._id }));
-          pendingCreateRef.current = false;
-        } else { setAutosaveStatus('idle'); return; }
-        setAutosaveStatus('saved');
-        setTimeout(() => setAutosaveStatus('idle'), 1500);
-      } catch (err) { pendingCreateRef.current = false; console.error('Autosave failed:', err); setAutosaveStatus('idle'); }
-    }, 3000);
-    return () => clearTimeout(autoSaveTimeoutRef.current);
-  }, [book, loading]);
-
-  // SAVE ON EXIT: Save to localStorage when user leaves the page
-  useEffect(() => {
-    const saveBeforeUnload = () => {
-      try {
-        const draftData = {
-          data: book,
-          timestamp: Date.now(),
-        };
-        localStorage.setItem(draftKey, JSON.stringify(draftData));
-        console.log('Draft saved before exit');
-      } catch (e) {
-        console.error('Failed to save draft before exit:', e);
-      }
-    };
-
-    window.addEventListener('beforeunload', saveBeforeUnload);
-    
-    return () => {
-      saveBeforeUnload();
-      window.removeEventListener('beforeunload', saveBeforeUnload);
-    };
-  }, [book, draftKey]);
-
   const restoreDraft = () => {
     try {
-      const savedDraft = localStorage.getItem(draftKey);
-      if (savedDraft) {
-        const parsed = JSON.parse(savedDraft);
-        setBook(parsed.data);
+      const draft = autosave.readDraft();
+      if (draft) {
+        setBook(draft.data);
       }
     } catch (e) {
       console.error('Failed to restore draft:', e);
@@ -371,45 +311,26 @@ export function BookEditor() {
   };
 
   const discardDraft = () => {
-    try {
-      localStorage.removeItem(draftKey);
-    } catch (e) {
-      console.error('Failed to discard draft:', e);
-    }
+    autosave.clearDraft();
     setShowDraftRecovery(false);
-  };
-
-  const clearLocalDraft = () => {
-    try {
-      localStorage.removeItem(draftKey);
-    } catch (e) {
-      console.error('Failed to clear draft:', e);
-    }
   };
 
   // Stable update callback
   const handleUpdateBook = useCallback((updatedBook: Book) => {
-    persistDraftNow(updatedBook);
     setBook(updatedBook);
-  }, [persistDraftNow]);
+  }, []);
 
   // Stable callback for review content updates
   const handleReviewCommit = useCallback((review: string) => {
-    setBook(prev => {
-      const nextBook = { ...prev, review };
-      persistDraftNow(nextBook);
-      return nextBook;
-    });
-  }, [persistDraftNow]);
+    setBook(prev => ({ ...prev, review: setLocalizedText(prev.review, autoFixLanguage, review) }));
+  }, [autoFixLanguage]);
 
   const handleAutoFixReview = useCallback((nextReview: string) => {
     setBook(prev => {
-      if (prev.review === nextReview) return prev;
-      const nextBook = { ...prev, review: nextReview };
-      persistDraftNow(nextBook);
-      return nextBook;
+      if (getExactLocalizedText(prev.review, autoFixLanguage) === nextReview) return prev;
+      return { ...prev, review: setLocalizedText(prev.review, autoFixLanguage, nextReview) };
     });
-  }, [persistDraftNow]);
+  }, [autoFixLanguage]);
 
   // Track caret changes for suggestions.
   useEffect(() => {
@@ -445,16 +366,29 @@ export function BookEditor() {
 
   const insertMarkdown = (before: string, after: string = '') => {
     const textarea = textareaRef.current;
-    if (!textarea) return;
+
+    if (!textarea) {
+      setBook(prev => {
+        const current = getExactLocalizedText(prev.review, autoFixLanguage);
+        const newText = current + before + after;
+        const nextBook = { ...prev, review: setLocalizedText(prev.review, autoFixLanguage, newText) };
+        persistDraftNow(nextBook);
+        return nextBook;
+      });
+      return;
+    }
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const text = textarea.value;
     const selected = text.substring(start, end);
-
     const newText = text.substring(0, start) + before + selected + after + text.substring(end);
+
+    textarea.value = newText;
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
     setBook(prev => {
-      const nextBook = { ...prev, review: newText };
+      const nextBook = { ...prev, review: setLocalizedText(prev.review, autoFixLanguage, newText) };
       persistDraftNow(nextBook);
       return nextBook;
     });
@@ -463,14 +397,14 @@ export function BookEditor() {
       textarea.focus();
       textarea.selectionStart = start + before.length;
       textarea.selectionEnd = start + before.length + selected.length;
-    });
+    }, 0);
   };
 
   const insertImageMarkdown = (imageMarkdown: string) => {
     const textarea = textareaRef.current;
     if (!textarea) {
       setBook(prev => {
-        const nextBook = { ...prev, review: `${prev.review}\n${imageMarkdown}\n` };
+        const nextBook = { ...prev, review: setLocalizedText(prev.review, autoFixLanguage, `${getExactLocalizedText(prev.review, autoFixLanguage)}\n${imageMarkdown}\n`) };
         persistDraftNow(nextBook);
         return nextBook;
       });
@@ -482,7 +416,7 @@ export function BookEditor() {
     const text = textarea.value;
     const newText = `${text.substring(0, start)}${imageMarkdown}${text.substring(end)}`;
     setBook(prev => {
-      const nextBook = { ...prev, review: newText };
+      const nextBook = { ...prev, review: setLocalizedText(prev.review, autoFixLanguage, newText) };
       persistDraftNow(nextBook);
       return nextBook;
     });
@@ -499,7 +433,7 @@ export function BookEditor() {
     const textarea = textareaRef.current;
     if (!textarea) {
       setBook(prev => {
-        const nextBook = { ...prev, review: `${prev.review}${prev.review ? '\n' : ''}${linkMarkdown}` };
+        const nextBook = { ...prev, review: setLocalizedText(prev.review, autoFixLanguage, `${getExactLocalizedText(prev.review, autoFixLanguage)}${getExactLocalizedText(prev.review, autoFixLanguage) ? '\n' : ''}${linkMarkdown}`) };
         persistDraftNow(nextBook);
         return nextBook;
       });
@@ -511,7 +445,7 @@ export function BookEditor() {
     const text = textarea.value;
     const newText = `${text.substring(0, start)}${linkMarkdown}${text.substring(end)}`;
     setBook(prev => {
-      const nextBook = { ...prev, review: newText };
+      const nextBook = { ...prev, review: setLocalizedText(prev.review, autoFixLanguage, newText) };
       persistDraftNow(nextBook);
       return nextBook;
     });
@@ -527,15 +461,15 @@ export function BookEditor() {
   const handleSave = async () => {
     console.log('handleSave called with book:', book);
     
-    if (!book.title) {
+    if (!exactLocalizedTitle) {
       alert('Title is required');
       return;
     }
 
     // Auto-generate slug if not provided
     let finalBook = { ...book };
-    if (!finalBook.id && finalBook.title) {
-      const autoSlug = finalBook.title
+    if (!finalBook.id && exactLocalizedTitle) {
+      const autoSlug = exactLocalizedTitle
         .toLowerCase()
         .replace(/[^a-z0-9\s-]/g, '')
         .replace(/\s+/g, '-')
@@ -552,11 +486,11 @@ export function BookEditor() {
     console.log('Payload to save:', payload);
 
     // Sanitize base64 images to URLs if present in review
-    if (hasBase64Images(payload.review)) {
+    if (hasBase64Images(exactLocalizedReview)) {
       setIsSaving(true);
       try {
-        const sanitized = await sanitizeMarkdown(payload.review);
-        payload.review = sanitized;
+        const sanitized = await sanitizeMarkdown(exactLocalizedReview);
+        payload.review = setLocalizedText(payload.review, autoFixLanguage, sanitized);
       } catch (err) {
         console.error('Image sanitization failed:', err);
         alert('Peringatan: Beberapa gambar mungkin gagal diupload, namun konten akan disimpan');
@@ -569,15 +503,16 @@ export function BookEditor() {
       if (book._id) {
         console.log('Updating existing book with _id:', book._id);
         await api.put(`/api/books/${book._id}`, payload);
+        setBook(payload);
+        autosave.markAsSaved(payload);
       } else {
         console.log('Creating new book...');
-        // Create new book and capture the _id from response
         const response = await api.post('/api/books', payload);
-        console.log('API response:', response);
-        // Update state with the _id returned from server
-        setBook(prev => ({ ...prev, _id: response._id }));
+        const newBook = { ...payload, _id: response._id };
+        setBook(newBook);
+        autosave.markAsSaved(newBook);
       }
-      clearLocalDraft();
+      
       alert('Book saved successfully!');
       navigate('/admin/books');
     } catch (err) {
@@ -612,7 +547,8 @@ export function BookEditor() {
               <h1 className="text-lg font-bold text-[#F8FAFC]">
                 {book._id ? 'Edit Book' : 'New Book'}
               </h1>
-              <p className="text-xs text-[#94A3B8]">{book.title || 'Untitled'}</p>
+              <p className="text-xs text-[#94A3B8]">{exactLocalizedTitle || 'Untitled'}</p>
+              
             </div>
           </div>
 
@@ -629,36 +565,26 @@ export function BookEditor() {
               </div>
             </div>
 
-            {/* Local Draft Indicator */}
-            {localDraftStatus !== 'idle' && (
-              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${
-                localDraftStatus === 'saving'
-                  ? 'text-yellow-400 bg-yellow-400/10'
-                  : 'text-green-400 bg-green-400/10'
-              }`}>
-                <HardDrive className={`w-3 h-3 ${localDraftStatus === 'saving' ? 'animate-pulse' : ''}`} />
-                <span>{localDraftStatus === 'saving' ? 'Local save...' : 'Local ✓'}</span>
-              </div>
+            {/* Autosave Indicator */}
+            {autosave.status === 'saving' && (
+              <span className="flex items-center text-amber-500 font-medium">
+                <Clock className="w-4 h-4 mr-1 animate-spin" /> Saving...
+              </span>
             )}
-
-            {/* Server Autosave Indicator */}
-            {autosaveStatus !== 'idle' && (
-              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${
-                autosaveStatus === 'saving' ? 'text-yellow-400 bg-yellow-400/10' : 'text-green-400 bg-green-400/10'
-              }`}>
-                {autosaveStatus === 'saving' && (
-                  <>
-                    <Clock className="w-3 h-3 animate-spin" />
-                    <span>Saving...</span>
-                  </>
-                )}
-                {autosaveStatus === 'saved' && (
-                  <>
-                    <Check className="w-3 h-3" />
-                    <span>Server ✓</span>
-                  </>
-                )}
-              </div>
+            {autosave.status === 'retrying' && (
+              <span className="flex items-center text-amber-500 font-medium">
+                <Clock className="w-4 h-4 mr-1 animate-spin" /> Retrying...
+              </span>
+            )}
+            {autosave.status === 'saved' && (
+              <span className="flex items-center text-emerald-500 font-medium">
+                <Check className="w-4 h-4 mr-1" /> Saved
+              </span>
+            )}
+            {autosave.status === 'error' && (
+              <span className="flex items-center text-red-500 font-medium">
+                <AlertCircle className="w-4 h-4 mr-1" /> Error
+              </span>
             )}
 
             {/* Full Page Preview Button */}
@@ -695,7 +621,7 @@ export function BookEditor() {
 
             <button
               onClick={() => handleSave()}
-              disabled={isSaving || !book.title}
+              disabled={isSaving || !exactLocalizedTitle}
               className="px-4 py-2 bg-[#1E40AF] text-white rounded-lg text-sm font-medium hover:bg-[#1E3A8A] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSaving
@@ -715,20 +641,58 @@ export function BookEditor() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl">
           {/* Editor Area - Left */}
           <div className="md:col-span-2 space-y-4">
+            
+            {/* Language Tabs & ID Display */}
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#334155] pb-2">
+              <div className="flex items-center gap-1">
+                {(!book.contentLanguage || book.contentLanguage === 'bilingual' || book.contentLanguage === 'id') && (
+                  <button
+                    onClick={() => setAutoFixLanguage('id')}
+                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${autoFixLanguage === 'id' ? 'bg-[#1E40AF] text-white' : 'bg-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC]'}`}
+                  >
+                    🇮🇩 Indonesia
+                  </button>
+                )}
+                {(!book.contentLanguage || book.contentLanguage === 'bilingual' || book.contentLanguage === 'en') && (
+                  <button
+                    onClick={() => setAutoFixLanguage('en')}
+                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${autoFixLanguage === 'en' ? 'bg-[#1E40AF] text-white' : 'bg-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC]'}`}
+                  >
+                    🇬🇧 English
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 text-[11px] text-[#94A3B8] pb-2">
+                <div className="flex items-center gap-1">
+                  <span>ID:</span>
+                  <code className="bg-[#0F172A] px-1.5 py-0.5 rounded text-[#60A5FA] select-all cursor-text font-mono">
+                    {book._id || 'Unsaved'}
+                  </code>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>Slug:</span>
+                  <code className="bg-[#0F172A] px-1.5 py-0.5 rounded text-[#60A5FA] select-all cursor-text font-mono">
+                    {book.id || 'Unsaved'}
+                  </code>
+                </div>
+              </div>
+            </div>
+
             {/* Title & Author */}
             <div className="space-y-3">
               <input
                 type="text"
                 value={localTitle}
                 onChange={e => handleTitleChange(e.target.value)}
-                placeholder="Book Title..."
+                placeholder={autoFixLanguage === 'id' ? 'Judul Buku...' : 'Book Title...'}
                 className="w-full text-3xl font-bold text-[#F8FAFC] bg-transparent border-b-2 border-[#334155] pb-3 focus:outline-none focus:border-[#60A5FA] transition-colors placeholder:text-[#475569]"
               />
               <input
                 type="text"
-                value={book.author}
-                onChange={e => setBook({ ...book, author: e.target.value })}
-                placeholder="Author name..."
+                value={exactLocalizedAuthor}
+                onChange={e => setBook(prev => ({ ...prev, author: setLocalizedText(prev.author, autoFixLanguage, e.target.value) }))}
+                placeholder={autoFixLanguage === 'id' ? 'Nama Penulis...' : 'Author name...'}
                 className="w-full text-lg text-[#94A3B8] bg-transparent border-b border-[#334155] pb-2 focus:outline-none focus:border-[#60A5FA] focus:text-[#F8FAFC] transition-colors placeholder:text-[#475569]"
               />
             </div>
@@ -741,11 +705,12 @@ export function BookEditor() {
                 onInsertImage={insertImageMarkdown}
                 onOpenImageDialog={() => setImageDialogOpen(true)}
                 onOpenLinkDialog={() => setLinkDialogOpen(true)}
+                onOpenAssetReuser={book.contentLanguage === 'bilingual' ? () => setAssetReuserOpen(true) : undefined}
               />
 
               <div className="flex items-center gap-2">
                 <AutoFixButton
-                  text={book.review}
+                  text={exactLocalizedReview}
                   onApply={handleAutoFixReview}
                   language={autoFixLanguage}
                 />
@@ -801,9 +766,9 @@ export function BookEditor() {
                 <div className="flex flex-col h-full">
                   <label className="text-xs text-[#94A3B8] font-medium mb-2">MARKDOWN</label>
                   <IsolatedContentEditor
-                    initialValue={book.review}
+                    initialValue={exactLocalizedReview}
                     onCommit={handleReviewCommit}
-                    id={book._id || book.id}
+                    id={`${book._id || book.id}-${autoFixLanguage}`}
                     textareaRef={textareaRef}
                     spellCheck
                     lang={autoFixLanguage}
@@ -836,9 +801,9 @@ export function BookEditor() {
             ) : (
               /* Full Editor (no preview) */
               <IsolatedContentEditor
-                initialValue={book.review}
+                initialValue={exactLocalizedReview}
                 onCommit={handleReviewCommit}
-                id={book._id || book.id}
+                id={`${book._id || book.id}-${autoFixLanguage}`}
                 textareaRef={textareaRef}
                 spellCheck
                 lang={autoFixLanguage}
@@ -870,6 +835,14 @@ export function BookEditor() {
         onInsert={insertImageMarkdown}
       />
 
+      <AssetReuserDialog
+        isOpen={assetReuserOpen}
+        onClose={() => setAssetReuserOpen(false)}
+        sourceLanguage={autoFixLanguage === 'en' ? 'id' : 'en'}
+        otherLanguageContent={getExactLocalizedText(book.review, autoFixLanguage === 'en' ? 'id' : 'en')}
+        onInsert={(markdown) => insertMarkdown(markdown)}
+      />
+
       <LinkInsertDialog
         isOpen={linkDialogOpen}
         onClose={() => setLinkDialogOpen(false)}
@@ -881,7 +854,7 @@ export function BookEditor() {
         isOpen={showFullPreview}
         onClose={() => setShowFullPreview(false)}
         type="book"
-        data={book}
+        data={book as never}
       />
 
       {/* Draft Recovery Dialog */}
@@ -897,7 +870,7 @@ export function BookEditor() {
                 <p className="text-sm text-[#94A3B8]">
                   Anda memiliki draft yang belum disimpan dari{' '}
                   <span className="text-[#F8FAFC] font-medium">
-                    {draftTimestamp ? formatDraftTime(draftTimestamp) : 'sebelumnya'}
+                    {autosave.draftTimestamp ? formatDraftTime(autosave.draftTimestamp) : 'sebelumnya'}
                   </span>
                 </p>
               </div>

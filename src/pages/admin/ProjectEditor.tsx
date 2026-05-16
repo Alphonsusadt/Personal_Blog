@@ -13,18 +13,21 @@ import { useRenderedMarkdown } from '../../hooks/useRenderedMarkdown';
 import { formatDraftTime } from '../../hooks/useLocalDraft';
 import { IsolatedContentEditor } from '../../components/IsolatedInput';
 import { AutoFixButton } from '../../components/AutoFixButton';
+import { AssetReuserDialog } from '../../components/AssetReuserDialog';
 import { useAutoFixLanguage } from '../../hooks/useAutoFixLanguage';
 import { getAutoFixSuggestionsForWord } from '../../utils/textAutoFix';
 import { getSpellSuggestions } from '../../utils/spellSuggester';
+import { resolveLocalizedText, getExactLocalizedText, setLocalizedText, type LocalizedTextValue } from '../../lib/localized';
+import { useAdminAutosave } from '../../hooks/useAdminAutosave';
 
 interface Project {
   _id?: string;
   id: string;
-  title: string;
-  description: string;
+  title: LocalizedTextValue;
+  description: LocalizedTextValue;
   tags: string[];
   category: string;
-  content: string;
+  content: LocalizedTextValue;
   status?: 'draft' | 'published' | 'scheduled';
   publishAt?: string;
   createdAt?: string;
@@ -39,6 +42,8 @@ interface Project {
   ogImage?: string;
   keywords?: string;
   metaTitle?: string;
+  contentLanguage?: 'en' | 'id' | 'bilingual';
+  translationOfId?: string;
 }
 
 const emptyProject: Project = {
@@ -58,9 +63,9 @@ const emptyProject: Project = {
 
 function hasMeaningfulProjectDraft(data: Project): boolean {
   return Boolean(
-    data.title?.trim() ||
-    data.description?.trim() ||
-    data.content?.trim() ||
+    resolveLocalizedText(data.title, 'en').trim() ||
+    resolveLocalizedText(data.description, 'en').trim() ||
+    resolveLocalizedText(data.content, 'en').trim() ||
     data.tags?.length ||
     data.githubUrl?.trim() ||
     data.paperUrl?.trim() ||
@@ -112,26 +117,22 @@ export function ProjectEditor() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
-  const localDraftStatusTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
-  const pendingCreateRef = useRef(false);
-
   const [project, setProject] = useState<Project>(emptyProject);
   const [localTitle, setLocalTitle] = useState(''); // Local state for smooth title typing
   const [loading, setLoading] = useState(!!slug);
   const [isSaving, setIsSaving] = useState(false);
   const [projectsSectionEnabled, setProjectsSectionEnabled] = useState(true);
-  const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showPreview, setShowPreview] = useState(false);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [showFullPreview, setShowFullPreview] = useState(false);
-  const [localDraftStatus, setLocalDraftStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showDraftRecovery, setShowDraftRecovery] = useState(false);
-  const previewHtml = useRenderedMarkdown(project.content || '*Start writing to see preview...*');
-  const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null);
+  const [assetReuserOpen, setAssetReuserOpen] = useState(false);
 
-  const { language: autoFixLanguage } = useAutoFixLanguage();
+  const { language: autoFixLanguage, setLanguage: setAutoFixLanguage } = useAutoFixLanguage();
+  const exactLocalizedTitle = getExactLocalizedText(project.title, autoFixLanguage);
+  const exactLocalizedContent = getExactLocalizedText(project.content, autoFixLanguage);
+  const previewHtml = useRenderedMarkdown(exactLocalizedContent || '*Start writing to see preview...*');
 
   const [caretWord, setCaretWord] = useState<{ word: string; start: number; end: number } | null>(null);
   const [caretSuggestions, setCaretSuggestions] = useState<string[]>([]);
@@ -201,34 +202,44 @@ export function ProjectEditor() {
 
   const draftKey = `project_draft_${slug || 'new'}`;
 
-  const persistDraftNow = useCallback((nextProject: Project) => {
-    try {
-      setLocalDraftStatus('saving');
-      localStorage.setItem(draftKey, JSON.stringify({ data: nextProject, timestamp: Date.now() }));
-      setLocalDraftStatus('saved');
-      clearTimeout(localDraftStatusTimeoutRef.current);
-      localDraftStatusTimeoutRef.current = setTimeout(() => setLocalDraftStatus('idle'), 900);
-    } catch (e) {
-      console.error('Local draft error:', e);
-    }
-  }, [draftKey]);
+  // ── useAdminAutosave: all 6 principles in one hook ────────────────────────
+  const autosave = useAdminAutosave<Project>({
+    storageKey: draftKey,
+    data: project,
+    enabled: !loading,
+    hasMeaningfulData: hasMeaningfulProjectDraft,
+    saveToServer: async (snapshot) => {
+      if (snapshot._id) {
+        await api.put(`/api/projects/${snapshot._id}`, snapshot);
+      } else {
+        const autoSlug = snapshot.id || createAutosaveDraftId(
+          resolveLocalizedText(snapshot.title, autoFixLanguage), 
+          resolveLocalizedText(snapshot.content, autoFixLanguage), 
+          'project'
+        );
+        const response = await api.post('/api/projects', { ...snapshot, id: autoSlug });
+        setProject(prev => ({ ...prev, _id: response._id }));
+      }
+    },
+    localDebounceMs: 800,
+    serverDebounceMs: 3000,
+    periodicIntervalMs: 30_000,
+    resetStatusMs: 1500,
+    maxRetries: 3,
+  });
 
   // Sync localTitle when project changes from external source
   useEffect(() => {
-    setLocalTitle(project.title);
-  }, [project.title]);
+    setLocalTitle(exactLocalizedTitle);
+  }, [exactLocalizedTitle, autoFixLanguage]);
 
   // Title is persisted immediately so fast navigation cannot lose edits.
   const handleTitleChange = (value: string) => {
     setLocalTitle(value);
-    setProject(prev => {
-      const nextProject = { ...prev, title: value };
-      persistDraftNow(nextProject);
-      return nextProject;
-    });
+    setProject(prev => ({ ...prev, title: setLocalizedText(prev.title, autoFixLanguage, value) }));
   };
 
-  const plainContent = project.content
+  const plainContent = exactLocalizedContent
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`[^`]*`/g, ' ')
     .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')
@@ -241,18 +252,11 @@ export function ProjectEditor() {
 
   // Check for local draft on mount
   useEffect(() => {
-    try {
-      const savedDraft = localStorage.getItem(draftKey);
-      if (savedDraft) {
-        const parsed = JSON.parse(savedDraft);
-        setDraftTimestamp(parsed.timestamp);
-        if (hasMeaningfulProjectDraft(parsed.data) && (Date.now() - parsed.timestamp) < 86400000) {
-          setShowDraftRecovery(true);
-        }
-      }
-    } catch (e) {
-      console.error('Failed to check draft:', e);
+    const draft = autosave.readDraft();
+    if (draft && hasMeaningfulProjectDraft(draft.data) && (Date.now() - draft.timestamp) < 86_400_000) {
+      setShowDraftRecovery(true);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey]);
 
   // Load project if editing existing one — use single-item endpoint with fallback
@@ -303,75 +307,11 @@ export function ProjectEditor() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // Periodic backup write without touching indicator state.
-  useEffect(() => {
-    if (loading) return;
-    const timeout = setTimeout(() => {
-      try {
-        localStorage.setItem(draftKey, JSON.stringify({ data: project, timestamp: Date.now() }));
-      } catch (e) { console.error('Local draft error:', e); }
-    }, 1000);
-    return () => clearTimeout(timeout);
-  }, [project, loading, draftKey]);
-
-  useEffect(() => {
-    return () => clearTimeout(localDraftStatusTimeoutRef.current);
-  }, []);
-
-  // Server autosave - 3s (FASTER!)
-  useEffect(() => {
-    const canAutosaveToServer = Boolean(project.title.trim() || getWordCount(project.content) >= 50);
-
-    if (loading || !canAutosaveToServer) return;
-    clearTimeout(autoSaveTimeoutRef.current);
-    autoSaveTimeoutRef.current = setTimeout(async () => {
-      setAutosaveStatus('saving');
-      try {
-        if (project._id) {
-          await api.put(`/api/projects/${project._id}`, project);
-        } else if (!pendingCreateRef.current) {
-          pendingCreateRef.current = true;
-          const draftId = project.id || createAutosaveDraftId(project.title, project.content, 'project');
-          const response = await api.post('/api/projects', { ...project, id: draftId });
-          setProject(prev => ({ ...prev, _id: response._id }));
-          pendingCreateRef.current = false;
-        } else { setAutosaveStatus('idle'); return; }
-        setAutosaveStatus('saved');
-        setTimeout(() => setAutosaveStatus('idle'), 1500);
-      } catch (err) { pendingCreateRef.current = false; console.error('Autosave failed:', err); setAutosaveStatus('idle'); }
-    }, 3000);
-    return () => clearTimeout(autoSaveTimeoutRef.current);
-  }, [project, loading]);
-
-  // SAVE ON EXIT: Save to localStorage when user leaves the page
-  useEffect(() => {
-    const saveBeforeUnload = () => {
-      try {
-        const draftData = {
-          data: project,
-          timestamp: Date.now(),
-        };
-        localStorage.setItem(draftKey, JSON.stringify(draftData));
-        console.log('Draft saved before exit');
-      } catch (e) {
-        console.error('Failed to save draft before exit:', e);
-      }
-    };
-
-    window.addEventListener('beforeunload', saveBeforeUnload);
-    
-    return () => {
-      saveBeforeUnload();
-      window.removeEventListener('beforeunload', saveBeforeUnload);
-    };
-  }, [project, draftKey]);
-
   const restoreDraft = () => {
     try {
-      const savedDraft = localStorage.getItem(draftKey);
-      if (savedDraft) {
-        const parsed = JSON.parse(savedDraft);
-        setProject(parsed.data);
+      const draft = autosave.readDraft();
+      if (draft) {
+        setProject(draft.data);
       }
     } catch (e) {
       console.error('Failed to restore draft:', e);
@@ -380,45 +320,28 @@ export function ProjectEditor() {
   };
 
   const discardDraft = () => {
-    try {
-      localStorage.removeItem(draftKey);
-    } catch (e) {
-      console.error('Failed to discard draft:', e);
-    }
+    autosave.clearDraft();
     setShowDraftRecovery(false);
-  };
-
-  const clearLocalDraft = () => {
-    try {
-      localStorage.removeItem(draftKey);
-    } catch (e) {
-      console.error('Failed to clear draft:', e);
-    }
   };
 
   // Stable update callback
   const handleUpdateProject = useCallback((updatedProject: Project) => {
-    persistDraftNow(updatedProject);
     setProject(updatedProject);
-  }, [persistDraftNow]);
+  }, []);
 
   // Stable callback for content updates
   const handleContentCommit = useCallback((content: string) => {
-    setProject(prev => {
-      const nextProject = { ...prev, content };
-      persistDraftNow(nextProject);
-      return nextProject;
-    });
-  }, [persistDraftNow]);
+    setProject(prev => ({
+      ...prev, content: setLocalizedText(prev.content, autoFixLanguage, content)
+    }));
+  }, [autoFixLanguage]);
 
   const handleAutoFixContent = useCallback((nextContent: string) => {
     setProject(prev => {
-      if (prev.content === nextContent) return prev;
-      const nextProject = { ...prev, content: nextContent };
-      persistDraftNow(nextProject);
-      return nextProject;
+      if (getExactLocalizedText(prev.content, autoFixLanguage) === nextContent) return prev;
+      return { ...prev, content: setLocalizedText(prev.content, autoFixLanguage, nextContent) };
     });
-  }, [persistDraftNow]);
+  }, [autoFixLanguage]);
 
   // Track caret changes for suggestions.
   useEffect(() => {
@@ -454,16 +377,29 @@ export function ProjectEditor() {
 
   const insertMarkdown = (before: string, after: string = '') => {
     const textarea = textareaRef.current;
-    if (!textarea) return;
+
+    if (!textarea) {
+      setProject(prev => {
+        const current = getExactLocalizedText(prev.content, autoFixLanguage);
+        const newText = current + before + after;
+        const nextProject = { ...prev, content: setLocalizedText(prev.content, autoFixLanguage, newText) };
+        persistDraftNow(nextProject);
+        return nextProject;
+      });
+      return;
+    }
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const text = textarea.value;
     const selected = text.substring(start, end);
-
     const newText = text.substring(0, start) + before + selected + after + text.substring(end);
+
+    textarea.value = newText;
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
     setProject(prev => {
-      const nextProject = { ...prev, content: newText };
+      const nextProject = { ...prev, content: setLocalizedText(prev.content, autoFixLanguage, newText) };
       persistDraftNow(nextProject);
       return nextProject;
     });
@@ -472,14 +408,14 @@ export function ProjectEditor() {
       textarea.focus();
       textarea.selectionStart = start + before.length;
       textarea.selectionEnd = start + before.length + selected.length;
-    });
+    }, 0);
   };
 
   const insertImageMarkdown = (imageMarkdown: string) => {
     const textarea = textareaRef.current;
     if (!textarea) {
       setProject(prev => {
-        const nextProject = { ...prev, content: `${prev.content}\n${imageMarkdown}\n` };
+        const nextProject = { ...prev, content: `${getExactLocalizedText(prev.content, autoFixLanguage)}\n${imageMarkdown}\n` };
         persistDraftNow(nextProject);
         return nextProject;
       });
@@ -508,7 +444,7 @@ export function ProjectEditor() {
     const textarea = textareaRef.current;
     if (!textarea) {
       setProject(prev => {
-        const nextProject = { ...prev, content: `${prev.content}${prev.content ? '\n' : ''}${linkMarkdown}` };
+        const nextProject = { ...prev, content: `${getExactLocalizedText(prev.content, autoFixLanguage)}${getExactLocalizedText(prev.content, autoFixLanguage) ? '\n' : ''}${linkMarkdown}` };
         persistDraftNow(nextProject);
         return nextProject;
       });
@@ -536,15 +472,15 @@ export function ProjectEditor() {
   const handleSave = async () => {
     console.log('handleSave called with project:', project);
     
-    if (!project.title) {
+    if (!exactLocalizedTitle) {
       alert('Title is required');
       return;
     }
 
     // Auto-generate slug if not provided
     let finalProject = { ...project };
-    if (!finalProject.id && finalProject.title) {
-      const autoSlug = finalProject.title
+    if (!finalProject.id && exactLocalizedTitle) {
+      const autoSlug = exactLocalizedTitle
         .toLowerCase()
         .replace(/[^a-z0-9\s-]/g, '')
         .replace(/\s+/g, '-')
@@ -561,11 +497,11 @@ export function ProjectEditor() {
     console.log('Payload to save:', payload);
 
     // Sanitize base64 images to URLs if present
-    if (hasBase64Images(payload.content)) {
+    if (hasBase64Images(exactLocalizedContent)) {
       setIsSaving(true);
       try {
-        const sanitized = await sanitizeMarkdown(payload.content);
-        payload.content = sanitized;
+        const sanitized = await sanitizeMarkdown(exactLocalizedContent);
+        payload.content = setLocalizedText(payload.content, autoFixLanguage, sanitized);
       } catch (err) {
         console.error('Image sanitization failed:', err);
         alert('Warning: Some images may have failed to upload, but content will be saved');
@@ -578,15 +514,19 @@ export function ProjectEditor() {
       if (project._id) {
         console.log('Updating existing project with _id:', project._id);
         await api.put(`/api/projects/${project._id}`, payload);
+        setProject(payload);
+        autosave.markAsSaved(payload);
       } else {
         console.log('Creating new project...');
         // Create new project and capture the _id from response
         const response = await api.post('/api/projects', payload);
         console.log('API response:', response);
         // Update state with the _id returned from server
-        setProject(prev => ({ ...prev, _id: response._id }));
+        const newProject = { ...payload, _id: response._id };
+        setProject(newProject);
+        autosave.markAsSaved(newProject);
       }
-      clearLocalDraft();
+      
       alert('Project saved successfully!');
       navigate('/admin/projects');
     } catch (err) {
@@ -622,7 +562,7 @@ export function ProjectEditor() {
                 {project._id ? 'Edit Project' : 'New Project'}
               </h1>
               <p className="text-xs text-[#94A3B8] truncate max-w-[150px] sm:max-w-none">
-                {project.title || 'Untitled'}
+                {exactLocalizedTitle || 'Untitled'}
               </p>
             </div>
           </div>
@@ -640,36 +580,26 @@ export function ProjectEditor() {
               </div>
             </div>
 
-            {/* Local Draft Indicator */}
-            {localDraftStatus !== 'idle' && (
-              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${
-                localDraftStatus === 'saving'
-                  ? 'text-yellow-400 bg-yellow-400/10'
-                  : 'text-green-400 bg-green-400/10'
-              }`}>
-                <HardDrive className={`w-3 h-3 ${localDraftStatus === 'saving' ? 'animate-pulse' : ''}`} />
-                <span>{localDraftStatus === 'saving' ? 'Local save...' : 'Local ✓'}</span>
-              </div>
+            {/* Autosave Indicator */}
+            {autosave.status === 'saving' && (
+              <span className="flex items-center text-amber-500 font-medium text-xs">
+                <Clock className="w-4 h-4 mr-1 animate-spin" /> Saving...
+              </span>
             )}
-
-            {/* Server Autosave Indicator */}
-            {autosaveStatus !== 'idle' && (
-              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${
-                autosaveStatus === 'saving' ? 'text-yellow-400 bg-yellow-400/10' : 'text-green-400 bg-green-400/10'
-              }`}>
-                {autosaveStatus === 'saving' && (
-                  <>
-                    <Clock className="w-3 h-3 animate-spin" />
-                    <span>Saving...</span>
-                  </>
-                )}
-                {autosaveStatus === 'saved' && (
-                  <>
-                    <Check className="w-3 h-3" />
-                    <span>Server ✓</span>
-                  </>
-                )}
-              </div>
+            {autosave.status === 'retrying' && (
+              <span className="flex items-center text-amber-500 font-medium text-xs">
+                <Clock className="w-4 h-4 mr-1 animate-spin" /> Retrying...
+              </span>
+            )}
+            {autosave.status === 'saved' && (
+              <span className="flex items-center text-emerald-500 font-medium text-xs">
+                <Check className="w-4 h-4 mr-1" /> Saved
+              </span>
+            )}
+            {autosave.status === 'error' && (
+              <span className="flex items-center text-red-500 font-medium text-xs">
+                <AlertCircle className="w-4 h-4 mr-1" /> Error
+              </span>
             )}
 
             {/* Full Page Preview Button */}
@@ -706,7 +636,7 @@ export function ProjectEditor() {
 
             <button
               onClick={() => handleSave()}
-              disabled={isSaving || !project.title}
+              disabled={isSaving || !exactLocalizedTitle}
               className="px-3 sm:px-4 py-2 bg-[#1E40AF] text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-[#1E3A8A] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSaving
@@ -726,13 +656,51 @@ export function ProjectEditor() {
         <div className="grid grid-cols-12 gap-4 sm:gap-6 lg:gap-8 max-w-[90rem] mx-auto">
           {/* Editor Area - col-span-8 on large screens */}
           <div className="col-span-12 lg:col-span-8 space-y-4">
+            
+            {/* Language Tabs & ID Display */}
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#334155] pb-2">
+              <div className="flex items-center gap-1">
+                {(!project.contentLanguage || project.contentLanguage === 'bilingual' || project.contentLanguage === 'id') && (
+                  <button
+                    onClick={() => setAutoFixLanguage('id')}
+                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${autoFixLanguage === 'id' ? 'bg-[#1E40AF] text-white' : 'bg-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC]'}`}
+                  >
+                    🇮🇩 Indonesia
+                  </button>
+                )}
+                {(!project.contentLanguage || project.contentLanguage === 'bilingual' || project.contentLanguage === 'en') && (
+                  <button
+                    onClick={() => setAutoFixLanguage('en')}
+                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${autoFixLanguage === 'en' ? 'bg-[#1E40AF] text-white' : 'bg-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC]'}`}
+                  >
+                    🇬🇧 English
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 text-[11px] text-[#94A3B8] pb-2">
+                <div className="flex items-center gap-1">
+                  <span>ID:</span>
+                  <code className="bg-[#0F172A] px-1.5 py-0.5 rounded text-[#60A5FA] select-all cursor-text font-mono">
+                    {project._id || 'Unsaved'}
+                  </code>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>Slug:</span>
+                  <code className="bg-[#0F172A] px-1.5 py-0.5 rounded text-[#60A5FA] select-all cursor-text font-mono">
+                    {project.id || 'Unsaved'}
+                  </code>
+                </div>
+              </div>
+            </div>
+
             {/* Title Input */}
             <div>
               <input
                 type="text"
                 value={localTitle}
                 onChange={e => handleTitleChange(e.target.value)}
-                placeholder="Project Title..."
+                placeholder={autoFixLanguage === 'id' ? 'Judul Proyek...' : 'Project Title...'}
                 className="w-full text-2xl sm:text-3xl font-bold text-[#F8FAFC] bg-transparent border-b-2 border-[#334155] pb-3 focus:outline-none focus:border-[#60A5FA] transition-colors placeholder:text-[#475569]"
               />
             </div>
@@ -745,11 +713,12 @@ export function ProjectEditor() {
                 onInsertImage={insertImageMarkdown}
                 onOpenImageDialog={() => setImageDialogOpen(true)}
                 onOpenLinkDialog={() => setLinkDialogOpen(true)}
+                onOpenAssetReuser={project.contentLanguage === 'bilingual' ? () => setAssetReuserOpen(true) : undefined}
               />
 
               <div className="flex items-center gap-2">
                 <AutoFixButton
-                  text={project.content}
+                  text={exactLocalizedContent}
                   onApply={handleAutoFixContent}
                   language={autoFixLanguage}
                 />
@@ -805,9 +774,9 @@ export function ProjectEditor() {
                 <div className="flex flex-col h-full">
                   <label className="text-xs text-[#94A3B8] font-medium mb-2">MARKDOWN</label>
                   <IsolatedContentEditor
-                    initialValue={project.content}
+                    initialValue={exactLocalizedContent}
                     onCommit={handleContentCommit}
-                    id={project._id || project.id}
+                    id={`${project._id || project.id}-${autoFixLanguage}`}
                     textareaRef={textareaRef}
                     spellCheck
                     lang={autoFixLanguage}
@@ -840,9 +809,9 @@ export function ProjectEditor() {
             ) : (
               /* Full Editor (no preview) */
               <IsolatedContentEditor
-                initialValue={project.content}
+                initialValue={exactLocalizedContent}
                 onCommit={handleContentCommit}
-                id={project._id || project.id}
+                id={`${project._id || project.id}-${autoFixLanguage}`}
                 textareaRef={textareaRef}
                 spellCheck
                 lang={autoFixLanguage}
@@ -876,6 +845,14 @@ export function ProjectEditor() {
         onInsert={insertImageMarkdown}
       />
 
+      <AssetReuserDialog
+        isOpen={assetReuserOpen}
+        onClose={() => setAssetReuserOpen(false)}
+        sourceLanguage={autoFixLanguage === 'en' ? 'id' : 'en'}
+        otherLanguageContent={getExactLocalizedText(project.content, autoFixLanguage === 'en' ? 'id' : 'en')}
+        onInsert={(markdown) => insertMarkdown(markdown)}
+      />
+
       <LinkInsertDialog
         isOpen={linkDialogOpen}
         onClose={() => setLinkDialogOpen(false)}
@@ -887,7 +864,7 @@ export function ProjectEditor() {
         isOpen={showFullPreview}
         onClose={() => setShowFullPreview(false)}
         type="project"
-        data={project}
+        data={project as never}
       />
 
       {/* Draft Recovery Dialog */}
@@ -903,7 +880,7 @@ export function ProjectEditor() {
                 <p className="text-sm text-[#94A3B8]">
                   Anda memiliki draft yang belum disimpan dari{' '}
                   <span className="text-[#F8FAFC] font-medium">
-                    {draftTimestamp ? formatDraftTime(draftTimestamp) : 'sebelumnya'}
+                    {autosave.draftTimestamp ? formatDraftTime(autosave.draftTimestamp) : 'sebelumnya'}
                   </span>
                 </p>
               </div>

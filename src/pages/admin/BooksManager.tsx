@@ -1,19 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, getRuntimeCache, setRuntimeCache } from '../../lib/api';
-import { Plus, Pencil, Trash2, Clock, Calendar, Eye, EyeOff } from 'lucide-react';
+import { Plus, Pencil, Trash2, Clock, Calendar, Eye, EyeOff, Filter } from 'lucide-react';
+import { resolveLocalizedText, getTranslationStatus, type LocalizedTextValue } from '../../lib/localized';
 
 interface Book {
   _id?: string;
   id: string;
-  title: string;
-  author: string;
+  title: LocalizedTextValue;
+  author: LocalizedTextValue;
   cover: string;
   rating: number;
   category: string;
   takeaways: string[];
-  review: string;
+  review: LocalizedTextValue;
   status?: 'draft' | 'published' | 'scheduled';
+  contentLanguage?: 'en' | 'id' | 'bilingual';
+  translationOfId?: string;
   visible?: boolean;
   publishAt?: string;
   createdAt?: string;
@@ -30,6 +33,7 @@ export function BooksManager() {
   const navigate = useNavigate();
   const [items, setItems] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterLang, setFilterLang] = useState<'all' | 'bilingual' | 'en' | 'id'>('all');
   const cacheKey = 'admin:books:list';
 
   const load = () => {
@@ -74,7 +78,22 @@ export function BooksManager() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-[#F8FAFC]">Books</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-[#F8FAFC] mb-2">Books</h1>
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-[#94A3B8]" />
+            <select
+              value={filterLang}
+              onChange={(e) => setFilterLang(e.target.value as any)}
+              className="bg-[#1E293B] border border-[#334155] text-[#F8FAFC] rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-[#60A5FA]"
+            >
+              <option value="all">Semua Bahasa</option>
+              <option value="bilingual">Bilingual (Dua Bahasa)</option>
+              <option value="id">Hanya Indonesia (ID)</option>
+              <option value="en">Hanya English (EN)</option>
+            </select>
+          </div>
+        </div>
         <button onClick={() => navigate('/admin/books/edit/new')} className="flex items-center gap-2 bg-[#1E40AF] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#1E3A8A]"><Plus className="w-4 h-4" /> Add Book</button>
       </div>
 
@@ -89,9 +108,30 @@ export function BooksManager() {
               <th className="px-6 py-3 text-xs font-medium text-[#94A3B8] uppercase text-right">Actions</th>
             </tr></thead>
             <tbody>
-              {items.map(item => (
+              {items.filter(item => {
+                if (filterLang === 'all') return true;
+                const status = getTranslationStatus(item.title, item.translationOfId);
+                if (filterLang === 'bilingual') return status === 'bilingual';
+                if (filterLang === 'id') return status === 'single-id';
+                if (filterLang === 'en') return status === 'single-en';
+                return true;
+              }).map(item => {
+                const status = getTranslationStatus(item.title, item.translationOfId);
+                return (
                 <tr key={item._id} className="border-b border-[#334155] last:border-0 hover:bg-[#334155]/20 transition-colors">
-                  <td className="px-6 py-4"><p className="text-[#F8FAFC] font-medium text-sm">{item.title}</p><p className="text-[#94A3B8] text-xs mt-1">{item.author}</p></td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-[#F8FAFC] font-medium text-sm">{resolveLocalizedText(item.title, 'id') || resolveLocalizedText(item.title, 'en') || 'Untitled'}</p>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                        status === 'bilingual' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
+                        status === 'single-id' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                        'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                      }`}>
+                        {status === 'bilingual' ? 'Bilingual' : status === 'single-id' ? 'Single (ID)' : 'Single (EN)'}
+                      </span>
+                    </div>
+                    <p className="text-[#94A3B8] text-xs mt-1">{resolveLocalizedText(item.author, 'id') || resolveLocalizedText(item.author, 'en')}</p>
+                  </td>
                   <td className="px-6 py-4 hidden md:table-cell"><span className="text-xs bg-[#334155] text-[#94A3B8] px-2 py-1 rounded">{item.category}</span></td>
                   <td className="px-6 py-4 hidden lg:table-cell">
                     <div className="text-xs text-[#94A3B8] space-y-1">
@@ -120,7 +160,8 @@ export function BooksManager() {
                     <button onClick={() => handleDelete(item._id!)} className="p-2 text-[#94A3B8] hover:text-red-400 transition-colors"><Trash2 className="w-4 h-4" /></button>
                   </div></td>
                 </tr>
-              ))}
+                );
+              })}
               {items.length === 0 && <tr><td colSpan={5} className="px-6 py-8 text-center text-[#94A3B8]">No books yet</td></tr>}
             </tbody>
           </table>

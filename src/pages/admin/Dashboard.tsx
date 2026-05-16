@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api, getRuntimeCache, setRuntimeCache } from '../../lib/api';
 import { FolderKanban, PenLine, BookOpen, Plus, Calendar, Eye, Edit, TrendingUp } from 'lucide-react';
+import { resolveLocalizedText } from '../../lib/localized';
 
 interface Writing {
   _id: string;
@@ -194,8 +195,8 @@ export function Dashboard() {
                   recentWritings.map(writing => (
                     <div key={writing._id} className="border-b border-[#334155] last:border-0 pb-3 last:pb-0">
                       <Link to={`/admin/writings/edit/${writing.id || writing._id || ''}`} className="block hover:text-purple-400 transition-colors group">
-                        <h4 className="text-[#F8FAFC] font-medium text-sm line-clamp-1 group-hover:text-purple-300">{writing.title}</h4>
-                        <p className="text-[#94A3B8] text-xs mt-1 line-clamp-2">{writing.excerpt}</p>
+                        <h4 className="text-[#F8FAFC] font-medium text-sm line-clamp-1 group-hover:text-purple-300">{resolveLocalizedText(writing.title, 'id')}</h4>
+                        <p className="text-[#94A3B8] text-xs mt-1 line-clamp-2">{resolveLocalizedText(writing.excerpt, 'id')}</p>
                         <div className="flex items-center justify-between mt-2">
                           <div className="flex items-center gap-2">
                             <Calendar className="w-3 h-3 text-[#64748B]" />
@@ -239,8 +240,8 @@ export function Dashboard() {
                   recentBooks.map(book => (
                     <div key={book._id} className="border-b border-[#334155] last:border-0 pb-3 last:pb-0">
                       <Link to={`/admin/books/edit/${book.id || book._id || ''}`} className="block hover:text-amber-400 transition-colors group">
-                        <h4 className="text-[#F8FAFC] font-medium text-sm line-clamp-1 group-hover:text-amber-300">{book.title}</h4>
-                        <p className="text-[#94A3B8] text-xs mt-1">by {book.author}</p>
+                        <h4 className="text-[#F8FAFC] font-medium text-sm line-clamp-1 group-hover:text-amber-300">{resolveLocalizedText(book.title, 'id')}</h4>
+                        <p className="text-[#94A3B8] text-xs mt-1">by {resolveLocalizedText(book.author, 'id')}</p>
                         <div className="flex items-center justify-between mt-2">
                           <div className="flex items-center gap-2">
                             <Calendar className="w-3 h-3 text-[#64748B]" />
@@ -288,8 +289,8 @@ export function Dashboard() {
                   recentProjects.map(project => (
                     <div key={project._id} className="border-b border-[#334155] last:border-0 pb-3 last:pb-0">
                       <Link to={`/admin/projects/edit/${project.id || project._id || ''}`} className="block hover:text-blue-400 transition-colors group">
-                        <h4 className="text-[#F8FAFC] font-medium text-sm line-clamp-1 group-hover:text-blue-300">{project.title}</h4>
-                        <p className="text-[#94A3B8] text-xs mt-1 line-clamp-2">{project.description}</p>
+                        <h4 className="text-[#F8FAFC] font-medium text-sm line-clamp-1 group-hover:text-blue-300">{resolveLocalizedText(project.title, 'id')}</h4>
+                        <p className="text-[#94A3B8] text-xs mt-1 line-clamp-2">{resolveLocalizedText(project.description, 'id')}</p>
                         <div className="flex items-center justify-between mt-2">
                           <div className="flex items-center gap-2">
                             <Calendar className="w-3 h-3 text-[#64748B]" />

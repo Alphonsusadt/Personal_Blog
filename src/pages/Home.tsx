@@ -6,6 +6,7 @@ import { WritingCard } from '../components/WritingCard';
 import { BookCard } from '../components/BookCard';
 import { api } from '../lib/api';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
+import { getExactLocalizedText } from '../lib/localized';
 import type { Project } from '../data/projects';
 import type { Writing } from '../data/writings';
 import type { Book } from '../data/library';
@@ -255,9 +256,9 @@ function generateECGPath(
 }
 
 export function Home() {
-  const [recentProjects, setRecentProjects] = useState<Project[]>([]);
-  const [recentWritings, setRecentWritings] = useState<Writing[]>([]);
-  const [featuredBooks, setFeaturedBooks] = useState<Book[]>([]);
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
+  const [allWritings, setAllWritings] = useState<Writing[]>([]);
+  const [allBooks, setAllBooks] = useState<Book[]>([]);
   const [homeData, setHomeData] = useState<HomeData>(defaultHomeData);
   const [sectionVisibility, setSectionVisibility] = useState({
     writings: true,
@@ -265,6 +266,36 @@ export function Home() {
     books: true,
   });
   const { language } = useSiteLanguage();
+
+  const recentProjects = useMemo(() => {
+    return allProjects.filter(p => {
+      if (p.contentLanguage && p.contentLanguage !== 'bilingual' && p.contentLanguage !== language) return false;
+      if (p.contentLanguage === 'bilingual' || !p.contentLanguage) {
+        if (!getExactLocalizedText(p.title, language)) return false;
+      }
+      return true;
+    }).slice(0, 3);
+  }, [allProjects, language]);
+
+  const recentWritings = useMemo(() => {
+    return allWritings.filter(w => {
+      if (w.contentLanguage && w.contentLanguage !== 'bilingual' && w.contentLanguage !== language) return false;
+      if (w.contentLanguage === 'bilingual' || !w.contentLanguage) {
+        if (!getExactLocalizedText(w.title, language)) return false;
+      }
+      return true;
+    }).slice(0, 3);
+  }, [allWritings, language]);
+
+  const featuredBooks = useMemo(() => {
+    return allBooks.filter(b => {
+      if (b.contentLanguage && b.contentLanguage !== 'bilingual' && b.contentLanguage !== language) return false;
+      if (b.contentLanguage === 'bilingual' || !b.contentLanguage) {
+        if (!getExactLocalizedText(b.title, language)) return false;
+      }
+      return true;
+    }).slice(0, 3);
+  }, [allBooks, language]);
 
   // Generate signal paths once on mount for organic variation
   const emgPath = useMemo(() => generateEMGPath(24, 161, 52, 8), []);
@@ -279,9 +310,9 @@ export function Home() {
       })
       .catch(console.error);
 
-    api.getPublicProjects().then((data: Project[]) => setRecentProjects(data.slice(0, 3))).catch(console.error);
-    api.getPublicWritings().then((data: Writing[]) => setRecentWritings(data.slice(0, 3))).catch(console.error);
-    api.getPublicBooks().then((data: Book[]) => setFeaturedBooks(data.slice(0, 3))).catch(console.error);
+    api.getPublicProjects().then((data: Project[]) => setAllProjects(data)).catch(console.error);
+    api.getPublicWritings().then((data: Writing[]) => setAllWritings(data)).catch(console.error);
+    api.getPublicBooks().then((data: Book[]) => setAllBooks(data)).catch(console.error);
 
     api.getPublicSettings().then((settings: PublicSettings) => {
       setSectionVisibility({
@@ -293,22 +324,22 @@ export function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-canvas">
       {/* Hero Section */}
-      <section className="relative py-20 lg:py-32 bg-[#FAFAFA] dark:bg-[#0F172A]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative py-[96px]">
+        <div className="max-w-[1280px] mx-auto px-6 lg:px-12">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             {/* Left Content */}
             <div className="space-y-8">
               <div className="space-y-4">
-                <h1 className="text-5xl lg:text-6xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] leading-tight">
+                <h1 className="display-xl text-ink">
                   {homeData.heroName[language]}
-                  <span className="block text-[#1E40AF] dark:text-[#60A5FA]">{homeData.heroLastName[language]}</span>
+                  <span className="block text-ink">{homeData.heroLastName[language]}</span>
                 </h1>
-                <p className="text-xl text-[#6B7280] max-w-lg">
+                <p className="body-lg text-ink">
                   {homeData.heroSubtitle[language]}
                 </p>
-                <p className="text-lg text-[#6B7280] leading-relaxed">
+                <p className="body-lg text-ink opacity-80">
                   {homeData.heroTagline[language]}
                 </p>
               </div>
@@ -335,24 +366,24 @@ export function Home() {
               <div className="flex items-center space-x-6 pt-4">
                 <a
                   href={homeData.socialLinks.linkedin}
-                  className="flex items-center space-x-2 text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors group"
+                  className="flex items-center space-x-2 text-ink opacity-60 hover:opacity-100 transition-opacity group"
                 >
                   <Linkedin className="w-5 h-5" />
-                  <span className="text-sm font-medium">LinkedIn</span>
+                  <span className="caption">LinkedIn</span>
                 </a>
                 <a
                   href={homeData.socialLinks.github}
-                  className="flex items-center space-x-2 text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors group"
+                  className="flex items-center space-x-2 text-ink opacity-60 hover:opacity-100 transition-opacity group"
                 >
                   <Github className="w-5 h-5" />
-                  <span className="text-sm font-medium">GitHub</span>
+                  <span className="caption">GitHub</span>
                 </a>
                 <a
                   href={`mailto:${homeData.socialLinks.email}`}
-                  className="flex items-center space-x-2 text-[#6B7280] hover:text-[#1E40AF] dark:hover:text-[#60A5FA] transition-colors group"
+                  className="flex items-center space-x-2 text-ink opacity-60 hover:opacity-100 transition-opacity group"
                 >
                   <Mail className="w-5 h-5" />
-                  <span className="text-sm font-medium">Email</span>
+                  <span className="caption">Email</span>
                 </a>
               </div>
             </div>
@@ -642,16 +673,17 @@ export function Home() {
 
       {/* Recent Projects Section */}
       {sectionVisibility.projects ? (
-      <section className="py-16 bg-white dark:bg-[#0F172A]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-4">
-              {homeData.sections.recentProjects.title[language]}
-            </h2>
-            <p className="text-lg text-[#6B7280] max-w-2xl mx-auto">
-              {homeData.sections.recentProjects.subtitle[language]}
-            </p>
-          </div>
+      <section className="mb-[96px]">
+        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-block-lime color-block-section">
+            <div className="mb-12">
+              <h2 className="display-lg text-ink mb-4">
+                {homeData.sections.recentProjects.title[language]}
+              </h2>
+              <p className="subhead text-ink max-w-2xl">
+                {homeData.sections.recentProjects.subtitle[language]}
+              </p>
+            </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {recentProjects.map((project) => (
@@ -659,14 +691,15 @@ export function Home() {
             ))}
           </div>
 
-          <div className="text-center mt-12">
-            <Link
-              to="/engineering"
-              className="btn btn-primary inline-flex items-center space-x-2"
-            >
-              <span>View All Projects</span>
-              <ChevronRight className="w-4 h-4" />
-            </Link>
+            <div className="text-center mt-12">
+              <Link
+                to="/engineering"
+                className="btn btn-primary inline-flex items-center space-x-2"
+              >
+                <span>View All Projects</span>
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -674,16 +707,17 @@ export function Home() {
 
       {/* Recent Writings Section */}
       {sectionVisibility.writings ? (
-      <section className="py-16">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-4">
-              {homeData.sections.recentWritings.title[language]}
-            </h2>
-            <p className="text-lg text-[#6B7280] max-w-2xl mx-auto">
-              {homeData.sections.recentWritings.subtitle[language]}
-            </p>
-          </div>
+      <section className="mb-[96px]">
+        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-block-lilac color-block-section">
+            <div className="mb-12">
+              <h2 className="display-lg text-ink mb-4">
+                {homeData.sections.recentWritings.title[language]}
+              </h2>
+              <p className="subhead text-ink max-w-2xl">
+                {homeData.sections.recentWritings.subtitle[language]}
+              </p>
+            </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {recentWritings.map((writing) => (
@@ -691,14 +725,15 @@ export function Home() {
             ))}
           </div>
 
-          <div className="text-center mt-12">
-            <Link
-              to="/writings"
-              className="btn btn-secondary inline-flex items-center space-x-2"
-            >
-              <span>Read All Writings</span>
-              <ChevronRight className="w-4 h-4" />
-            </Link>
+            <div className="text-center mt-12">
+              <Link
+                to="/writings"
+                className="btn btn-primary inline-flex items-center space-x-2"
+              >
+                <span>Read All Writings</span>
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -706,16 +741,17 @@ export function Home() {
 
       {/* Featured Books Section */}
       {sectionVisibility.books ? (
-      <section className="py-16 bg-white dark:bg-[#0F172A]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-[#1A1A1A] dark:text-[#F8FAFC] mb-4">
-              {homeData.sections.featuredBooks.title[language]}
-            </h2>
-            <p className="text-lg text-[#6B7280] max-w-2xl mx-auto">
-              {homeData.sections.featuredBooks.subtitle[language]}
-            </p>
-          </div>
+      <section className="mb-[96px]">
+        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-block-cream color-block-section">
+            <div className="mb-12">
+              <h2 className="display-lg text-ink mb-4">
+                {homeData.sections.featuredBooks.title[language]}
+              </h2>
+              <p className="subhead text-ink max-w-2xl">
+                {homeData.sections.featuredBooks.subtitle[language]}
+              </p>
+            </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {featuredBooks.map((book) => (
@@ -723,14 +759,15 @@ export function Home() {
             ))}
           </div>
 
-          <div className="text-center mt-12">
-            <Link
-              to="/library"
-              className="btn btn-primary inline-flex items-center space-x-2"
-            >
-              <span>Browse Library</span>
-              <ChevronRight className="w-4 h-4" />
-            </Link>
+            <div className="text-center mt-12">
+              <Link
+                to="/library"
+                className="btn btn-primary inline-flex items-center space-x-2"
+              >
+                <span>Browse Library</span>
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>

@@ -1,17 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, getRuntimeCache, setRuntimeCache } from '../../lib/api';
-import { Plus, Pencil, Trash2, Clock, Calendar, Eye, EyeOff } from 'lucide-react';
+import { Plus, Pencil, Trash2, Clock, Calendar, Eye, EyeOff, Filter } from 'lucide-react';
+import { resolveLocalizedText, getTranslationStatus, type LocalizedTextValue } from '../../lib/localized';
 
 interface Project {
   _id?: string;
   id: string;
-  title: string;
-  description: string;
+  title: LocalizedTextValue;
+  description: LocalizedTextValue;
   tags: string[];
   category: string;
-  content: string;
+  content: LocalizedTextValue;
   status?: 'draft' | 'published' | 'scheduled';
+  contentLanguage?: 'en' | 'id' | 'bilingual';
+  translationOfId?: string;
   visible?: boolean;
   publishAt?: string;
   createdAt?: string;
@@ -28,6 +31,7 @@ export function ProjectsManager() {
   const navigate = useNavigate();
   const [items, setItems] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterLang, setFilterLang] = useState<'all' | 'bilingual' | 'en' | 'id'>('all');
   const cacheKey = 'admin:projects:list';
 
   const load = () => {
@@ -74,7 +78,22 @@ export function ProjectsManager() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-[#F8FAFC]">Projects</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-[#F8FAFC] mb-2">Projects</h1>
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-[#94A3B8]" />
+            <select
+              value={filterLang}
+              onChange={(e) => setFilterLang(e.target.value as any)}
+              className="bg-[#1E293B] border border-[#334155] text-[#F8FAFC] rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-[#60A5FA]"
+            >
+              <option value="all">Semua Bahasa</option>
+              <option value="bilingual">Bilingual (Dua Bahasa)</option>
+              <option value="id">Hanya Indonesia (ID)</option>
+              <option value="en">Hanya English (EN)</option>
+            </select>
+          </div>
+        </div>
         <button onClick={() => navigate('/admin/projects/edit/new')} className="flex items-center gap-2 bg-[#1E40AF] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#1E3A8A] transition-colors">
           <Plus className="w-4 h-4" /> Add Project
         </button>
@@ -93,11 +112,29 @@ export function ProjectsManager() {
               </tr>
             </thead>
             <tbody>
-              {items.map(item => (
+              {items.filter(item => {
+                if (filterLang === 'all') return true;
+                const status = getTranslationStatus(item.title, item.translationOfId);
+                if (filterLang === 'bilingual') return status === 'bilingual';
+                if (filterLang === 'id') return status === 'single-id';
+                if (filterLang === 'en') return status === 'single-en';
+                return true;
+              }).map(item => {
+                const status = getTranslationStatus(item.title, item.translationOfId);
+                return (
                 <tr key={item._id} className="border-b border-[#334155] last:border-0 hover:bg-[#334155]/20 transition-colors">
                   <td className="px-6 py-4">
-                    <p className="text-[#F8FAFC] font-medium text-sm">{item.title}</p>
-                    <p className="text-[#94A3B8] text-xs mt-1 line-clamp-1">{item.description}</p>
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-[#F8FAFC] font-medium text-sm">{resolveLocalizedText(item.title, 'id') || resolveLocalizedText(item.title, 'en') || 'Untitled'}</p>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                        status === 'bilingual' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
+                        status === 'single-id' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                        'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                      }`}>
+                        {status === 'bilingual' ? 'Bilingual' : status === 'single-id' ? 'Single (ID)' : 'Single (EN)'}
+                      </span>
+                    </div>
+                    <p className="text-[#94A3B8] text-xs line-clamp-1">{resolveLocalizedText(item.description, 'id') || resolveLocalizedText(item.description, 'en')}</p>
                   </td>
                   <td className="px-6 py-4 hidden md:table-cell">
                     <span className="text-xs bg-[#334155] text-[#94A3B8] px-2 py-1 rounded">{item.category}</span>
@@ -131,7 +168,8 @@ export function ProjectsManager() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {items.length === 0 && <tr><td colSpan={5} className="px-6 py-8 text-center text-[#94A3B8]">No projects yet</td></tr>}
             </tbody>
           </table>

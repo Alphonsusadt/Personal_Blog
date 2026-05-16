@@ -6,9 +6,10 @@ interface BookToolbarProps {
   onInsertImage?: (imageMarkdown: string) => void;
   onOpenImageDialog?: () => void;
   onOpenLinkDialog?: () => void;
+  onOpenAssetReuser?: () => void;
 }
 
-export function BookToolbar({ textareaRef, onInsert, onOpenImageDialog, onOpenLinkDialog }: BookToolbarProps) {
+export function BookToolbar({ textareaRef, onInsert, onOpenImageDialog, onOpenLinkDialog, onOpenAssetReuser }: BookToolbarProps) {
   const buttons = [
     { icon: Bold, label: 'Bold', action: () => onInsert('**', '**') },
     { icon: Italic, label: 'Italic', action: () => onInsert('*', '*') },
@@ -44,6 +45,19 @@ export function BookToolbar({ textareaRef, onInsert, onOpenImageDialog, onOpenLi
           <Icon className="w-4 h-4" />
         </button>
       ))}
+
+      {onOpenAssetReuser && (
+        <div className="pl-2 ml-1 border-l border-[#334155]">
+          <button
+            onClick={onOpenAssetReuser}
+            onMouseDown={(e) => e.preventDefault()}
+            title="Reuse Images & Code from other language"
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded transition-colors"
+          >
+            Reuse Assets
+          </button>
+        </div>
+      )}
     </div>
   );
 }
