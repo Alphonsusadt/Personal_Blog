@@ -436,13 +436,25 @@ async function seed() {
     process.exit(1);
   }
   const users = db.collection('users');
-  const existing = await users.findOne({ username: adminUsername });
-  if (!existing) {
-    const hashed = await bcrypt.hash(adminPassword, 10);
-    await users.insertOne({ username: adminUsername, password: hashed, createdAt: new Date() });
+  const hashed = await bcrypt.hash(adminPassword, 10);
+  const result = await users.updateOne(
+    { username: adminUsername },
+    {
+      $set: {
+        username: adminUsername,
+        password: hashed,
+        updatedAt: new Date(),
+      },
+      $setOnInsert: {
+        createdAt: new Date(),
+      }
+    },
+    { upsert: true }
+  );
+  if (result.upsertedId) {
     console.log(`Created admin user (username: ${adminUsername})`);
   } else {
-    console.log('Admin user already exists');
+    console.log(`Updated admin user password (username: ${adminUsername})`);
   }
 
   await client.close();

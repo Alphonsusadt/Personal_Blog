@@ -857,7 +857,12 @@ export function BookEditor() {
         isOpen={showFullPreview}
         onClose={() => setShowFullPreview(false)}
         type="book"
-        data={book as never}
+        data={{
+          ...book,
+          title: resolveLocalizedText(book.title, autoFixLanguage),
+          author: resolveLocalizedText(book.author, autoFixLanguage),
+          review: resolveLocalizedText(book.review, autoFixLanguage),
+        } as never}
       />
 
       {/* Draft Recovery Dialog */}

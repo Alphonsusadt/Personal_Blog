@@ -867,7 +867,12 @@ export function ProjectEditor() {
         isOpen={showFullPreview}
         onClose={() => setShowFullPreview(false)}
         type="project"
-        data={project as never}
+        data={{
+          ...project,
+          title: resolveLocalizedText(project.title, autoFixLanguage),
+          description: resolveLocalizedText(project.description, autoFixLanguage),
+          content: resolveLocalizedText(project.content, autoFixLanguage),
+        } as never}
       />
 
       {/* Draft Recovery Dialog */}

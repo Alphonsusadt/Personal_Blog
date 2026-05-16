@@ -20,7 +20,6 @@ async function trySupabase(supabaseFn, mongoFn) {
   return mongoFn();
 }
 
-// Fields that may not exist in Supabase schema — strip before insert/update
 const SUPABASE_STRIP_FIELDS = ['translationOfId', 'contentLanguage'];
 
 function stripForSupabase(data) {
@@ -29,6 +28,23 @@ function stripForSupabase(data) {
     delete cleaned[field];
   }
   return cleaned;
+}
+
+// Helper: Safely parse JSON string back to object
+function parseSupabaseJson(data) {
+  if (!data) return data;
+  const parsed = { ...data };
+  const jsonFields = ['title', 'excerpt', 'content', 'description', 'review'];
+  for (const field of jsonFields) {
+    if (typeof parsed[field] === 'string' && (parsed[field].startsWith('{') || parsed[field].startsWith('['))) {
+      try {
+        parsed[field] = JSON.parse(parsed[field]);
+      } catch (e) {
+        // ignore parse errors, keep as string
+      }
+    }
+  }
+  return parsed;
 }
 
 export default function writingsRoutes(db) {
@@ -49,7 +65,7 @@ export default function writingsRoutes(db) {
           .or(`status.eq.published,and(status.eq.scheduled,publishAt.lte.${now})`)
           .order('createdAt', { ascending: false });
         if (error) throw error;
-        return data;
+        return data.map(parseSupabaseJson);
       },
       async () => {
         return fallbackCol.find({
@@ -77,7 +93,7 @@ export default function writingsRoutes(db) {
           .or(`status.eq.published,and(status.eq.scheduled,publishAt.lte.${now})`)
           .single();
         if (error) throw error;
-        return data;
+        return parseSupabaseJson(data);
       },
       async () => {
         return fallbackCol.findOne({
@@ -100,7 +116,7 @@ export default function writingsRoutes(db) {
           .select('*')
           .order('updatedAt', { ascending: false });
         if (error) throw error;
-        return data.map(d => ({ ...d, _id: d._id }));
+        return data.map(d => parseSupabaseJson({ ...d, _id: d._id }));
       },
       async () => {
         return fallbackCol.find().sort({ updatedAt: -1, createdAt: -1, date: -1 }).toArray();

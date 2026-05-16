@@ -19,6 +19,7 @@ import { getAutoFixSuggestionsForWord } from '../../utils/textAutoFix';
 import { getSpellSuggestions } from '../../utils/spellSuggester';
 import { useAdminAutosave } from '../../hooks/useAdminAutosave';
 import { resolveLocalizedText, getExactLocalizedText, setLocalizedText, type LocalizedTextValue } from '../../lib/localized';
+import { AutosaveStatusBar } from '../../components/AutosaveStatusBar';
 
 interface Writing {
   _id?: string;
@@ -596,27 +597,16 @@ export function WritingEditor() {
               </div>
             </div>
 
-            {/* Autosave Status Indicator (unified: local + server) */}
-            {autosave.status !== 'idle' && (
-              <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-all ${
-                autosave.status === 'saving'   ? 'text-yellow-400 bg-yellow-400/10' :
-                autosave.status === 'retrying' ? 'text-orange-400 bg-orange-400/10' :
-                autosave.status === 'error'    ? 'text-red-400 bg-red-400/10' :
-                                                 'text-green-400 bg-green-400/10'
-              }`}>
-                {autosave.status === 'saving'   && <><Clock className="w-3 h-3 animate-spin" /><span>Saving…</span></>}
-                {autosave.status === 'retrying'  && <><RefreshCw className="w-3 h-3 animate-spin" /><span>{autosave.errorMessage || 'Retrying…'}</span></>}
-                {autosave.status === 'error'     && <><AlertCircle className="w-3 h-3" /><span title={autosave.errorMessage}>Save failed</span></>}
-                {autosave.status === 'saved'     && <><Check className="w-3 h-3" /><span>Saved ✓</span></>}
-              </div>
-            )}
-            {/* Local draft indicator (always-on safety net) */}
-            {autosave.hasDraft && autosave.status === 'idle' && (
-              <div className="flex items-center gap-1 text-xs text-[#475569] px-2 py-1">
-                <HardDrive className="w-3 h-3" />
-                <span>Draft saved</span>
-              </div>
-            )}
+            {/* Autosave Status Bar */}
+            <AutosaveStatusBar
+              status={autosave.status}
+              errorMessage={autosave.errorMessage}
+              hasDraft={autosave.hasDraft}
+              draftTimestamp={autosave.draftTimestamp}
+              onSaveNow={autosave.saveNow}
+              isNew={!writing._id}
+              lastServerSavedAt={writing.updatedAt || null}
+            />
 
             {/* Full Page Preview Button */}
             <button
@@ -886,7 +876,12 @@ export function WritingEditor() {
         isOpen={showFullPreview}
         onClose={() => setShowFullPreview(false)}
         type="writing"
-        data={writing as never}
+        data={{
+          ...writing,
+          title: resolveLocalizedText(writing.title, autoFixLanguage),
+          excerpt: resolveLocalizedText(writing.excerpt, autoFixLanguage),
+          content: resolveLocalizedText(writing.content, autoFixLanguage),
+        } as never}
       />
 
       {/* Draft Recovery Dialog */}

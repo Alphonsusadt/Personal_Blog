@@ -16,6 +16,7 @@ import settingsRoutes from './routes/settings.js';
 import mediaRoutes from './routes/media.js';
 import fs from 'fs/promises';
 import spellCheckRoutes from './routes/spellCheck.js';
+import translationRoutes from './routes/translation.js';
 import { initQueue } from './utils/autosaveQueue.js';
 import { authMiddleware } from './middleware/auth.js';
 
@@ -106,7 +107,7 @@ async function start() {
 
   // CORS configuration - allow frontend origin
   app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'],
+    origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174'],
     credentials: true,
   }));
   app.use(express.json({ limit: '10mb' }));
@@ -130,6 +131,9 @@ async function start() {
   app.use('/api/home', homeRoutes(db));
   app.use('/api/settings', settingsRoutes(db));
   app.use('/api/media', mediaRoutes(db));
+
+  // Translation routes (Translate, Hybrid, SmartAI buttons)
+  app.use('/api', translationRoutes(db));
 
   // Spell-check routes (using hunspell-id dictionary)
   app.use('/api', spellCheckRoutes);
@@ -207,9 +211,63 @@ async function start() {
   const initialSettings = await db.collection('settings').findOne({ key: 'settings' });
   setCachedSettings(initialSettings);
 
+  // ============================================================
+  // TRANSLATION SYSTEM - VALIDATE EXTERNAL APIS
+  // ============================================================
+  validateExternalAPIs();
+
   app.listen(PORT, () => {
     console.log(`CMS API server running on http://localhost:${PORT}`);
   });
 }
 
-start().catch(console.error);
+/**
+ * Validate that required external APIs are configured
+ * Provides helpful warnings if APIs are missing
+ */
+function validateExternalAPIs() {
+  console.log('\n--- Translation System Startup Validation ---');
+  
+  const apiStatus = {
+    google: process.env.GOOGLE_TRANSLATE_API_KEY ? '✅' : '❌',
+    openrouter: process.env.OPENROUTER_API_KEY ? '✅' : '❌',
+    ollama: process.env.USE_OLLAMA_FALLBACK === 'true' ? '✅ (configured)' : '⚠️  (disabled)',
+  };
+  
+  console.log(`Google Translate:    ${apiStatus.google}`);
+  console.log(`OpenRouter/LLM:      ${apiStatus.openrouter}`);
+  console.log(`Ollama Fallback:     ${apiStatus.ollama}`);
+  
+  const hasGoogleKey = process.env.GOOGLE_TRANSLATE_API_KEY && 
+                       process.env.GOOGLE_TRANSLATE_API_KEY !== 'YOUR_GOOGLE_TRANSLATE_API_KEY_HERE';
+  const hasOpenrouterKey = process.env.OPENROUTER_API_KEY && 
+                           process.env.OPENROUTER_API_KEY !== 'YOUR_OPENROUTER_API_KEY_HERE';
+  
+  if (!hasGoogleKey && process.env.USE_OLLAMA_FALLBACK !== 'true') {
+    console.warn('\n⚠️  WARNING: Google Translate API key not configured!');
+    console.warn('   Language detection will be limited');
+  }
+  
+  if (!hasOpenrouterKey && process.env.USE_OLLAMA_FALLBACK !== 'true') {
+    console.warn('\n⚠️  WARNING: OpenRouter API key not configured!');
+    console.warn('   Advanced translation (Hybrid, Smart AI) will NOT work');
+    console.warn('   Basic Google Translate will still work if key is set');
+  }
+  
+  if (!hasGoogleKey && !hasOpenrouterKey && process.env.USE_OLLAMA_FALLBACK !== 'true') {
+    console.error('\n❌ ERROR: No translation APIs configured!');
+    console.error('   At least one of the following must be configured:');
+    console.error('   - GOOGLE_TRANSLATE_API_KEY (in cms/.env)');
+    console.error('   - OPENROUTER_API_KEY (in cms/.env)');
+    console.error('   - USE_OLLAMA_FALLBACK=true + Ollama running on ' + (process.env.OLLAMA_BASE_URL || 'http://localhost:11434'));
+    console.warn('\n   Translation endpoints will return user-friendly errors.\n');
+  } else {
+    console.log('\n✅ Translation system is ready!\n');
+  }
+}
+
+// Start the server
+start().catch(err => {
+  console.error('Failed to start CMS server:', err);
+  process.exit(1);
+});

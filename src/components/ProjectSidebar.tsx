@@ -5,6 +5,8 @@ import { generateSlug, isValidSlug } from '../utils/slugify';
 import { IsolatedInput, IsolatedTextarea, IsolatedTagInput } from './IsolatedInput';
 import { useAutoFixLanguage } from '../hooks/useAutoFixLanguage';
 import { resolveLocalizedText, setLocalizedText, type LocalizedTextValue } from '../lib/localized';
+import { TranslationButtonGroup } from './TranslationButtonGroup';
+import { TranslationStatusBadge } from './TranslationStatusBadge';
 
 interface Project {
   _id?: string;
@@ -78,6 +80,7 @@ function SidebarCard({
 
 export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, sectionEnabled = true }: ProjectSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
+  const [translationStatus, setTranslationStatus] = React.useState<any>(null);
   const { language, setLanguage } = useAutoFixLanguage();
   void onSave;
   void isSaving;
@@ -523,6 +526,47 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
             onUpdate({ ...project, content: setLocalizedText(project.content, language, updatedContent) });
           }}
         />
+      </SidebarCard>
+
+      {/* Translation Card */}
+      <SidebarCard title="Translation" cardKey="translation" collapsed={collapsed} onToggle={() => setCollapsed(prev => ({ ...prev, translation: !prev.translation }))}>
+        <div className="space-y-3">
+          <TranslationButtonGroup
+            postId={project._id}
+            contentType="project"
+            onTranslationStart={() => {
+              // Optional: show loading state
+            }}
+            onTranslationComplete={(result: any) => {
+              setTranslationStatus({
+                status: 'completed',
+                method: result.method,
+                language: result.targetLanguage || 'en',
+              });
+              onUpdate(project);
+            }}
+            onError={(_error: string) => {
+              setTranslationStatus({
+                status: 'failed',
+                method: null,
+                language: null,
+              });
+            }}
+          />
+
+          {translationStatus && (
+            <div className="mt-3">
+              <TranslationStatusBadge
+                status={translationStatus.status}
+                method={translationStatus.method}
+                language={translationStatus.language}
+                onRollback={() => {
+                  setTranslationStatus(null);
+                }}
+              />
+            </div>
+          )}
+        </div>
       </SidebarCard>
 
     </aside>
