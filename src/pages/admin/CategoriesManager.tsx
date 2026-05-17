@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { api } from '../../lib/api';
 import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Tag, X, Check } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
 
 interface CategoryItem {
   _id: string;
@@ -26,20 +27,58 @@ const SECTION_COLORS: Record<SectionKey, string> = {
   books: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
 };
 
+const POPULAR_LUCIDE_ICONS = [
+  'Activity', 'BarChart3', 'Binary', 'BookOpen', 'Brain', 'Calculator',
+  'Cpu', 'Database', 'Feather', 'FileCode', 'FlaskConical', 'Glasses',
+  'Heart', 'JournalText', 'Layers', 'Lightbulb', 'Mail', 'Microscope',
+  'PenTool', 'Puzzle', 'Rocket', 'Scale', 'Search', 'Shield',
+  'Sparkles', 'Star', 'Terminal', 'TreePine', 'User', 'Wrench',
+  'Zap', 'Code', 'Globe', 'GraduationCap', 'Atom', 'CircuitBoard',
+];
+
+function CategoryIconPreview({ icon, size = 18 }: { icon: string; size?: number }) {
+  const isUrl = icon.startsWith('http') || icon.startsWith('/');
+  const isEmoji = /\p{Emoji}/u.test(icon) && !icon.startsWith('http') && icon.length <= 4;
+
+  if (!icon) return <Tag style={{ width: size, height: size }} className="text-[#94A3B8]" />;
+
+  if (isUrl) {
+    return <img src={icon} alt="" style={{ width: size, height: size }} className="object-contain" />;
+  }
+
+  if (isEmoji) {
+    return <span style={{ fontSize: size }}>{icon}</span>;
+  }
+
+  const IconComp = (LucideIcons as Record<string, React.ComponentType<{ size?: number; className?: string }>>)[icon];
+  if (IconComp) return <IconComp size={size} className="text-[#94A3B8]" />;
+
+  return <Tag style={{ width: size, height: size }} className="text-[#94A3B8]" />;
+}
+
 function CategoryForm({
   initial,
   onSave,
   onCancel,
 }: {
   initial?: CategoryItem | null;
-  onSave: (data: { section: string; value: string; label: { en: string; id: string }; order: number }) => void;
+  onSave: (data: { section: string; value: string; label: { en: string; id: string }; icon: string; order: number }) => void;
   onCancel: () => void;
 }) {
   const [section, setSection] = useState<SectionKey>(initial?.section as SectionKey || 'projects');
   const [value, setValue] = useState(initial?.value || '');
   const [labelEn, setLabelEn] = useState(initial?.label?.en || '');
   const [labelId, setLabelId] = useState(initial?.label?.id || '');
+  const [icon, setIcon] = useState(initial?.icon || '');
   const [order, setOrder] = useState(initial?.order ?? 1);
+  const [iconSearch, setIconSearch] = useState('');
+
+  const filteredIcons = useMemo(() => {
+    if (!iconSearch.trim()) return POPULAR_LUCIDE_ICONS;
+    return POPULAR_LUCIDE_ICONS.filter((name) =>
+      name.toLowerCase().includes(iconSearch.toLowerCase())
+    );
+  }, [iconSearch]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,6 +87,7 @@ function CategoryForm({
       section,
       value: value.trim().toLowerCase().replace(/\s+/g, '-'),
       label: { en: labelEn.trim(), id: labelId.trim() || labelEn.trim() },
+      icon: icon.trim(),
       order,
     });
   };
@@ -111,6 +151,49 @@ function CategoryForm({
             className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
           />
         </div>
+        <div className="md:col-span-2">
+          <label className="block text-xs text-[#94A3B8] mb-1">
+            Icon — emoji, <a href="https://lucide.dev/icons" target="_blank" rel="noopener" className="text-[#60A5FA] underline">Lucide name</a>, or <a href="https://www.flaticon.com" target="_blank" rel="noopener" className="text-[#60A5FA] underline">image URL from Flaticon</a>
+          </label>
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={icon}
+              onChange={(e) => setIcon(e.target.value)}
+              placeholder="e.g. 🧠 or Activity or https://cdn-icons-png.flaticon.com/..."
+              className="flex-1 bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+            />
+            <div className="w-10 h-10 flex items-center justify-center bg-[#0F172A] border border-[#334155] rounded-lg">
+              <CategoryIconPreview icon={icon} size={22} />
+            </div>
+          </div>
+          <div className="mt-2">
+            <input
+              type="text"
+              value={iconSearch}
+              onChange={(e) => setIconSearch(e.target.value)}
+              placeholder="Search Lucide icons..."
+              className="w-full bg-[#0F172A] border border-[#334155] text-[#94A3B8] rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-[#60A5FA]"
+            />
+            <div className="flex flex-wrap gap-1 mt-2 max-h-24 overflow-y-auto">
+              {filteredIcons.map((name) => {
+                const IconComp = (LucideIcons as Record<string, React.ComponentType<{ size?: number; className?: string }>>)[name];
+                if (!IconComp) return null;
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => setIcon(name)}
+                    className={`p-1.5 rounded transition-colors ${icon === name ? 'bg-[#1E40AF] text-white' : 'bg-[#0F172A] text-[#94A3B8] hover:bg-[#334155]'}`}
+                    title={name}
+                  >
+                    <IconComp size={16} />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
       <div className="flex items-center gap-3 mt-4">
         <button type="submit" className="flex items-center gap-2 bg-[#1E40AF] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#1E3A8A]">
@@ -143,7 +226,7 @@ export function CategoriesManager() {
 
   useEffect(() => { load(); }, []);
 
-  const handleCreate = async (data: { section: string; value: string; label: { en: string; id: string }; order: number }) => {
+  const handleCreate = async (data: { section: string; value: string; label: { en: string; id: string }; icon: string; order: number }) => {
     try {
       await api.post('/api/categories', data);
       setShowForm(false);
@@ -153,7 +236,7 @@ export function CategoriesManager() {
     }
   };
 
-  const handleUpdate = async (data: { section: string; value: string; label: { en: string; id: string }; order: number }) => {
+  const handleUpdate = async (data: { section: string; value: string; label: { en: string; id: string }; icon: string; order: number }) => {
     if (!editing) return;
     try {
       await api.put(`/api/categories/${editing._id}`, data);
@@ -248,7 +331,9 @@ export function CategoriesManager() {
                   <tr key={item._id} className="border-b border-[#334155] last:border-0 hover:bg-[#334155]/20 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <Tag className="w-4 h-4 text-[#94A3B8]" />
+                        <div className="w-6 h-6 flex items-center justify-center">
+                          <CategoryIconPreview icon={item.icon} size={20} />
+                        </div>
                         <div>
                           <p className="text-[#F8FAFC] text-sm font-medium">{item.label.en}</p>
                           <p className="text-[#94A3B8] text-xs">{item.label.id}</p>

@@ -1,11 +1,19 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, type ComponentType, type SVGProps } from 'react';
 import { Search, Book } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
 import { BookCard } from '../components/BookCard';
 import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { resolveLocalizedText, getExactLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
+
+function resolveIcon(iconStr: string): ComponentType<SVGProps<SVGSVGElement> & { size?: number; className?: string }> {
+  if (!iconStr) return Book;
+  if (iconStr.startsWith('http') || iconStr.startsWith('/')) return Book;
+  const Comp = (LucideIcons as Record<string, ComponentType<SVGProps<SVGSVGElement> & { size?: number; className?: string }>>)[iconStr];
+  return Comp || Book;
+}
 
 interface BookItem {
   id: string;
@@ -35,10 +43,10 @@ interface CategoryItem {
 }
 
 const FALLBACK_CATEGORIES: CategoryItem[] = [
-  { _id: 'fb1', section: 'books', value: 'technical', label: { en: 'Technical', id: 'Teknis' }, icon: '', enabled: true, order: 1 },
-  { _id: 'fb2', section: 'books', value: 'biography', label: { en: 'Biography', id: 'Biografi' }, icon: '', enabled: true, order: 2 },
-  { _id: 'fb3', section: 'books', value: 'spiritual', label: { en: 'Spiritual', id: 'Spiritual' }, icon: '', enabled: true, order: 3 },
-  { _id: 'fb4', section: 'books', value: 'philosophy', label: { en: 'Philosophy', id: 'Filosofi' }, icon: '', enabled: true, order: 4 },
+  { _id: 'fb1', section: 'books', value: 'technical', label: { en: 'Technical', id: 'Teknis' }, icon: 'Terminal', enabled: true, order: 1 },
+  { _id: 'fb2', section: 'books', value: 'biography', label: { en: 'Biography', id: 'Biografi' }, icon: 'User', enabled: true, order: 2 },
+  { _id: 'fb3', section: 'books', value: 'spiritual', label: { en: 'Spiritual', id: 'Spiritual' }, icon: 'Heart', enabled: true, order: 3 },
+  { _id: 'fb4', section: 'books', value: 'philosophy', label: { en: 'Philosophy', id: 'Filosofi' }, icon: 'Scale', enabled: true, order: 4 },
 ];
 
 export function Library() {
@@ -87,7 +95,7 @@ export function Library() {
     const dbCats = dynamicCategories.map((cat) => ({
       value: cat.value,
       label: cat.label[language] || cat.label.en,
-      icon: Book,
+      icon: resolveIcon(cat.icon),
     }));
     return [
       { value: 'all', label: t('category.allBooks', language), icon: Book },

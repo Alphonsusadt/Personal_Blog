@@ -1,11 +1,19 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, type ComponentType, type SVGProps } from 'react';
 import { Search, BookOpen } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
 import { WritingCard } from '../components/WritingCard';
 import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { resolveLocalizedText, getExactLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
+
+function resolveIcon(iconStr: string): ComponentType<SVGProps<SVGSVGElement> & { size?: number; className?: string }> {
+  if (!iconStr) return BookOpen;
+  if (iconStr.startsWith('http') || iconStr.startsWith('/')) return BookOpen;
+  const Comp = (LucideIcons as Record<string, ComponentType<SVGProps<SVGSVGElement> & { size?: number; className?: string }>>)[iconStr];
+  return Comp || BookOpen;
+}
 
 interface Writing {
   id: string;
@@ -32,9 +40,9 @@ interface CategoryItem {
 }
 
 const FALLBACK_CATEGORIES: CategoryItem[] = [
-  { _id: 'fb1', section: 'writings', value: 'reflections', label: { en: 'Reflections', id: 'Refleksi' }, icon: '', enabled: true, order: 1 },
-  { _id: 'fb2', section: 'writings', value: 'stories', label: { en: 'Stories', id: 'Cerita' }, icon: '', enabled: true, order: 2 },
-  { _id: 'fb3', section: 'writings', value: 'fiction', label: { en: 'Fiction', id: 'Fiksi' }, icon: '', enabled: true, order: 3 },
+  { _id: 'fb1', section: 'writings', value: 'reflections', label: { en: 'Reflections', id: 'Refleksi' }, icon: 'Lightbulb', enabled: true, order: 1 },
+  { _id: 'fb2', section: 'writings', value: 'stories', label: { en: 'Stories', id: 'Cerita' }, icon: 'Feather', enabled: true, order: 2 },
+  { _id: 'fb3', section: 'writings', value: 'fiction', label: { en: 'Fiction', id: 'Fiksi' }, icon: 'Sparkles', enabled: true, order: 3 },
 ];
 
 export function Writings() {
@@ -83,7 +91,7 @@ export function Writings() {
     const dbCats = dynamicCategories.map((cat) => ({
       value: cat.value,
       label: cat.label[language] || cat.label.en,
-      icon: BookOpen,
+      icon: resolveIcon(cat.icon),
     }));
     return [
       { value: 'all', label: t('category.allWritings', language), icon: BookOpen },

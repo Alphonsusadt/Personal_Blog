@@ -1,11 +1,19 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Search, Code, X } from 'lucide-react';
+import { useState, useMemo, useEffect, type ComponentType, type SVGProps } from 'react';
+import { Search, Code, X, Tag as TagIcon } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
 import { ProjectCard } from '../components/ProjectCard';
 import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { resolveLocalizedText, getExactLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
+
+function resolveIcon(iconStr: string): ComponentType<SVGProps<SVGSVGElement> & { size?: number; className?: string }> {
+  if (!iconStr) return Code;
+  if (iconStr.startsWith('http') || iconStr.startsWith('/')) return Code;
+  const Comp = (LucideIcons as Record<string, ComponentType<SVGProps<SVGSVGElement> & { size?: number; className?: string }>>)[iconStr];
+  return Comp || Code;
+}
 
 interface Project {
   id: string;
@@ -34,9 +42,9 @@ interface CategoryItem {
 }
 
 const FALLBACK_CATEGORIES: CategoryItem[] = [
-  { _id: 'fb1', section: 'projects', value: 'signal-processing', label: { en: 'Signal Processing', id: 'Pemrosesan Sinyal' }, icon: '', enabled: true, order: 1 },
-  { _id: 'fb2', section: 'projects', value: 'control', label: { en: 'Control', id: 'Kontrol' }, icon: '', enabled: true, order: 2 },
-  { _id: 'fb3', section: 'projects', value: 'data-analysis', label: { en: 'Data Analysis', id: 'Analisis Data' }, icon: '', enabled: true, order: 3 },
+  { _id: 'fb1', section: 'projects', value: 'signal-processing', label: { en: 'Signal Processing', id: 'Pemrosesan Sinyal' }, icon: 'Activity', enabled: true, order: 1 },
+  { _id: 'fb2', section: 'projects', value: 'control', label: { en: 'Control', id: 'Kontrol' }, icon: 'Cpu', enabled: true, order: 2 },
+  { _id: 'fb3', section: 'projects', value: 'data-analysis', label: { en: 'Data Analysis', id: 'Analisis Data' }, icon: 'BarChart3', enabled: true, order: 3 },
 ];
 
 export function Engineering() {
@@ -87,7 +95,7 @@ export function Engineering() {
     const dbCats = dynamicCategories.map((cat) => ({
       value: cat.value,
       label: cat.label[language] || cat.label.en,
-      icon: Code,
+      icon: resolveIcon(cat.icon),
     }));
     return [
       { value: 'all', label: t('category.allProjects', language), icon: Code },
