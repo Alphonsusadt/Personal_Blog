@@ -8,11 +8,14 @@ import { resolveLocalizedText, getExactLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
 
-function CategoryIcon({ icon, className }: { icon: string; className?: string }) {
+function CategoryIcon({ icon, className, inverted }: { icon: string; className?: string; inverted?: boolean }) {
   const isUrl = icon.startsWith('http') || icon.startsWith('/');
   const isEmoji = /\p{Emoji}/u.test(icon) && !icon.startsWith('http') && icon.length <= 4;
 
-  if (isUrl) return <img src={icon} alt="" className={`object-contain ${className || ''}`} style={{ width: 16, height: 16 }} />;
+  // When on dark background, make image icons white via CSS filter
+  const invertClass = inverted ? '[filter:brightness(0)_invert(1)]' : '';
+
+  if (isUrl) return <img src={icon} alt="" className={`object-contain ${invertClass} ${className || ''}`} style={{ width: 16, height: 16 }} />;
   if (isEmoji) return <span className={className} style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>;
 
   const Comp = (LucideIcons as Record<string, React.ComponentType<{ className?: string }>>)[icon];
@@ -172,7 +175,7 @@ export function Engineering() {
                       : 'bg-canvas text-ink border-hairline hover:border-ink hover:bg-surface-soft'
                   ].join(' ')}
                 >
-                  <CategoryIcon icon={category.icon} className="w-4 h-4" />
+                  <CategoryIcon icon={category.icon} className="w-4 h-4" inverted={selectedCategory === category.value} />
                   <span>{category.label}</span>
                 </button>
               );
