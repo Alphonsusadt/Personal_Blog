@@ -3,6 +3,7 @@
  * Backend endpoint untuk image upload
  * Menyimpan files ke file system atau cloud storage
  * API: POST /api/media/upload - Upload single image
+ * API: POST /api/media/proxy-icon - Download & cache external icon
  */
 
 import fs from 'fs/promises';
@@ -16,6 +17,7 @@ import multer from 'multer';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const UPLOAD_DIR = path.join(__dirname, '../../public/uploads');
+const ICONS_DIR = path.join(__dirname, '../../public/uploads/icons');
 const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
 
 async function getFileHash(filePath) {
@@ -24,6 +26,9 @@ async function getFileHash(filePath) {
 }
 
 import cloudinary from '../config/cloudinary.js';
+
+// Ensure icons directory exists
+fs.mkdir(ICONS_DIR, { recursive: true }).catch(() => {});
 
 async function persistUpload(db, file, altText, uploadedBy) {
   const mediaCollection = db.collection('media');
@@ -377,6 +382,61 @@ export default function mediaRoutes(db) {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to delete media',
       });
+    }
+  });
+
+  // ── Proxy external icon: download, cache locally, return local URL ──
+  router.post('/proxy-icon', authMiddleware, async (req, res) => {
+    const { url } = req.body;
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: 'url is required' });
+    }
+
+    // Only allow image URLs from known icon CDNs
+    const allowedHosts = [
+      'cdn-icons-png.flaticon.com',
+      'cdn.iconscout.com',
+      'cdn.jsdelivr.net',
+    ];
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return res.status(400).json({ error: 'Invalid URL' });
+    }
+    if (!allowedHosts.some((h) => parsedUrl.hostname.endsWith(h) || parsedUrl.hostname === h)) {
+      return res.status(400).json({ error: `Domain ${parsedUrl.hostname} not allowed. Use icon CDNs.` });
+    }
+
+    try {
+      // Use URL hash as filename for caching
+      const urlHash = crypto.createHash('md5').update(url).digest('hex').slice(0, 12);
+      const ext = parsedUrl.pathname.endsWith('.svg') ? '.svg' : '.png';
+      const localPath = path.join(ICONS_DIR, `${urlHash}${ext}`);
+
+      // If already cached, return immediately
+      try {
+        await fs.access(localPath);
+        return res.json({ url: `/uploads/icons/${urlHash}${ext}`, cached: true });
+      } catch { /* not cached yet */ }
+
+      // Download the image
+      const response = await fetch(url, {
+        headers: { 'User-Agent': 'AlphonsusCMS/1.0' },
+        signal: AbortSignal.timeout(10_000),
+      });
+
+      if (!response.ok) {
+        return res.status(502).json({ error: `Failed to fetch icon: ${response.status}` });
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      await fs.writeFile(localPath, buffer);
+
+      res.json({ url: `/uploads/icons/${urlHash}${ext}`, cached: false });
+    } catch (error) {
+      console.error('[proxy-icon] Error:', error.message);
+      res.status(500).json({ error: 'Failed to download icon' });
     }
   });
 

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Search, Book } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
+import { getLucideIcon } from '../lib/iconMap';
 import { BookCard } from '../components/BookCard';
 import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
@@ -17,7 +17,7 @@ function CategoryIcon({ icon, className, inverted }: { icon: string; className?:
   if (isUrl) return <img src={icon} alt="" className={`object-contain ${invertClass} ${className || ''}`} style={{ width: 16, height: 16 }} />;
   if (isEmoji) return <span className={className} style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>;
 
-  const Comp = (LucideIcons as Record<string, React.ComponentType<{ className?: string }>>)[icon];
+  const Comp = getLucideIcon(icon);
   if (Comp) return <Comp className={className} />;
   return <Book className={className} />;
 }

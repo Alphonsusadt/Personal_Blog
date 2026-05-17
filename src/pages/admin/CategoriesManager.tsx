@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { api } from '../../lib/api';
 import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Tag, X, Check } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
+import { ICON_MAP, AVAILABLE_ICON_NAMES, getLucideIcon } from '../../lib/iconMap';
 
 interface CategoryItem {
   _id: string;
@@ -27,14 +27,7 @@ const SECTION_COLORS: Record<SectionKey, string> = {
   books: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
 };
 
-const POPULAR_LUCIDE_ICONS = [
-  'Activity', 'BarChart3', 'Binary', 'BookOpen', 'Brain', 'Calculator',
-  'Cpu', 'Database', 'Feather', 'FileCode', 'FlaskConical', 'Glasses',
-  'Heart', 'JournalText', 'Layers', 'Lightbulb', 'Mail', 'Microscope',
-  'PenTool', 'Puzzle', 'Rocket', 'Scale', 'Search', 'Shield',
-  'Sparkles', 'Star', 'Terminal', 'TreePine', 'User', 'Wrench',
-  'Zap', 'Code', 'Globe', 'GraduationCap', 'Atom', 'CircuitBoard',
-];
+const POPULAR_LUCIDE_ICONS = AVAILABLE_ICON_NAMES;
 
 /**
  * Convert a Flaticon page URL into a direct PNG URL.
@@ -70,7 +63,7 @@ function CategoryIconPreview({ icon, size = 18 }: { icon: string; size?: number 
     return <span style={{ fontSize: size }}>{icon}</span>;
   }
 
-  const IconComp = (LucideIcons as Record<string, React.ComponentType<{ size?: number; className?: string }>>)[icon];
+  const IconComp = getLucideIcon(icon);
   if (IconComp) return <IconComp size={size} className="text-[#94A3B8]" />;
 
   return <Tag style={{ width: size, height: size }} className="text-[#94A3B8]" />;
@@ -100,14 +93,27 @@ function CategoryForm({
     );
   }, [iconSearch]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!value.trim() || !labelEn.trim()) return;
+
+    // If icon is an external URL, proxy it through backend first
+    let finalIcon = icon.trim();
+    if (finalIcon.startsWith('http')) {
+      try {
+        const res = await api.post('/api/media/proxy-icon', { url: finalIcon });
+        finalIcon = res.url;
+      } catch {
+        // If proxy fails, keep the original URL
+        console.warn('Failed to proxy icon, using original URL');
+      }
+    }
+
     onSave({
       section,
       value: value.trim().toLowerCase().replace(/\s+/g, '-'),
       label: { en: labelEn.trim(), id: labelId.trim() || labelEn.trim() },
-      icon: icon.trim(),
+      icon: finalIcon,
       order,
     });
   };
@@ -202,7 +208,7 @@ function CategoryForm({
             />
             <div className="flex flex-wrap gap-1 mt-2 max-h-24 overflow-y-auto">
               {filteredIcons.map((name) => {
-                const IconComp = (LucideIcons as Record<string, React.ComponentType<{ size?: number; className?: string }>>)[name];
+                const IconComp = getLucideIcon(name);
                 if (!IconComp) return null;
                 return (
                   <button

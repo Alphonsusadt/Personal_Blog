@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Search, Code, X } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
+import { getLucideIcon } from '../lib/iconMap';
 import { ProjectCard } from '../components/ProjectCard';
 import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
@@ -12,13 +12,12 @@ function CategoryIcon({ icon, className, inverted }: { icon: string; className?:
   const isUrl = icon.startsWith('http') || icon.startsWith('/');
   const isEmoji = /\p{Emoji}/u.test(icon) && !icon.startsWith('http') && icon.length <= 4;
 
-  // When on dark background, make image icons white via CSS filter
   const invertClass = inverted ? '[filter:brightness(0)_invert(1)]' : '';
 
   if (isUrl) return <img src={icon} alt="" className={`object-contain ${invertClass} ${className || ''}`} style={{ width: 16, height: 16 }} />;
   if (isEmoji) return <span className={className} style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>;
 
-  const Comp = (LucideIcons as Record<string, React.ComponentType<{ className?: string }>>)[icon];
+  const Comp = getLucideIcon(icon);
   if (Comp) return <Comp className={className} />;
   return <Code className={className} />;
 }
