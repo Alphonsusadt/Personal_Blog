@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, type ComponentType, type SVGProps } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Search, BookOpen } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { WritingCard } from '../components/WritingCard';
@@ -8,11 +8,16 @@ import { resolveLocalizedText, getExactLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
 
-function resolveIcon(iconStr: string): ComponentType<SVGProps<SVGSVGElement> & { size?: number; className?: string }> {
-  if (!iconStr) return BookOpen;
-  if (iconStr.startsWith('http') || iconStr.startsWith('/')) return BookOpen;
-  const Comp = (LucideIcons as Record<string, ComponentType<SVGProps<SVGSVGElement> & { size?: number; className?: string }>>)[iconStr];
-  return Comp || BookOpen;
+function CategoryIcon({ icon, className }: { icon: string; className?: string }) {
+  const isUrl = icon.startsWith('http') || icon.startsWith('/');
+  const isEmoji = /\p{Emoji}/u.test(icon) && !icon.startsWith('http') && icon.length <= 4;
+
+  if (isUrl) return <img src={icon} alt="" className={`object-contain ${className || ''}`} style={{ width: 16, height: 16 }} />;
+  if (isEmoji) return <span className={className} style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>;
+
+  const Comp = (LucideIcons as Record<string, React.ComponentType<{ className?: string }>>)[icon];
+  if (Comp) return <Comp className={className} />;
+  return <BookOpen className={className} />;
 }
 
 interface Writing {
@@ -91,10 +96,10 @@ export function Writings() {
     const dbCats = dynamicCategories.map((cat) => ({
       value: cat.value,
       label: cat.label[language] || cat.label.en,
-      icon: resolveIcon(cat.icon),
+      icon: cat.icon,
     }));
     return [
-      { value: 'all', label: t('category.allWritings', language), icon: BookOpen },
+      { value: 'all', label: t('category.allWritings', language), icon: 'BookOpen' },
       ...dbCats,
     ];
   }, [dynamicCategories, language]);
@@ -140,21 +145,20 @@ export function Writings() {
         {/* Category Navigation */}
         <div className="flex flex-wrap justify-center gap-2 mb-8">
           {categories.map((category) => {
-            const Icon = category.icon;
-            return (
-              <button
-                key={category.value}
-                onClick={() => setSelectedCategory(category.value)}
-                className={[
-                  'inline-flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-[480] transition-colors border',
-                  selectedCategory === category.value
-                    ? 'bg-primary text-on-primary border-primary'
-                    : 'bg-canvas text-ink border-hairline hover:border-ink hover:bg-surface-soft'
-                ].join(' ')}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{category.label}</span>
-              </button>
+              return (
+                <button
+                  key={category.value}
+                  onClick={() => setSelectedCategory(category.value)}
+                  className={[
+                    'inline-flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-[480] transition-colors border',
+                    selectedCategory === category.value
+                      ? 'bg-primary text-on-primary border-primary'
+                      : 'bg-canvas text-ink border-hairline hover:border-ink hover:bg-surface-soft'
+                  ].join(' ')}
+                >
+                  <CategoryIcon icon={category.icon} className="w-4 h-4" />
+                  <span>{category.label}</span>
+                </button>
             );
           })}
         </div>

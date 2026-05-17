@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, type ComponentType, type SVGProps } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Search, Book } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { BookCard } from '../components/BookCard';
@@ -8,11 +8,16 @@ import { resolveLocalizedText, getExactLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
 
-function resolveIcon(iconStr: string): ComponentType<SVGProps<SVGSVGElement> & { size?: number; className?: string }> {
-  if (!iconStr) return Book;
-  if (iconStr.startsWith('http') || iconStr.startsWith('/')) return Book;
-  const Comp = (LucideIcons as Record<string, ComponentType<SVGProps<SVGSVGElement> & { size?: number; className?: string }>>)[iconStr];
-  return Comp || Book;
+function CategoryIcon({ icon, className }: { icon: string; className?: string }) {
+  const isUrl = icon.startsWith('http') || icon.startsWith('/');
+  const isEmoji = /\p{Emoji}/u.test(icon) && !icon.startsWith('http') && icon.length <= 4;
+
+  if (isUrl) return <img src={icon} alt="" className={`object-contain ${className || ''}`} style={{ width: 16, height: 16 }} />;
+  if (isEmoji) return <span className={className} style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>;
+
+  const Comp = (LucideIcons as Record<string, React.ComponentType<{ className?: string }>>)[icon];
+  if (Comp) return <Comp className={className} />;
+  return <Book className={className} />;
 }
 
 interface BookItem {
@@ -95,10 +100,10 @@ export function Library() {
     const dbCats = dynamicCategories.map((cat) => ({
       value: cat.value,
       label: cat.label[language] || cat.label.en,
-      icon: resolveIcon(cat.icon),
+      icon: cat.icon,
     }));
     return [
-      { value: 'all', label: t('category.allBooks', language), icon: Book },
+      { value: 'all', label: t('category.allBooks', language), icon: 'Book' },
       ...dbCats,
     ];
   }, [dynamicCategories, language]);
@@ -157,7 +162,6 @@ export function Library() {
           {/* Filter Buttons */}
           <div className="flex flex-wrap justify-center gap-2">
             {categories.map((category) => {
-              const Icon = category.icon;
               return (
                 <button
                   key={category.value}
@@ -169,7 +173,7 @@ export function Library() {
                       : 'bg-canvas text-ink border-hairline hover:border-ink hover:bg-surface-soft'
                   ].join(' ')}
                 >
-                  <Icon className="w-4 h-4" />
+                  <CategoryIcon icon={category.icon} className="w-4 h-4" />
                   <span>{category.label}</span>
                 </button>
               );

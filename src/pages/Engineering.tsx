@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect, type ComponentType, type SVGProps } from 'react';
-import { Search, Code, X, Tag as TagIcon } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Search, Code, X } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { ProjectCard } from '../components/ProjectCard';
 import { api } from '../lib/api';
@@ -8,11 +8,16 @@ import { resolveLocalizedText, getExactLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
 
-function resolveIcon(iconStr: string): ComponentType<SVGProps<SVGSVGElement> & { size?: number; className?: string }> {
-  if (!iconStr) return Code;
-  if (iconStr.startsWith('http') || iconStr.startsWith('/')) return Code;
-  const Comp = (LucideIcons as Record<string, ComponentType<SVGProps<SVGSVGElement> & { size?: number; className?: string }>>)[iconStr];
-  return Comp || Code;
+function CategoryIcon({ icon, className }: { icon: string; className?: string }) {
+  const isUrl = icon.startsWith('http') || icon.startsWith('/');
+  const isEmoji = /\p{Emoji}/u.test(icon) && !icon.startsWith('http') && icon.length <= 4;
+
+  if (isUrl) return <img src={icon} alt="" className={`object-contain ${className || ''}`} style={{ width: 16, height: 16 }} />;
+  if (isEmoji) return <span className={className} style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>;
+
+  const Comp = (LucideIcons as Record<string, React.ComponentType<{ className?: string }>>)[icon];
+  if (Comp) return <Comp className={className} />;
+  return <Code className={className} />;
 }
 
 interface Project {
@@ -95,10 +100,10 @@ export function Engineering() {
     const dbCats = dynamicCategories.map((cat) => ({
       value: cat.value,
       label: cat.label[language] || cat.label.en,
-      icon: resolveIcon(cat.icon),
+      icon: cat.icon,
     }));
     return [
-      { value: 'all', label: t('category.allProjects', language), icon: Code },
+      { value: 'all', label: t('category.allProjects', language), icon: 'Code' },
       ...dbCats,
     ];
   }, [dynamicCategories, language]);
@@ -156,7 +161,6 @@ export function Engineering() {
           {/* Filter Buttons */}
           <div className="flex flex-wrap gap-2">
             {categories.map((category) => {
-              const Icon = category.icon;
               return (
                 <button
                   key={category.value}
@@ -168,7 +172,7 @@ export function Engineering() {
                       : 'bg-canvas text-ink border-hairline hover:border-ink hover:bg-surface-soft'
                   ].join(' ')}
                 >
-                  <Icon className="w-4 h-4" />
+                  <CategoryIcon icon={category.icon} className="w-4 h-4" />
                   <span>{category.label}</span>
                 </button>
               );
