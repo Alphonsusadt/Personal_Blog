@@ -36,14 +36,34 @@ const POPULAR_LUCIDE_ICONS = [
   'Zap', 'Code', 'Globe', 'GraduationCap', 'Atom', 'CircuitBoard',
 ];
 
+/**
+ * Convert a Flaticon page URL into a direct PNG URL.
+ * e.g. https://www.flaticon.com/free-icon/eucharist_10221243?...
+ *   → https://cdn-icons-png.flaticon.com/512/10221/10221243.png
+ */
+function resolveFlaticonUrl(input: string): string {
+  try {
+    const url = new URL(input);
+    // Match Flaticon page URLs: /free-icon/name_ID or /premium-icon/name_ID
+    const match = url.pathname.match(/\/(?:free|premium)-icon\/[^/]+_(\d+)$/);
+    if (match && (url.hostname === 'www.flaticon.com' || url.hostname === 'flaticon.com')) {
+      const id = match[1];
+      const folder = id.length > 5 ? id.slice(0, 5) : id;
+      return `https://cdn-icons-png.flaticon.com/128/${folder}/${id}.png`;
+    }
+  } catch { /* not a valid URL, ignore */ }
+  return input;
+}
+
 function CategoryIconPreview({ icon, size = 18 }: { icon: string; size?: number }) {
-  const isUrl = icon.startsWith('http') || icon.startsWith('/');
+  const resolved = resolveFlaticonUrl(icon);
+  const isUrl = resolved.startsWith('http') || resolved.startsWith('/');
   const isEmoji = /\p{Emoji}/u.test(icon) && !icon.startsWith('http') && icon.length <= 4;
 
   if (!icon) return <Tag style={{ width: size, height: size }} className="text-[#94A3B8]" />;
 
   if (isUrl) {
-    return <img src={icon} alt="" style={{ width: size, height: size }} className="object-contain" />;
+    return <img src={resolved} alt="" style={{ width: size, height: size }} className="object-contain" />;
   }
 
   if (isEmoji) {
@@ -153,14 +173,19 @@ function CategoryForm({
         </div>
         <div className="md:col-span-2">
           <label className="block text-xs text-[#94A3B8] mb-1">
-            Icon — emoji, <a href="https://lucide.dev/icons" target="_blank" rel="noopener" className="text-[#60A5FA] underline">Lucide name</a>, or <a href="https://www.flaticon.com" target="_blank" rel="noopener" className="text-[#60A5FA] underline">image URL from Flaticon</a>
+            Icon — emoji, <a href="https://lucide.dev/icons" target="_blank" rel="noopener" className="text-[#60A5FA] underline">Lucide name</a>, or paste a <a href="https://www.flaticon.com" target="_blank" rel="noopener" className="text-[#60A5FA] underline">Flaticon</a> link (auto-converted)
           </label>
           <div className="flex items-center gap-3">
             <input
               type="text"
               value={icon}
-              onChange={(e) => setIcon(e.target.value)}
-              placeholder="e.g. 🧠 or Activity or https://cdn-icons-png.flaticon.com/..."
+              onChange={(e) => {
+                const val = e.target.value.trim();
+                // Auto-convert Flaticon page URLs to direct PNG
+                setIcon(val !== e.target.value ? val : resolveFlaticonUrl(e.target.value));
+              }}
+              onBlur={() => setIcon(resolveFlaticonUrl(icon))}
+              placeholder="e.g. 🧠 or Activity or paste Flaticon link"
               className="flex-1 bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />
             <div className="w-10 h-10 flex items-center justify-center bg-[#0F172A] border border-[#334155] rounded-lg">
