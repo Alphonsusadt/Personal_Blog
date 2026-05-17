@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Search, BookOpen, Edit3, PenTool } from 'lucide-react';
+import { Search, BookOpen } from 'lucide-react';
 import { WritingCard } from '../components/WritingCard';
 import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
@@ -13,13 +13,29 @@ interface Writing {
   excerpt: string;
   date: string;
   readTime: string;
-  category: 'reflections' | 'stories' | 'fiction';
+  category: string;
   tags?: string[];
   content: string;
   status?: 'draft' | 'published';
   contentLanguage?: 'en' | 'id' | 'bilingual';
   translationOfId?: string;
 }
+
+interface CategoryItem {
+  _id: string;
+  section: string;
+  value: string;
+  label: { en: string; id: string };
+  icon: string;
+  enabled: boolean;
+  order: number;
+}
+
+const FALLBACK_CATEGORIES: CategoryItem[] = [
+  { _id: 'fb1', section: 'writings', value: 'reflections', label: { en: 'Reflections', id: 'Refleksi' }, icon: '', enabled: true, order: 1 },
+  { _id: 'fb2', section: 'writings', value: 'stories', label: { en: 'Stories', id: 'Cerita' }, icon: '', enabled: true, order: 2 },
+  { _id: 'fb3', section: 'writings', value: 'fiction', label: { en: 'Fiction', id: 'Fiksi' }, icon: '', enabled: true, order: 3 },
+];
 
 export function Writings() {
   const navigate = useNavigate();
@@ -28,10 +44,15 @@ export function Writings() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [dynamicCategories, setDynamicCategories] = useState<CategoryItem[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+
+    api.getPublicCategories('writings')
+      .then((cats: CategoryItem[]) => { if (!cancelled) setDynamicCategories(cats); })
+      .catch(() => { if (!cancelled) setDynamicCategories(FALLBACK_CATEGORIES); });
 
     api.getPublicSettings()
       .then((settings: any) => {
@@ -58,12 +79,17 @@ export function Writings() {
     };
   }, [navigate]);
 
-  const categories = [
-    { value: 'all', label: t('category.allWritings', language), icon: BookOpen },
-    { value: 'reflections', label: t('category.reflections', language), icon: BookOpen },
-    { value: 'stories', label: t('category.stories', language), icon: Edit3 },
-    { value: 'fiction', label: t('category.fiction', language), icon: PenTool }
-  ];
+  const categories = useMemo(() => {
+    const dbCats = dynamicCategories.map((cat) => ({
+      value: cat.value,
+      label: cat.label[language] || cat.label.en,
+      icon: BookOpen,
+    }));
+    return [
+      { value: 'all', label: t('category.allWritings', language), icon: BookOpen },
+      ...dbCats,
+    ];
+  }, [dynamicCategories, language]);
 
   const filteredWritings = useMemo(() => {
     return allWritings.filter(writing => {

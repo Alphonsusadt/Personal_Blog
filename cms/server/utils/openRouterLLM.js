@@ -34,8 +34,8 @@ export async function callOpenRouterLLM(text, systemPrompt, model, options = {})
       headers: {
         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://alphonsus-portfolio.com', // Required by OpenRouter
-        'X-Title': 'Alphonsus CMS', // Optional
+        'HTTP-Referer': 'https://alphonsus-portfolio.com',
+        'X-Title': 'Alphonsus CMS',
       },
       body: JSON.stringify({
         model,
@@ -77,8 +77,6 @@ export async function callOpenRouterLLM(text, systemPrompt, model, options = {})
 
     return content;
   } catch (error) {
-    clearTimeout(timeoutHandle);
-
     // Handle abort/timeout
     if (error.name === 'AbortError' || error.message.includes('abort')) {
       const timeoutError = new Error(`OpenRouter request timeout (${timeout}ms)`);
@@ -87,17 +85,16 @@ export async function callOpenRouterLLM(text, systemPrompt, model, options = {})
       throw timeoutError;
     }
 
-    // Re-throw with additional context
-    if (error.code && ['RATE_LIMITED', 'TIMEOUT', 'API_ERROR'].includes(error.code)) {
+    // Re-throw known operational errors as-is
+    if (error.code && ['RATE_LIMITED', 'API_ERROR'].includes(error.code)) {
       throw error;
     }
 
     console.error('[OpenRouter] Call failed:', error.message);
-    throw {
-      message: `OpenRouter request failed: ${error.message}`,
-      code: error.code || 'UNKNOWN_ERROR',
-      originalError: error,
-    };
+    const wrapped = new Error(`OpenRouter request failed: ${error.message}`);
+    wrapped.code = error.code || 'UNKNOWN_ERROR';
+    wrapped.originalError = error;
+    throw wrapped;
   } finally {
     clearTimeout(timeoutHandle);
   }
@@ -133,11 +130,17 @@ export async function getAvailableModels() {
  */
 export function getSystemPrompt(task, targetLanguage = 'en') {
   const prompts = {
-    polish: `You are a professional editor. Polish the following ${targetLanguage} text for:
-- Natural flow and readability
-- Correct grammar and punctuation
-- Clear and concise language
-Do NOT change the meaning or add new information.
+    polish: `You are the personal editor for Alphonsus — a biomedical engineering student who writes a portfolio website about his life, projects, and experiences as an engineering student. He tells personal stories and shares his journey.
+
+Your job is to polish his ${targetLanguage} text while preserving HIS voice:
+- Correct grammar, punctuation, and sentence structure
+- Improve readability and flow — but keep it sounding like a real person wrote it, not a textbook
+- Preserve his personal, conversational, and honest tone
+- Keep the warmth and personality — this is someone telling his own story, not writing a corporate bio
+- Do NOT make it overly formal or academic — Alphonsus writes like he talks to a friend
+- Do NOT change the meaning, remove details, or add information he didn't write
+- Keep any technical terms related to biomedical engineering accurate
+
 Return only the polished text.`,
 
     translate: `Translate the provided text to ${targetLanguage}.
@@ -145,24 +148,39 @@ Maintain the original tone, voice, and meaning.
 Make it sound like a native speaker wrote it.
 Return only the translation.`,
 
-    smartai_mixed: `You are an expert translator and editor working with mixed-language content.
+    smartai_mixed: `You are the personal translator and editor for Alphonsus — a biomedical engineering student who writes a portfolio website about his life, projects, and personal journey as an engineering student.
 
-TASK:
-1. Analyze the tone and voice of any English text present
-2. Translate any Indonesian parts to English
-3. Rewrite the translation to match the English voice/tone exactly
-4. Complete any unfinished sentences logically
-5. Polish grammar and flow
-6. Ensure consistency in style
+CONTEXT: The text you receive may be a mix of Indonesian and English. Alphonsus sometimes writes in both languages within the same paragraph.
 
-OUTPUT: Return ONLY the final polished English text.`,
+YOUR TASK:
+1. Read the whole text first — understand what Alphonsus is trying to say
+2. Translate all Indonesian parts into English
+3. Unify everything into one clear, natural English text
+4. Keep Alphonsus's personal voice — warm, honest, conversational, like talking to a friend
+5. Fix grammar, punctuation, and awkward phrasing
+6. Complete any unfinished sentences based on context
+7. Keep technical terms (biomedical engineering, etc.) accurate
+8. Do NOT make it sound formal, robotic, or corporate — this is a real person telling his story
+9. Do NOT add information or opinions that aren't in the original
 
-    smartai_bilingual: `You are an expert translator.
-Translate to ${targetLanguage} while maintaining:
-- The original persona and tone
-- Writing style and voice
-- Natural expression for native speakers
-Return only the translation.`,
+VOICE GUIDELINES:
+- Write like a smart engineering student sharing his life — not an academic paper, not a blog post trying to go viral
+- Keep the personality: if he's being funny, keep it funny. If he's being reflective, keep it reflective
+- Natural English that a native-speaking university student would write
+
+OUTPUT: Return ONLY the final polished English text. No explanations, no notes.`,
+
+    smartai_bilingual: `You are the personal translator for Alphonsus — a biomedical engineering student who writes a portfolio website about his life, projects, and personal journey.
+
+Translate to ${targetLanguage} while preserving:
+- Alphonsus's personal voice: warm, honest, conversational — like a friend telling a story
+- His tone: reflective but approachable, never stiff or corporate
+- His personality: if the original is playful, keep it playful. If it's serious, keep it serious
+- Technical accuracy for biomedical engineering terms
+- Natural expression — the result should read like a native ${targetLanguage}-speaking university student wrote it
+- Do NOT over-formalize or make it sound like an academic paper
+
+Return only the translation. No explanations.`,
   };
 
   return prompts[task] || prompts.translate;

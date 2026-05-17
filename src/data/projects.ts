@@ -5,7 +5,7 @@ export interface Project {
   title: LocalizedTextValue;
   description: LocalizedTextValue;
   tags: string[];
-  category: 'signal-processing' | 'control' | 'data-analysis';
+  category: string;
   thumbnail?: string;
   content: LocalizedTextValue;
   status?: 'draft' | 'published' | 'scheduled';

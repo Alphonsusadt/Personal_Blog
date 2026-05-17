@@ -6,7 +6,7 @@ export interface Writing {
   excerpt: LocalizedTextValue;
   date: string;
   readTime: string;
-  category: 'reflections' | 'stories' | 'fiction';
+  category: string;
   tags?: string[];
   content: LocalizedTextValue;
   translationGroupId?: string;

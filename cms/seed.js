@@ -403,8 +403,29 @@ async function seed() {
     db.collection('about').deleteMany({}),
     db.collection('home').deleteMany({}),
     db.collection('settings').deleteMany({}),
+    db.collection('categories').deleteMany({}),
   ]);
   console.log('Cleared existing data');
+
+  // Seed default categories
+  const defaultCategories = [
+    // Projects
+    { section: 'projects', value: 'signal-processing', label: { en: 'Signal Processing', id: 'Pemrosesan Sinyal' }, icon: '', enabled: true, order: 1 },
+    { section: 'projects', value: 'control', label: { en: 'Control', id: 'Kontrol' }, icon: '', enabled: true, order: 2 },
+    { section: 'projects', value: 'data-analysis', label: { en: 'Data Analysis', id: 'Analisis Data' }, icon: '', enabled: true, order: 3 },
+    // Writings
+    { section: 'writings', value: 'reflections', label: { en: 'Reflections', id: 'Refleksi' }, icon: '', enabled: true, order: 1 },
+    { section: 'writings', value: 'stories', label: { en: 'Stories', id: 'Cerita' }, icon: '', enabled: true, order: 2 },
+    { section: 'writings', value: 'fiction', label: { en: 'Fiction', id: 'Fiksi' }, icon: '', enabled: true, order: 3 },
+    // Books
+    { section: 'books', value: 'technical', label: { en: 'Technical', id: 'Teknis' }, icon: '', enabled: true, order: 1 },
+    { section: 'books', value: 'biography', label: { en: 'Biography', id: 'Biografi' }, icon: '', enabled: true, order: 2 },
+    { section: 'books', value: 'spiritual', label: { en: 'Spiritual', id: 'Spiritual' }, icon: '', enabled: true, order: 3 },
+    { section: 'books', value: 'philosophy', label: { en: 'Philosophy', id: 'Filosofi' }, icon: '', enabled: true, order: 4 },
+  ].map(c => ({ ...c, createdAt: new Date(), updatedAt: new Date() }));
+
+  await db.collection('categories').insertMany(defaultCategories);
+  console.log(`Inserted ${defaultCategories.length} categories`);
 
   // Insert data (ensure all items have status: 'published' and visible: true)
   const publishedProjects = projects.map(p => ({ ...p, status: 'published', visible: true }));

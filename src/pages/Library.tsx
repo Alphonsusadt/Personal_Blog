@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Search, Book, User, Sparkles } from 'lucide-react';
+import { Search, Book } from 'lucide-react';
 import { BookCard } from '../components/BookCard';
 import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
@@ -7,13 +7,13 @@ import { resolveLocalizedText, getExactLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
 
-interface Book {
+interface BookItem {
   id: string;
   title: string;
   author: string;
   cover: string;
   rating: number;
-  category: 'technical' | 'biography' | 'spiritual' | 'philosophy';
+  category: string;
   takeaways: string[];
   review: string;
   status?: 'draft' | 'published' | 'scheduled';
@@ -24,17 +24,39 @@ interface Book {
   translationOfId?: string;
 }
 
+interface CategoryItem {
+  _id: string;
+  section: string;
+  value: string;
+  label: { en: string; id: string };
+  icon: string;
+  enabled: boolean;
+  order: number;
+}
+
+const FALLBACK_CATEGORIES: CategoryItem[] = [
+  { _id: 'fb1', section: 'books', value: 'technical', label: { en: 'Technical', id: 'Teknis' }, icon: '', enabled: true, order: 1 },
+  { _id: 'fb2', section: 'books', value: 'biography', label: { en: 'Biography', id: 'Biografi' }, icon: '', enabled: true, order: 2 },
+  { _id: 'fb3', section: 'books', value: 'spiritual', label: { en: 'Spiritual', id: 'Spiritual' }, icon: '', enabled: true, order: 3 },
+  { _id: 'fb4', section: 'books', value: 'philosophy', label: { en: 'Philosophy', id: 'Filosofi' }, icon: '', enabled: true, order: 4 },
+];
+
 export function Library() {
   const navigate = useNavigate();
   const { language } = useSiteLanguage();
-  const [allBooks, setAllBooks] = useState<Book[]>([]);
+  const [allBooks, setAllBooks] = useState<BookItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [dynamicCategories, setDynamicCategories] = useState<CategoryItem[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+
+    api.getPublicCategories('books')
+      .then((cats: CategoryItem[]) => { if (!cancelled) setDynamicCategories(cats); })
+      .catch(() => { if (!cancelled) setDynamicCategories(FALLBACK_CATEGORIES); });
 
     api.getPublicSettings()
       .then((settings: any) => {
@@ -43,12 +65,12 @@ export function Library() {
           navigate('/', { replace: true });
           return;
         }
-        return api.getPublicBooks().then((books: Book[]) => {
+        return api.getPublicBooks().then((books: BookItem[]) => {
           if (!cancelled) setAllBooks(books);
         });
       })
       .catch(() => {
-        return api.getPublicBooks().then((books: Book[]) => {
+        return api.getPublicBooks().then((books: BookItem[]) => {
           if (!cancelled) setAllBooks(books);
         }).catch(console.error);
       })
@@ -61,13 +83,17 @@ export function Library() {
     };
   }, [navigate]);
 
-  const categories = [
-    { value: 'all', label: t('category.allBooks', language), icon: Book },
-    { value: 'technical', label: t('category.technical', language), icon: Book },
-    { value: 'biography', label: t('category.biography', language), icon: User },
-    { value: 'spiritual', label: t('category.spiritual', language), icon: Sparkles },
-    { value: 'philosophy', label: t('category.philosophy', language), icon: Sparkles }
-  ];
+  const categories = useMemo(() => {
+    const dbCats = dynamicCategories.map((cat) => ({
+      value: cat.value,
+      label: cat.label[language] || cat.label.en,
+      icon: Book,
+    }));
+    return [
+      { value: 'all', label: t('category.allBooks', language), icon: Book },
+      ...dbCats,
+    ];
+  }, [dynamicCategories, language]);
 
   const filteredBooks = useMemo(() => {
     return allBooks.filter(book => {

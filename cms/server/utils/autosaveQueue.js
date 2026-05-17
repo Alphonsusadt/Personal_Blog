@@ -82,6 +82,10 @@ function dispatchToWorker(jobId) {
 /**
  * Merges new fields into the RAM Queue and schedules a save to DB.
  * Guaranteed to return < 5ms.
+ *
+ * Field deletion: callers may set a field to `null` to signal that it
+ * should be removed from the queued $setDoc so it won't be written to
+ * the database as a literal null.
  */
 export function queueAutosave(collectionName, documentId, newSetDoc) {
   if (!worker) {
@@ -94,8 +98,14 @@ export function queueAutosave(collectionName, documentId, newSetDoc) {
   if (pendingUpdates.has(jobId)) {
     const item = pendingUpdates.get(jobId);
     
-    // Merge fields
-    item.$setDoc = { ...item.$setDoc, ...newSetDoc };
+    // Merge fields — null values remove the key so stale data doesn't persist
+    for (const [key, value] of Object.entries(newSetDoc)) {
+      if (value === null || value === undefined) {
+        delete item.$setDoc[key];
+      } else {
+        item.$setDoc[key] = value;
+      }
+    }
     item.lastUpdatedAt = now;
 
     // If it's already in-flight, the worker will finish the previous snapshot,
@@ -114,13 +124,20 @@ export function queueAutosave(collectionName, documentId, newSetDoc) {
       item.timeoutRef = setTimeout(() => dispatchToWorker(jobId), DEBOUNCE_MS);
     }
   } else {
-    // New job
+    // New job — strip null/undefined keys up front
+    const cleanedSetDoc = {};
+    for (const [key, value] of Object.entries(newSetDoc)) {
+      if (value !== null && value !== undefined) {
+        cleanedSetDoc[key] = value;
+      }
+    }
+
     const timeoutRef = setTimeout(() => dispatchToWorker(jobId), DEBOUNCE_MS);
     
     pendingUpdates.set(jobId, {
       collectionName,
       documentId,
-      $setDoc: { ...newSetDoc },
+      $setDoc: cleanedSetDoc,
       firstUpdatedAt: now,
       lastUpdatedAt: now,
       status: 'queued', // 'queued' | 'saving'

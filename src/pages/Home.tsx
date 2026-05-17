@@ -127,8 +127,8 @@ const defaultHomeData: HomeData = {
 };
 
 /**
- * Generates EMG signal path with stochastic high-frequency noise pattern
- * Simulates muscle bursts (active) and rests (quiet) - NOT periodic like ECG
+ * Generates EMG signal path with perfectly periodic burst pattern for seamless scrolling.
+ * Uses a fixed deterministic pattern per cycle so scroll animation is seamless.
  */
 function generateEMGPath(
   startX: number,
@@ -139,54 +139,49 @@ function generateEMGPath(
   const points: string[] = [];
   points.push(`M${startX},${baselineY}`);
 
+  // Fixed deterministic EMG burst pattern for seamless tiling
+  const burstPattern = [
+    0, -1, 2, -3, 5, -6, 7, -5, 4, -7, 8, -6, 3, -5, 7, -8, 6, -4,
+    3, -6, 8, -7, 5, -3, 2, -4, 6, -5, 3, -2, 1, 0, -1, 2, -1, 0
+  ];
+  const restPhase1 = 8; // quiet before burst
+  const burstLength = burstPattern.length;
+
   for (let cycle = 0; cycle < numCycles; cycle++) {
     const cycleStartX = startX + cycle * cycleWidth;
 
-    // Vary burst timing slightly per cycle
-    const restDuration1 = 17 + (Math.random() - 0.5) * 4;
-    const burstDuration = 18 + (Math.random() - 0.5) * 4;
-    const restDuration2 = cycleWidth - restDuration1 - burstDuration;
-
-    // REST PHASE 1: Very low amplitude noise (quiet muscle)
-    for (let i = 0; i < restDuration1; i += 2) {
+    // REST PHASE 1: Quiet baseline with tiny noise
+    for (let i = 0; i < restPhase1; i += 2) {
       const x = cycleStartX + i;
-      const y = baselineY + (Math.random() - 0.5) * 3;
-      points.push(`L${x.toFixed(1)},${y.toFixed(1)}`);
+      points.push(`L${x},${baselineY}`);
     }
 
-    // BURST PHASE: High-frequency stochastic spikes (muscle activation)
-    const burstStartX = cycleStartX + restDuration1;
-    for (let i = 0; i < burstDuration; i += 1) {
+    // BURST PHASE: Fixed deterministic spikes
+    const burstStartX = cycleStartX + restPhase1;
+    for (let i = 0; i < burstLength; i++) {
       const x = burstStartX + i;
-
-      // Envelope: amplitude peaks in middle of burst (natural ramp up/down)
-      const burstProgress = i / burstDuration;
-      const envelope = Math.sin(burstProgress * Math.PI);
-
-      // Random spike with envelope-modulated amplitude
-      const maxAmplitude = 9;
-      const amplitude = maxAmplitude * envelope * (0.4 + Math.random() * 0.6);
-      const direction = Math.random() > 0.5 ? 1 : -1;
-
-      const y = baselineY + direction * amplitude;
-      points.push(`L${x.toFixed(1)},${y.toFixed(1)}`);
+      const y = baselineY + burstPattern[i];
+      points.push(`L${x},${y}`);
     }
 
-    // REST PHASE 2: Return to quiet baseline
-    const rest2StartX = burstStartX + burstDuration;
-    for (let i = 0; i < restDuration2; i += 2) {
+    // REST PHASE 2: Fill remaining width with quiet baseline
+    const rest2StartX = burstStartX + burstLength;
+    const remaining = cycleWidth - restPhase1 - burstLength;
+    for (let i = 0; i < remaining; i += 2) {
       const x = rest2StartX + i;
-      const y = baselineY + (Math.random() - 0.5) * 3;
-      points.push(`L${x.toFixed(1)},${y.toFixed(1)}`);
+      points.push(`L${x},${baselineY}`);
     }
+
+    // End exactly at cycleWidth
+    points.push(`L${cycleStartX + cycleWidth},${baselineY}`);
   }
 
   return points.join(' ');
 }
 
 /**
- * Generates ECG signal path with organic PQRST variation
- * Adds subtle R-R interval variation and baseline drift for realistic appearance
+ * Generates ECG signal path with perfectly periodic PQRST for seamless scrolling.
+ * All cycles are identical so the scroll animation at exactly 1 cycle width is seamless.
  */
 function generateECGPath(
   startX: number,
@@ -197,60 +192,42 @@ function generateECGPath(
   const points: string[] = [];
   points.push(`M${startX},${baselineY}`);
 
-  let currentX = startX;
-
+  // Generate one perfect cycle, then repeat it identically
   for (let cycle = 0; cycle < numCycles; cycle++) {
-    // R-R interval variation: +/- 3px (about 6% heart rate variability)
-    const rrVariation = (Math.random() - 0.5) * 6;
-    const effectiveCycleWidth = cycleWidth + rrVariation;
-    const scale = effectiveCycleWidth / cycleWidth;
-
-    // Baseline drift: subtle wandering +/- 2px
-    const baselineDrift = (Math.random() - 0.5) * 4;
-    const localBaseline = baselineY + baselineDrift;
-
-    // Amplitude variations (subtle)
-    const rVariation = 1 + (Math.random() - 0.5) * 0.2;
-    const sVariation = 1 + (Math.random() - 0.5) * 0.2;
-    const pVariation = 1 + (Math.random() - 0.5) * 0.3;
-    const tVariation = 1 + (Math.random() - 0.5) * 0.3;
-
-    const cycleStart = currentX;
+    const cycleStart = startX + cycle * cycleWidth;
 
     // Flat baseline to P wave start
-    points.push(`L${(cycleStart + 4 * scale).toFixed(1)},${localBaseline.toFixed(1)}`);
+    points.push(`L${cycleStart + 4},${baselineY}`);
 
     // P wave (small atrial depolarization bump)
-    points.push(`L${(cycleStart + 5 * scale).toFixed(1)},${(localBaseline - 2 * pVariation).toFixed(1)}`);
-    points.push(`L${(cycleStart + 6 * scale).toFixed(1)},${(localBaseline - 3 * pVariation).toFixed(1)}`);
-    points.push(`L${(cycleStart + 8 * scale).toFixed(1)},${(localBaseline - 2 * pVariation).toFixed(1)}`);
+    points.push(`L${cycleStart + 5},${baselineY - 2}`);
+    points.push(`L${cycleStart + 6},${baselineY - 3}`);
+    points.push(`L${cycleStart + 8},${baselineY - 2}`);
 
     // PR segment (flat, isoelectric)
-    points.push(`L${(cycleStart + 12 * scale).toFixed(1)},${localBaseline.toFixed(1)}`);
+    points.push(`L${cycleStart + 12},${baselineY}`);
 
     // Q wave (small dip before R)
-    points.push(`L${(cycleStart + 13 * scale).toFixed(1)},${(localBaseline + 4 * sVariation).toFixed(1)}`);
+    points.push(`L${cycleStart + 13},${baselineY + 4}`);
 
-    // R wave (tall sharp spike - ventricular depolarization)
-    points.push(`L${(cycleStart + 14 * scale).toFixed(1)},${(localBaseline - 24 * rVariation).toFixed(1)}`);
+    // R wave (tall sharp spike)
+    points.push(`L${cycleStart + 14},${baselineY - 24}`);
 
     // S wave (dip below baseline)
-    points.push(`L${(cycleStart + 15 * scale).toFixed(1)},${(localBaseline + 10 * sVariation).toFixed(1)}`);
+    points.push(`L${cycleStart + 15},${baselineY + 10}`);
 
     // Return to baseline (ST segment)
-    points.push(`L${(cycleStart + 16 * scale).toFixed(1)},${localBaseline.toFixed(1)}`);
+    points.push(`L${cycleStart + 16},${baselineY}`);
 
-    // T wave (ventricular repolarization - broader, gentler)
-    points.push(`L${(cycleStart + 20 * scale).toFixed(1)},${localBaseline.toFixed(1)}`);
-    points.push(`L${(cycleStart + 22 * scale).toFixed(1)},${(localBaseline - 3 * tVariation).toFixed(1)}`);
-    points.push(`L${(cycleStart + 25 * scale).toFixed(1)},${(localBaseline - 4 * tVariation).toFixed(1)}`);
-    points.push(`L${(cycleStart + 28 * scale).toFixed(1)},${(localBaseline - 3 * tVariation).toFixed(1)}`);
+    // T wave (ventricular repolarization)
+    points.push(`L${cycleStart + 20},${baselineY}`);
+    points.push(`L${cycleStart + 22},${baselineY - 3}`);
+    points.push(`L${cycleStart + 25},${baselineY - 4}`);
+    points.push(`L${cycleStart + 28},${baselineY - 3}`);
 
     // Return to baseline for rest of cycle
-    points.push(`L${(cycleStart + 32 * scale).toFixed(1)},${localBaseline.toFixed(1)}`);
-
-    currentX = cycleStart + effectiveCycleWidth;
-    points.push(`L${currentX.toFixed(1)},${localBaseline.toFixed(1)}`);
+    points.push(`L${cycleStart + 32},${baselineY}`);
+    points.push(`L${cycleStart + cycleWidth},${baselineY}`);
   }
 
   return points.join(' ');
@@ -420,19 +397,16 @@ export function Home() {
                         50% { opacity: 0.2; }
                       }
                       @keyframes arm-rotate1 {
-                        0%, 100% { transform-origin: 241px 312px; transform: rotate(0deg); }
-                        40% { transform-origin: 241px 312px; transform: rotate(-18deg); }
-                        70% { transform-origin: 241px 312px; transform: rotate(12deg); }
+                        0%, 100% { transform: rotate(0deg); }
+                        50% { transform: rotate(-6deg); }
                       }
                       @keyframes arm-rotate2 {
-                        0%, 100% { transform-origin: 241px 262px; transform: rotate(0deg); }
-                        40% { transform-origin: 241px 262px; transform: rotate(20deg); }
-                        70% { transform-origin: 241px 262px; transform: rotate(-15deg); }
+                        0%, 100% { transform: rotate(0deg); }
+                        50% { transform: rotate(7deg); }
                       }
                       @keyframes arm-rotate3 {
-                        0%, 100% { transform-origin: 241px 222px; transform: rotate(0deg); }
-                        40% { transform-origin: 241px 222px; transform: rotate(-10deg); }
-                        70% { transform-origin: 241px 222px; transform: rotate(8deg); }
+                        0%, 100% { transform: rotate(0deg); }
+                        50% { transform: rotate(-5deg); }
                       }
                       @keyframes signal-pulse {
                         0%, 100% { opacity: 0.4; }
@@ -461,11 +435,26 @@ export function Home() {
                         92%  { opacity: 1; }
                         100% { offset-distance: 100%; opacity: 0; }
                       }
-                      .arm1 { animation: arm-rotate1 3.5s ease-in-out infinite; }
-                      .arm2 { animation: arm-rotate2 3.5s ease-in-out infinite; }
-                      .arm3 { animation: arm-rotate3 3.5s ease-in-out infinite; }
-                      .scroll-ecg { animation: scroll-ecg 1.5s linear infinite; }
-                      .scroll-emg { animation: scroll-emg 0.9s linear infinite; }
+                      .arm1 {
+                        transform-origin: 241px 320px;
+                        transform-box: view-box;
+                        will-change: transform;
+                        animation: arm-rotate1 4s ease-in-out infinite;
+                      }
+                      .arm2 {
+                        transform-origin: 241px 268px;
+                        transform-box: view-box;
+                        will-change: transform;
+                        animation: arm-rotate2 4s ease-in-out infinite 0.3s;
+                      }
+                      .arm3 {
+                        transform-origin: 241px 228px;
+                        transform-box: view-box;
+                        will-change: transform;
+                        animation: arm-rotate3 4s ease-in-out infinite 0.6s;
+                      }
+                      .scroll-ecg { will-change: transform; animation: scroll-ecg 1.5s linear infinite; }
+                      .scroll-emg { will-change: transform; animation: scroll-emg 0.9s linear infinite; }
                       .blink  { animation: blink-dot 1.2s ease-in-out infinite; }
                       .blink2 { animation: blink-dot 1.8s ease-in-out infinite 0.4s; }
                       .pulse-dot { animation: signal-pulse 1.5s ease-in-out infinite; }
@@ -532,15 +521,14 @@ export function Home() {
                   {/* ── ECG PANEL — seamless scrolling PQRST ── */}
                   <rect x="18" y="18" width="170" height="80" rx="10" fill="rgba(15,23,42,0.85)" stroke="#34D399" strokeWidth="1.5"/>
                   <text x="30" y="36" fontSize="9" fill="#6EE7B7" fontFamily="monospace" fontWeight="bold">ECG SIGNAL</text>
-                  <circle cx="172" cy="30" r="5" fill="#4ADE80" className="blink" filter="url(#glow-green)"/>
-                  <text x="162" y="34" fontSize="7" fill="#4ADE80" fontFamily="monospace">LIVE</text>
+                  <text x="156" y="34" fontSize="7" fill="#4ADE80" fontFamily="monospace" fontWeight="bold">● LIVE</text>
                   <rect x="24" y="44" width="158" height="44" rx="4" fill="rgba(2,6,23,0.7)"/>
                   {/* Clip + scroll: path is 8 cycles × 52px = 416px; animate by -52px */}
                   <g clipPath="url(#ecg-clip)">
                     <g className="scroll-ecg">
                       <path
                         d={ecgPath}
-                        stroke="#4ADE80" strokeWidth="1.2" fill="none" filter="url(#glow-green)"
+                        stroke="#4ADE80" strokeWidth="1.2" fill="none"
                       />
                     </g>
                   </g>
@@ -548,14 +536,14 @@ export function Home() {
                   {/* ── EMG PANEL — stochastic noise bursts (muscle activation) ── */}
                   <rect x="18" y="118" width="170" height="70" rx="10" fill="rgba(15,23,42,0.85)" stroke="#C084FC" strokeWidth="1.5"/>
                   <text x="30" y="136" fontSize="9" fill="#E879F9" fontFamily="monospace" fontWeight="bold">EMG SIGNAL</text>
-                  <circle cx="170" cy="130" r="5" fill="#C084FC" className="blink2" filter="url(#glow-purple)"/>
+                  <text x="154" y="134" fontSize="7" fill="#C084FC" fontFamily="monospace" fontWeight="bold">● LIVE</text>
                   <rect x="24" y="143" width="158" height="36" rx="4" fill="rgba(2,6,23,0.7)"/>
-                  {/* Clip + scroll: stochastic bursts with quiet rest periods */}
+                  {/* Clip + scroll: deterministic bursts with quiet rest periods */}
                   <g clipPath="url(#emg-clip)">
                     <g className="scroll-emg">
                       <path
                         d={emgPath}
-                        stroke="#E879F9" strokeWidth="1.5" fill="none" filter="url(#glow-purple)"
+                        stroke="#E879F9" strokeWidth="1.5" fill="none"
                       />
                     </g>
                   </g>
@@ -563,14 +551,14 @@ export function Home() {
                   {/* ── TRAVELLING DOTS on all connections ── */}
                   {/* ECG → robot */}
                   <path d="M188,58 Q214,143 241,228" stroke="#4ADE80" strokeWidth="1" strokeDasharray="3 4" opacity="0.35" className="flow-dash"/>
-                  <circle r="2.5" fill="#4ADE80" filter="url(#glow-green)" className="ecg-dot-1"/>
-                  <circle r="2.5" fill="#4ADE80" filter="url(#glow-green)" className="ecg-dot-2"/>
-                  <circle r="2.5" fill="#4ADE80" filter="url(#glow-green)" className="ecg-dot-3"/>
+                  <circle r="2.5" fill="#4ADE80" className="ecg-dot-1"/>
+                  <circle r="2.5" fill="#4ADE80" className="ecg-dot-2"/>
+                  <circle r="2.5" fill="#4ADE80" className="ecg-dot-3"/>
                   {/* EMG → robot */}
                   <path d="M188,153 Q214,190 241,228" stroke="#C084FC" strokeWidth="1" strokeDasharray="3 4" opacity="0.35" className="flow-dash"/>
-                  <circle r="2.5" fill="#E879F9" filter="url(#glow-purple)" className="emg-dot-1"/>
-                  <circle r="2.5" fill="#E879F9" filter="url(#glow-purple)" className="emg-dot-2"/>
-                  <circle r="2.5" fill="#E879F9" filter="url(#glow-purple)" className="emg-dot-3"/>
+                  <circle r="2.5" fill="#E879F9" className="emg-dot-1"/>
+                  <circle r="2.5" fill="#E879F9" className="emg-dot-2"/>
+                  <circle r="2.5" fill="#E879F9" className="emg-dot-3"/>
 
                   {/* ── CONTROL SYSTEM (top right) - Closed-Loop Feedback ── */}
                   <rect x="294" y="18" width="170" height="90" rx="10" fill="rgba(15,23,42,0.85)" stroke="#38BDF8" strokeWidth="1.5"/>
@@ -653,14 +641,14 @@ export function Home() {
                   {/* ── CONNECTING LINES ── */}
                   {/* Control → robot */}
                   <path d="M294,62 Q267,130 241,196" stroke="#38BDF8" strokeWidth="1" strokeDasharray="3 4" opacity="0.35" className="flow-dash"/>
-                  <circle r="2.5" fill="#38BDF8" filter="url(#glow-blue)" className="ctrl-dot-1"/>
-                  <circle r="2.5" fill="#38BDF8" filter="url(#glow-blue)" className="ctrl-dot-2"/>
-                  <circle r="2.5" fill="#38BDF8" filter="url(#glow-blue)" className="ctrl-dot-3"/>
+                  <circle r="2.5" fill="#38BDF8" className="ctrl-dot-1"/>
+                  <circle r="2.5" fill="#38BDF8" className="ctrl-dot-2"/>
+                  <circle r="2.5" fill="#38BDF8" className="ctrl-dot-3"/>
                   {/* Biosensor → robot */}
                   <path d="M294,174 Q267,200 241,228" stroke="#FBBF24" strokeWidth="1" strokeDasharray="3 4" opacity="0.35" className="flow-dash"/>
-                  <circle r="2.5" fill="#FCD34D" filter="url(#glow-blue)" className="bio-dot-1"/>
-                  <circle r="2.5" fill="#FCD34D" filter="url(#glow-blue)" className="bio-dot-2"/>
-                  <circle r="2.5" fill="#FCD34D" filter="url(#glow-blue)" className="bio-dot-3"/>
+                  <circle r="2.5" fill="#FCD34D" className="bio-dot-1"/>
+                  <circle r="2.5" fill="#FCD34D" className="bio-dot-2"/>
+                  <circle r="2.5" fill="#FCD34D" className="bio-dot-3"/>
 
                   {/* ── LABEL ── */}
                   <text x="240" y="382" fontSize="8.5" fill="#64748B" textAnchor="middle" fontFamily="monospace" letterSpacing="2">BIOMEDICAL ROBOTICS · SIGNAL SYSTEMS</text>

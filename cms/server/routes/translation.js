@@ -26,7 +26,15 @@ async function trySupabase(supabaseFn, mongoFn) {
     try {
       return await supabaseFn();
     } catch (err) {
-      console.warn('[translation] Supabase unavailable or failed, falling back to MongoDB:', err?.message || err);
+      const status = err?.status || err?.code || 'unknown';
+      const msg = err?.message || String(err);
+      console.warn(
+        `[translation] Supabase failed (${status}): ${msg}. Falling back to MongoDB.`
+      );
+      // In development, include the full stack for debugging
+      if (process.env.NODE_ENV === 'development' && err?.stack) {
+        console.debug('[translation] Supabase error stack:', err.stack);
+      }
     }
   }
   return mongoFn();

@@ -14,6 +14,7 @@ import aboutRoutes from './routes/about.js';
 import homeRoutes from './routes/home.js';
 import settingsRoutes from './routes/settings.js';
 import mediaRoutes from './routes/media.js';
+import categoriesRoutes from './routes/categories.js';
 import fs from 'fs/promises';
 import spellCheckRoutes from './routes/spellCheck.js';
 import translationRoutes from './routes/translation.js';
@@ -33,9 +34,26 @@ const parseSectionFlag = (value, fallback = true) => {
 };
 
 async function start() {
-  const client = new MongoClient(MONGODB_URI);
-  await client.connect();
-  console.log('Connected to MongoDB');
+  // Connect to MongoDB with retry logic for resilience
+  const client = new MongoClient(MONGODB_URI, {
+    connectTimeoutMS: 10_000,
+    socketTimeoutMS: 45_000,
+    serverSelectionTimeoutMS: 10_000,
+    retryWrites: true,
+  });
+
+  await connectWithRetry(client);
+
+  // Listen for connection drops and auto-reconnect
+  client.on('connectionPoolCleared', () => {
+    console.warn('[MongoDB] Connection pool cleared — will reconnect on next operation');
+  });
+  client.on('serverDescriptionChanged', (event) => {
+    if (event.newDescription.type === 'Unknown') {
+      console.warn('[MongoDB] Server became unavailable');
+    }
+  });
+
   const db = client.db(DB_NAME);
 
   // Start the background worker thread for RAM-Queue Autosaves
@@ -131,6 +149,7 @@ async function start() {
   app.use('/api/home', homeRoutes(db));
   app.use('/api/settings', settingsRoutes(db));
   app.use('/api/media', mediaRoutes(db));
+  app.use('/api/categories', categoriesRoutes(db));
 
   // Translation routes (Translate, Hybrid, SmartAI buttons)
   app.use('/api', translationRoutes(db));
@@ -271,3 +290,30 @@ start().catch(err => {
   console.error('Failed to start CMS server:', err);
   process.exit(1);
 });
+
+/**
+ * Connect to MongoDB with exponential back-off retry.
+ * Retries up to 5 times before giving up.
+ */
+const MONGO_RETRY_ATTEMPTS = 5;
+const MONGO_RETRY_BASE_MS = 2000;
+
+async function connectWithRetry(client, attempt = 1) {
+  try {
+    await client.connect();
+    console.log('Connected to MongoDB');
+    return;
+  } catch (err) {
+    if (attempt >= MONGO_RETRY_ATTEMPTS) {
+      console.error(`[MongoDB] Failed after ${attempt} attempts. Giving up.`);
+      throw err;
+    }
+    const delay = MONGO_RETRY_BASE_MS * Math.pow(2, attempt - 1);
+    console.warn(
+      `[MongoDB] Connection attempt ${attempt}/${MONGO_RETRY_ATTEMPTS} failed: ${err.message}`
+    );
+    console.warn(`[MongoDB] Retrying in ${delay / 1000}s...`);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    return connectWithRetry(client, attempt + 1);
+  }
+}

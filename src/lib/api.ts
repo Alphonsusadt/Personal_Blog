@@ -136,6 +136,7 @@ export const api = {
   async getPublicBooks() { return this.get('/api/books/public', false); },
   async getPublicAbout() { return this.get('/api/about/public', false); },
   async getPublicHome() { return this.get('/api/home/public', false); },
+  async getPublicCategories(section: string) { return this.get(`/api/categories/public/${section}`, false); },
   async getPublicSettings(opts?: { force?: boolean }) {
     if (opts?.force) {
       publicSettingsCache = null;

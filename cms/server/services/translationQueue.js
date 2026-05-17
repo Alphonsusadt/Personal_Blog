@@ -19,6 +19,27 @@ export class TranslationQueue {
 
     // Request timeout
     this.defaultTimeout = options.defaultTimeout || 30000; // 30s
+
+    // Periodic cleanup: purge stale rate-limiter entries every 2 minutes
+    this._cleanupInterval = setInterval(() => this._cleanupRateLimiter(), 120_000);
+    // Allow the process to exit even if this timer is still alive
+    if (this._cleanupInterval.unref) this._cleanupInterval.unref();
+  }
+
+  /**
+   * Remove users whose entire timestamp window has expired.
+   * Prevents unbounded memory growth for one-off users.
+   */
+  _cleanupRateLimiter() {
+    const now = Date.now();
+    for (const [userId, timestamps] of this.rateLimiter) {
+      const live = timestamps.filter((t) => now - t < this.rateLimitWindow);
+      if (live.length === 0) {
+        this.rateLimiter.delete(userId);
+      } else if (live.length !== timestamps.length) {
+        this.rateLimiter.set(userId, live);
+      }
+    }
   }
 
   /**

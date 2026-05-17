@@ -6,7 +6,7 @@ export interface Book {
   author: LocalizedTextValue;
   cover: string;
   rating: number;
-  category: 'technical' | 'biography' | 'spiritual' | 'philosophy';
+  category: string;
   takeaways: string[];
   review: LocalizedTextValue;
   status?: 'draft' | 'published' | 'scheduled';

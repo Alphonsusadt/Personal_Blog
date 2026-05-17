@@ -12,12 +12,31 @@ import {
 } from '../config/modelRegistry.js';
 import { isRetryableError, shouldFallbackToNextModel } from '../utils/errorClassifier.js';
 
+const FAILURE_TTL_MS = 30 * 60 * 1000; // 30 minutes — old failures expire
+
 export class ModelSelector {
   constructor() {
-    // Track failures per model: Map<modelId, {count, lastError, timestamp}>
+    // Track failures per model: Map<key, {count, lastError, lastFailureTime}>
     this.failureHistory = new Map();
     // Track retry delays: Map<modelId, {retryAfter}>
     this.retryDelays = new Map();
+
+    // Periodic cleanup: purge stale failure entries every 5 minutes
+    this._cleanupInterval = setInterval(() => this._cleanupStaleEntries(), 5 * 60 * 1000);
+    if (this._cleanupInterval.unref) this._cleanupInterval.unref();
+  }
+
+  /**
+   * Remove failure history entries older than FAILURE_TTL_MS so that
+   * transient failures don't permanently block a model.
+   */
+  _cleanupStaleEntries() {
+    const now = Date.now();
+    for (const [key, history] of this.failureHistory) {
+      if (now - history.lastFailureTime > FAILURE_TTL_MS) {
+        this.failureHistory.delete(key);
+      }
+    }
   }
 
   /**
@@ -139,12 +158,18 @@ export class ModelSelector {
   }
 
   /**
-   * Check if model has too many recent failures
+   * Check if model has too many recent failures (within TTL window)
    */
   isModelUnreliable(buttonKey, modelId) {
     const key = `${buttonKey}:${modelId}`;
     const history = this.failureHistory.get(key);
-    return history && history.count >= 3;
+    if (!history) return false;
+    // Expire stale entries on read
+    if (Date.now() - history.lastFailureTime > FAILURE_TTL_MS) {
+      this.failureHistory.delete(key);
+      return false;
+    }
+    return history.count >= 3;
   }
 
   /**

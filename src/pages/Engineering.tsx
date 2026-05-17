@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Search, Code, Activity, Database, X } from 'lucide-react';
+import { Search, Code, X } from 'lucide-react';
 import { ProjectCard } from '../components/ProjectCard';
 import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
@@ -12,7 +12,7 @@ interface Project {
   title: string;
   description: string;
   tags: string[];
-  category: 'signal-processing' | 'control' | 'data-analysis';
+  category: string;
   content: string;
   featured?: boolean;
   status?: 'draft' | 'published' | 'scheduled';
@@ -23,6 +23,22 @@ interface Project {
   translationOfId?: string;
 }
 
+interface CategoryItem {
+  _id: string;
+  section: string;
+  value: string;
+  label: { en: string; id: string };
+  icon: string;
+  enabled: boolean;
+  order: number;
+}
+
+const FALLBACK_CATEGORIES: CategoryItem[] = [
+  { _id: 'fb1', section: 'projects', value: 'signal-processing', label: { en: 'Signal Processing', id: 'Pemrosesan Sinyal' }, icon: '', enabled: true, order: 1 },
+  { _id: 'fb2', section: 'projects', value: 'control', label: { en: 'Control', id: 'Kontrol' }, icon: '', enabled: true, order: 2 },
+  { _id: 'fb3', section: 'projects', value: 'data-analysis', label: { en: 'Data Analysis', id: 'Analisis Data' }, icon: '', enabled: true, order: 3 },
+];
+
 export function Engineering() {
   const navigate = useNavigate();
   const { language } = useSiteLanguage();
@@ -31,10 +47,15 @@ export function Engineering() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [dynamicCategories, setDynamicCategories] = useState<CategoryItem[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+
+    api.getPublicCategories('projects')
+      .then((cats: CategoryItem[]) => { if (!cancelled) setDynamicCategories(cats); })
+      .catch(() => { if (!cancelled) setDynamicCategories(FALLBACK_CATEGORIES); });
 
     api.getPublicSettings()
       .then((settings: any) => {
@@ -62,12 +83,17 @@ export function Engineering() {
     };
   }, [navigate]);
 
-  const categories = [
-    { value: 'all', label: t('category.allProjects', language), icon: Code },
-    { value: 'signal-processing', label: t('category.signalProcessing', language), icon: Activity },
-    { value: 'control', label: t('category.control', language), icon: Database },
-    { value: 'data-analysis', label: t('category.dataAnalysis', language), icon: Database }
-  ];
+  const categories = useMemo(() => {
+    const dbCats = dynamicCategories.map((cat) => ({
+      value: cat.value,
+      label: cat.label[language] || cat.label.en,
+      icon: Code,
+    }));
+    return [
+      { value: 'all', label: t('category.allProjects', language), icon: Code },
+      ...dbCats,
+    ];
+  }, [dynamicCategories, language]);
 
   const filteredProjects = useMemo(() => {
     return allProjects.filter(project => {
