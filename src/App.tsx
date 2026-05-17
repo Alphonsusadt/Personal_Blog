@@ -25,6 +25,7 @@ const BookEditor = lazy(() => import('./pages/admin/BookEditor').then(m => ({ de
 const AboutManager = lazy(() => import('./pages/admin/AboutManager').then(m => ({ default: m.AboutManager })));
 const HomeManager = lazy(() => import('./pages/admin/HomeManager').then(m => ({ default: m.HomeManager })));
 const SettingsManager = lazy(() => import('./pages/admin/SettingsManager').then(m => ({ default: m.SettingsManager })));
+const CategoriesManager = lazy(() => import('./pages/admin/CategoriesManager').then(m => ({ default: m.CategoriesManager })));
 
 function ScrollToTop() {
   const location = useLocation();
@@ -78,6 +79,7 @@ export function App() {
             <Route path="about" element={<AboutManager />} />
             <Route path="home" element={<HomeManager />} />
             <Route path="settings" element={<SettingsManager />} />
+            <Route path="categories" element={<CategoriesManager />} />
           </Route>
 
           {/* Public Routes */}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../../lib/api';
 import {
-  LayoutDashboard, FolderKanban, PenLine, BookOpen, UserCircle, Home, Settings, LogOut, Menu, X, ChevronRight
+  LayoutDashboard, FolderKanban, PenLine, BookOpen, UserCircle, Home, Settings, LogOut, Menu, X, ChevronRight, Tags
 } from 'lucide-react';
 
 const sidebarItems = [
@@ -10,6 +10,7 @@ const sidebarItems = [
   { path: '/admin/projects', label: 'Projects', icon: FolderKanban },
   { path: '/admin/writings', label: 'Writings', icon: PenLine },
   { path: '/admin/books', label: 'Books', icon: BookOpen },
+  { path: '/admin/categories', label: 'Categories', icon: Tags },
   { path: '/admin/about', label: 'About Page', icon: UserCircle },
   { path: '/admin/home', label: 'Home Page', icon: Home },
   { path: '/admin/settings', label: 'Settings', icon: Settings },
