@@ -543,7 +543,43 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
                 method: result.method,
                 language: result.targetLanguage || 'en',
               });
-              onUpdate(project);
+
+              // Merge translated data into the existing project object so UI updates instantly
+              const lang = result.targetLanguage || 'en';
+              const updatedProject = { ...project };
+
+              // Helper to safely format LocalizedText
+              const applyTranslation = (current: any, newText: string) => {
+                if (typeof current === 'string') {
+                  try {
+                    const parsed = JSON.parse(current);
+                    return { ...parsed, [lang]: newText };
+                  } catch {
+                    const srcLang = lang === 'en' ? 'id' : 'en';
+                    return { [srcLang]: current, [lang]: newText };
+                  }
+                }
+                if (current && typeof current === 'object') {
+                  return { ...current, [lang]: newText };
+                }
+                return { [lang]: newText };
+              };
+
+              const translations = result.translations || {};
+              if (result.title) translations.title = result.title;
+              if (result.content) translations.description = result.content;
+
+              for (const [field, translatedText] of Object.entries(translations)) {
+                if (typeof translatedText === 'string') {
+                  if (field === 'metaTitle' || field === 'metaDescription' || field === 'keywords') {
+                    (updatedProject as any)[field] = translatedText;
+                  } else {
+                    (updatedProject as any)[field] = applyTranslation((project as any)[field], translatedText);
+                  }
+                }
+              }
+
+              onUpdate(updatedProject);
             }}
             onError={(_error: string) => {
               setTranslationStatus({

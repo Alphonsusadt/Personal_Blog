@@ -10,6 +10,7 @@ const translations: Translations = {
   'nav.writings': { en: 'Writings', id: 'Tulisan' },
   'nav.library': { en: 'Library', id: 'Perpustakaan' },
   'nav.about': { en: 'About', id: 'Tentang' },
+  'nav.contact': { en: 'Contact', id: 'Kontak' },
 
   // Footer
   'footer.quickLinks': { en: 'Quick Links', id: 'Tautan Cepat' },

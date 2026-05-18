@@ -48,6 +48,7 @@ export function Navigation() {
       { path: '/writings', label: t('nav.writings', language), enabled: sections.writings },
       { path: '/library', label: t('nav.library', language), enabled: sections.books },
       { path: '/about', label: t('nav.about', language) },
+      { path: '/contact', label: t('nav.contact', language) },
     ];
     return items.filter((item) => item.enabled !== false);
   }, [sections.books, sections.projects, sections.writings, language]);

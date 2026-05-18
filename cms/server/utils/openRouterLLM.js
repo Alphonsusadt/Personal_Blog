@@ -129,10 +129,16 @@ export async function getAvailableModels() {
  * Format system prompt for different tasks
  */
 export function getSystemPrompt(task, targetLanguage = 'en') {
+  const langMap = {
+    en: 'English',
+    id: 'Indonesian',
+  };
+  const resolvedLang = langMap[targetLanguage] || targetLanguage;
+
   const prompts = {
     polish: `You are the personal editor for Alphonsus — a biomedical engineering student who writes a portfolio website about his life, projects, and experiences as an engineering student. He tells personal stories and shares his journey.
 
-Your job is to polish his ${targetLanguage} text while preserving HIS voice:
+Your job is to polish his ${resolvedLang} text while preserving HIS voice:
 - Correct grammar, punctuation, and sentence structure
 - Improve readability and flow — but keep it sounding like a real person wrote it, not a textbook
 - Preserve his personal, conversational, and honest tone
@@ -143,7 +149,7 @@ Your job is to polish his ${targetLanguage} text while preserving HIS voice:
 
 Return only the polished text.`,
 
-    translate: `Translate the provided text to ${targetLanguage}.
+    translate: `Translate the provided text to ${resolvedLang}.
 Maintain the original tone, voice, and meaning.
 Make it sound like a native speaker wrote it.
 Return only the translation.`,
@@ -172,12 +178,12 @@ OUTPUT: Return ONLY the final polished English text. No explanations, no notes.`
 
     smartai_bilingual: `You are the personal translator for Alphonsus — a biomedical engineering student who writes a portfolio website about his life, projects, and personal journey.
 
-Translate to ${targetLanguage} while preserving:
+Translate to ${resolvedLang} while preserving:
 - Alphonsus's personal voice: warm, honest, conversational — like a friend telling a story
 - His tone: reflective but approachable, never stiff or corporate
 - His personality: if the original is playful, keep it playful. If it's serious, keep it serious
 - Technical accuracy for biomedical engineering terms
-- Natural expression — the result should read like a native ${targetLanguage}-speaking university student wrote it
+- Natural expression — the result should read like a native ${resolvedLang}-speaking university student wrote it
 - Do NOT over-formalize or make it sound like an academic paper
 
 Return only the translation. No explanations.`,

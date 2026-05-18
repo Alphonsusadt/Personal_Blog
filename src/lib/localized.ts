@@ -70,30 +70,44 @@ export function setLocalizedText(
   };
 }
 
-export function getTranslationStatus(value: LocalizedTextValue, translationOfId?: string): 'bilingual' | 'single-id' | 'single-en' {
+export function getTranslationStatus(
+  value: LocalizedTextValue | LocalizedTextValue[], 
+  translationOfId?: string,
+  contentLanguage?: string
+): 'bilingual' | 'single-id' | 'single-en' {
+  // If explicitly designated via contentLanguage, honor it immediately
+  if (contentLanguage === 'bilingual') return 'bilingual';
+  if (contentLanguage === 'id') return 'single-id';
+  if (contentLanguage === 'en') return 'single-en';
+
   if (translationOfId && translationOfId.trim().length > 0) {
     return 'bilingual';
   }
 
-  if (!value) return 'single-id';
+  const values = Array.isArray(value) ? value : [value];
+  let hasEnGlobal = false;
+  let hasIdGlobal = false;
 
-  let parsedValue = value;
-  if (typeof value === 'string' && value.trim().startsWith('{') && value.trim().endsWith('}')) {
-    try { parsedValue = JSON.parse(value); } catch (e) {}
+  for (const val of values) {
+    if (!val) continue;
+    let parsedValue = val;
+    if (typeof val === 'string' && val.trim().startsWith('{') && val.trim().endsWith('}')) {
+      try { parsedValue = JSON.parse(val); } catch (e) {}
+    }
+
+    if (typeof parsedValue === 'object' && parsedValue !== null) {
+      const hasEn = !!(parsedValue as any).en?.trim();
+      const hasId = !!(parsedValue as any).id?.trim();
+
+      if (hasEn && hasId) return 'bilingual';
+      if (hasEn) hasEnGlobal = true;
+      if (hasId) hasIdGlobal = true;
+    } else if (typeof parsedValue === 'string' && parsedValue.trim().length > 0) {
+      hasEnGlobal = true;
+    }
   }
 
-  if (typeof parsedValue === 'string') {
-    return 'single-en';
-  }
-
-  if (typeof parsedValue === 'object' && parsedValue !== null) {
-    const hasEn = !!(parsedValue as any).en?.trim();
-    const hasId = !!(parsedValue as any).id?.trim();
-
-    if (hasEn && hasId) return 'bilingual';
-    if (hasEn) return 'single-en';
-    if (hasId) return 'single-id';
-  }
-
-  return 'single-id';
+  if (hasEnGlobal && hasIdGlobal) return 'bilingual';
+  if (hasIdGlobal) return 'single-id';
+  return 'single-en';
 }

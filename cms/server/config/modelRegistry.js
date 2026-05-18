@@ -37,6 +37,45 @@ export const MODELS = {
     supportedFor: ['detect', 'translate'],
   },
 
+  DEEPSEEK_V4_FREE: {
+    id: 'deepseek/deepseek-v4-flash:free',
+    provider: 'openrouter',
+    name: 'DeepSeek V4 Flash Free',
+    tier: 'free',
+    inputPrice: 0,
+    outputPrice: 0,
+    maxTokens: 8192,
+    speedRating: 'fast',
+    qualityRating: 'high',
+    supportedFor: ['translate', 'polish', 'smartai'],
+  },
+
+  OPENROUTER_FREE: {
+    id: 'openrouter/free',
+    provider: 'openrouter',
+    name: 'OpenRouter Free Router',
+    tier: 'free',
+    inputPrice: 0,
+    outputPrice: 0,
+    maxTokens: 8192,
+    speedRating: 'fast',
+    qualityRating: 'medium',
+    supportedFor: ['translate', 'polish', 'smartai'],
+  },
+
+  GEMMA_4_FREE: {
+    id: 'google/gemma-4-31b-it:free',
+    provider: 'openrouter',
+    name: 'Gemma 4 31B Free',
+    tier: 'free',
+    inputPrice: 0,
+    outputPrice: 0,
+    maxTokens: 8192,
+    speedRating: 'fast',
+    qualityRating: 'high',
+    supportedFor: ['translate', 'polish', 'smartai'],
+  },
+
   MISTRAL_7B: {
     id: 'mistralai/mistral-7b-instruct',
     provider: 'openrouter',
@@ -83,18 +122,25 @@ export const MODELS = {
  */
 export const FALLBACK_CHAINS = {
   'button-translate': [
-    'baidu/cobuddy:free', // Primary: free Baidu Cobuddy
-    'ollama/llama2:7b', // Fallback: local free
+    'google-translate',
   ],
 
   'button-hybrid': [
-    'baidu/cobuddy:free', // Primary: free Baidu Cobuddy
-    'ollama/llama2:7b', // Fallback: local free
+    'deepseek/deepseek-v4-flash:free',
+    'openrouter/free',
+    'google/gemma-4-31b-it:free',
+    'mistralai/mistral-7b-instruct',
+    'baidu/cobuddy:free',
+    'ollama/llama2:7b',
   ],
 
   'button-smartai': [
-    'baidu/cobuddy:free', // Primary: free Baidu Cobuddy
-    'ollama/llama2:7b', // Fallback: local free
+    'deepseek/deepseek-v4-flash:free',
+    'openrouter/free',
+    'google/gemma-4-31b-it:free',
+    'mistralai/mistral-7b-instruct',
+    'baidu/cobuddy:free',
+    'ollama/llama2:7b',
   ],
 };
 

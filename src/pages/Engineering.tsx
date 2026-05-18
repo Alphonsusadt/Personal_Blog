@@ -117,16 +117,14 @@ export function Engineering() {
         return false;
       }
 
-      // For bilingual content, check if the selected language has actual title text.
-      if (project.contentLanguage === 'bilingual' || !project.contentLanguage) {
-        const titleForLang = getExactLocalizedText(project.title, language);
-        if (!titleForLang) return false;
-      }
-
+      // For bilingual content, allow showing even if specific language is missing
+      // (resolveLocalizedText will fallback to other language)
       const title = resolveLocalizedText(project.title, language);
+      if (!title) return false; // Only filter if NO title exists at all
+
       const description = resolveLocalizedText(project.description, language);
       const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (description?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
                            project.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesCategory = selectedCategory === 'all' || project.category === selectedCategory;
       return matchesSearch && matchesCategory;

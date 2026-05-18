@@ -12,6 +12,7 @@ const WritingDetail = lazy(() => import('./pages/WritingDetail').then(m => ({ de
 const Library = lazy(() => import('./pages/Library').then(m => ({ default: m.Library })));
 const BookDetail = lazy(() => import('./pages/BookDetail').then(m => ({ default: m.BookDetail })));
 const About = lazy(() => import('./pages/About').then(m => ({ default: m.About })));
+const Contact = lazy(() => import('./pages/Contact').then(m => ({ default: m.Contact })));
 
 const Login = lazy(() => import('./pages/admin/Login').then(m => ({ default: m.Login })));
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout').then(m => ({ default: m.AdminLayout })));
@@ -26,6 +27,7 @@ const AboutManager = lazy(() => import('./pages/admin/AboutManager').then(m => (
 const HomeManager = lazy(() => import('./pages/admin/HomeManager').then(m => ({ default: m.HomeManager })));
 const SettingsManager = lazy(() => import('./pages/admin/SettingsManager').then(m => ({ default: m.SettingsManager })));
 const CategoriesManager = lazy(() => import('./pages/admin/CategoriesManager').then(m => ({ default: m.CategoriesManager })));
+const MessagesManager = lazy(() => import('./pages/admin/MessagesManager').then(m => ({ default: m.MessagesManager })));
 
 function ScrollToTop() {
   const location = useLocation();
@@ -53,6 +55,7 @@ function PublicLayout() {
             <Route path="/library" element={<Library />} />
             <Route path="/library/:id" element={<BookDetail />} />
             <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
           </Routes>
         </Suspense>
       </main>
@@ -80,6 +83,7 @@ export function App() {
             <Route path="home" element={<HomeManager />} />
             <Route path="settings" element={<SettingsManager />} />
             <Route path="categories" element={<CategoriesManager />} />
+            <Route path="messages" element={<MessagesManager />} />
           </Route>
 
           {/* Public Routes */}

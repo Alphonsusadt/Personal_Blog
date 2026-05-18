@@ -110,13 +110,13 @@ export function BooksManager() {
             <tbody>
               {items.filter(item => {
                 if (filterLang === 'all') return true;
-                const status = getTranslationStatus(item.title, item.translationOfId);
+                const status = getTranslationStatus([item.title, item.review], item.translationOfId, item.contentLanguage);
                 if (filterLang === 'bilingual') return status === 'bilingual';
                 if (filterLang === 'id') return status === 'single-id';
                 if (filterLang === 'en') return status === 'single-en';
                 return true;
               }).map(item => {
-                const status = getTranslationStatus(item.title, item.translationOfId);
+                const status = getTranslationStatus([item.title, item.review], item.translationOfId, item.contentLanguage);
                 return (
                 <tr key={item._id} className="border-b border-[#334155] last:border-0 hover:bg-[#334155]/20 transition-colors">
                   <td className="px-6 py-4">

@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Github, Linkedin, Mail, ExternalLink, ChevronRight } from 'lucide-react';
+import { Github, Linkedin, Mail, ExternalLink, ChevronRight, Instagram, Twitter, Globe } from 'lucide-react';
 import { ProjectCard } from '../components/ProjectCard';
 import { WritingCard } from '../components/WritingCard';
 import { BookCard } from '../components/BookCard';
 import { api } from '../lib/api';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
-import { getExactLocalizedText } from '../lib/localized';
+import { getExactLocalizedText, resolveLocalizedText } from '../lib/localized';
 import { t } from '../lib/translations';
 import type { Project } from '../data/projects';
 import type { Writing } from '../data/writings';
@@ -32,6 +32,22 @@ interface PublicSettings {
     writings?: { enabled?: boolean };
     projects?: { enabled?: boolean };
     books?: { enabled?: boolean };
+  };
+  socialLinks?: {
+    linkedin?: string;
+    github?: string;
+    instagram?: string;
+    twitter?: string;
+    researchgate?: string;
+    email?: string;
+  };
+  socialVisibility?: {
+    linkedin?: boolean;
+    github?: boolean;
+    instagram?: boolean;
+    twitter?: boolean;
+    researchgate?: boolean;
+    email?: boolean;
   };
 }
 
@@ -243,13 +259,14 @@ export function Home() {
     projects: true,
     books: true,
   });
+  const [settings, setSettings] = useState<PublicSettings | null>(null);
   const { language } = useSiteLanguage();
 
   const recentProjects = useMemo(() => {
     return allProjects.filter(p => {
       if (p.contentLanguage && p.contentLanguage !== 'bilingual' && p.contentLanguage !== language) return false;
       if (p.contentLanguage === 'bilingual' || !p.contentLanguage) {
-        if (!getExactLocalizedText(p.title, language)) return false;
+        if (!resolveLocalizedText(p.title, language)) return false;
       }
       return true;
     }).slice(0, 3);
@@ -259,7 +276,7 @@ export function Home() {
     return allWritings.filter(w => {
       if (w.contentLanguage && w.contentLanguage !== 'bilingual' && w.contentLanguage !== language) return false;
       if (w.contentLanguage === 'bilingual' || !w.contentLanguage) {
-        if (!getExactLocalizedText(w.title, language)) return false;
+        if (!resolveLocalizedText(w.title, language)) return false;
       }
       return true;
     }).slice(0, 3);
@@ -269,7 +286,7 @@ export function Home() {
     return allBooks.filter(b => {
       if (b.contentLanguage && b.contentLanguage !== 'bilingual' && b.contentLanguage !== language) return false;
       if (b.contentLanguage === 'bilingual' || !b.contentLanguage) {
-        if (!getExactLocalizedText(b.title, language)) return false;
+        if (!resolveLocalizedText(b.title, language)) return false;
       }
       return true;
     }).slice(0, 3);
@@ -293,6 +310,7 @@ export function Home() {
     api.getPublicBooks().then((data: Book[]) => setAllBooks(data)).catch(console.error);
 
     api.getPublicSettings().then((settings: PublicSettings) => {
+      setSettings(settings);
       setSectionVisibility({
         writings: settings.sections?.writings?.enabled !== false,
         projects: settings.sections?.projects?.enabled !== false,
@@ -300,6 +318,20 @@ export function Home() {
       });
     }).catch(console.error);
   }, []);
+
+  const linkedinUrl = settings?.socialLinks?.linkedin || homeData.socialLinks?.linkedin || 'https://linkedin.com/in/alphonsusadt';
+  const githubUrl = settings?.socialLinks?.github || homeData.socialLinks?.github || 'https://github.com/alphonsusadt';
+  const emailUrl = settings?.socialLinks?.email || homeData.socialLinks?.email || 'alphonsus@example.com';
+  const instagramUrl = settings?.socialLinks?.instagram || homeData.socialLinks?.instagram || 'https://instagram.com/alphonsusadt';
+  const twitterUrl = settings?.socialLinks?.twitter || homeData.socialLinks?.twitter || 'https://twitter.com/alphonsusadt';
+  const researchGateUrl = settings?.socialLinks?.researchgate || homeData.socialLinks?.researchgate || 'https://researchgate.net';
+
+  const showLinkedin = settings?.socialVisibility?.linkedin !== false;
+  const showGithub = settings?.socialVisibility?.github !== false;
+  const showInstagram = settings?.socialVisibility?.instagram !== false;
+  const showTwitter = settings?.socialVisibility?.twitter !== false;
+  const showResearchGate = settings?.socialVisibility?.researchgate !== false;
+  const showEmail = settings?.socialVisibility?.email !== false;
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -341,28 +373,71 @@ export function Home() {
               </div>
 
               {/* Social Links */}
-              <div className="flex items-center space-x-6 pt-4">
-                <a
-                  href={homeData.socialLinks.linkedin}
-                  className="flex items-center space-x-2 text-ink opacity-60 hover:opacity-100 transition-opacity group"
-                >
-                  <Linkedin className="w-5 h-5" />
-                  <span className="caption">LinkedIn</span>
-                </a>
-                <a
-                  href={homeData.socialLinks.github}
-                  className="flex items-center space-x-2 text-ink opacity-60 hover:opacity-100 transition-opacity group"
-                >
-                  <Github className="w-5 h-5" />
-                  <span className="caption">GitHub</span>
-                </a>
-                <a
-                  href={`mailto:${homeData.socialLinks.email}`}
-                  className="flex items-center space-x-2 text-ink opacity-60 hover:opacity-100 transition-opacity group"
-                >
-                  <Mail className="w-5 h-5" />
-                  <span className="caption">Email</span>
-                </a>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-4">
+                {showLinkedin && (
+                  <a
+                    href={linkedinUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center space-x-2 text-ink opacity-60 hover:opacity-100 transition-opacity group"
+                  >
+                    <Linkedin className="w-5 h-5" />
+                    <span className="caption">LinkedIn</span>
+                  </a>
+                )}
+                {showGithub && (
+                  <a
+                    href={githubUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center space-x-2 text-ink opacity-60 hover:opacity-100 transition-opacity group"
+                  >
+                    <Github className="w-5 h-5" />
+                    <span className="caption">GitHub</span>
+                  </a>
+                )}
+                {showInstagram && (
+                  <a
+                    href={instagramUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center space-x-2 text-ink opacity-60 hover:opacity-100 transition-opacity group"
+                  >
+                    <Instagram className="w-5 h-5 text-pink-500" />
+                    <span className="caption">Instagram</span>
+                  </a>
+                )}
+                {showTwitter && (
+                  <a
+                    href={twitterUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center space-x-2 text-ink opacity-60 hover:opacity-100 transition-opacity group"
+                  >
+                    <Twitter className="w-5 h-5 text-sky-400" />
+                    <span className="caption">Twitter</span>
+                  </a>
+                )}
+                {showResearchGate && (
+                  <a
+                    href={researchGateUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center space-x-2 text-ink opacity-60 hover:opacity-100 transition-opacity group"
+                  >
+                    <Globe className="w-5 h-5 text-teal-500" />
+                    <span className="caption">ResearchGate</span>
+                  </a>
+                )}
+                {showEmail && (
+                  <a
+                    href={`mailto:${emailUrl}`}
+                    className="flex items-center space-x-2 text-ink opacity-60 hover:opacity-100 transition-opacity group"
+                  >
+                    <Mail className="w-5 h-5" />
+                    <span className="caption">Email</span>
+                  </a>
+                )}
               </div>
             </div>
 

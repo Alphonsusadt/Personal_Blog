@@ -92,7 +92,8 @@ export function queueAutosave(collectionName, documentId, newSetDoc) {
     throw new Error('Autosave Queue not initialized. Call initQueue first.');
   }
 
-  const jobId = `${collectionName}_${documentId}`;
+  const docIdStr = String(documentId);
+  const jobId = `${collectionName}_${docIdStr}`;
   const now = Date.now();
 
   if (pendingUpdates.has(jobId)) {
@@ -136,7 +137,7 @@ export function queueAutosave(collectionName, documentId, newSetDoc) {
     
     pendingUpdates.set(jobId, {
       collectionName,
-      documentId,
+      documentId: docIdStr,
       $setDoc: cleanedSetDoc,
       firstUpdatedAt: now,
       lastUpdatedAt: now,

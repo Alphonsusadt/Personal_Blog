@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { supabase } from '../config/supabase.js';
 import { queueAutosave } from '../utils/autosaveQueue.js';
+import { dualWrite, dualDelete, syncMongoToSupabase } from '../utils/dataSync.js';
 
 async function isSectionEnabled(db, sectionKey) {
   const settings = await db.collection('settings').findOne({ key: 'settings' });
@@ -56,8 +57,21 @@ export default function writingsRoutes(db) {
     if (!enabled) return res.json([]);
     const now = new Date().toISOString();
 
+    // Try MongoDB first (most up-to-date), Supabase as fallback
     const result = await trySupabase(
       async () => {
+        // Try MongoDB first - it's the primary source
+        const items = await fallbackCol.find({
+          visible: { $ne: false },
+          $or: [{ status: 'published' }, { status: 'scheduled', publishAt: { $lte: new Date() } }],
+        }).sort({ createdAt: -1, date: -1 }).toArray();
+        
+        // Check if we have items with content
+        if (items.length > 0 && items[0].content) {
+          return items.map(parseSupabaseJson);
+        }
+        
+        // If MongoDB is empty, try Supabase
         const { data, error } = await supabase
           .from('artikel')
           .select('*')
@@ -68,10 +82,12 @@ export default function writingsRoutes(db) {
         return data.map(parseSupabaseJson);
       },
       async () => {
-        return fallbackCol.find({
+        // Fallback - use MongoDB
+        const items = await fallbackCol.find({
           visible: { $ne: false },
           $or: [{ status: 'published' }, { status: 'scheduled', publishAt: { $lte: new Date() } }],
         }).sort({ createdAt: -1, date: -1 }).toArray();
+        return items.map(parseSupabaseJson);
       }
     );
 
@@ -85,6 +101,18 @@ export default function writingsRoutes(db) {
 
     const result = await trySupabase(
       async () => {
+        // Try MongoDB first
+        const item = await fallbackCol.findOne({
+          id: req.params.id,
+          visible: { $ne: false },
+          $or: [{ status: 'published' }, { status: 'scheduled', publishAt: { $lte: new Date() } }],
+        });
+        
+        if (item && item.content) {
+          return parseSupabaseJson(item);
+        }
+        
+        // If MongoDB doesn't have it, try Supabase
         const { data, error } = await supabase
           .from('artikel')
           .select('*')
@@ -96,11 +124,12 @@ export default function writingsRoutes(db) {
         return parseSupabaseJson(data);
       },
       async () => {
-        return fallbackCol.findOne({
+        const item = await fallbackCol.findOne({
           id: req.params.id,
           visible: { $ne: false },
           $or: [{ status: 'published' }, { status: 'scheduled', publishAt: { $lte: new Date() } }],
         });
+        return item ? parseSupabaseJson(item) : null;
       }
     );
 
@@ -119,7 +148,9 @@ export default function writingsRoutes(db) {
         return data.map(d => parseSupabaseJson({ ...d, _id: d._id }));
       },
       async () => {
-        return fallbackCol.find().sort({ updatedAt: -1, createdAt: -1, date: -1 }).toArray();
+        const items = await fallbackCol.find().sort({ updatedAt: -1, createdAt: -1, date: -1 }).toArray();
+        // Apply same transformation for consistency
+        return items.map(d => parseSupabaseJson({ ...d, _id: d._id }));
       }
     );
 
@@ -142,122 +173,59 @@ export default function writingsRoutes(db) {
       data.publishAt = null;
     }
 
-    const result = await trySupabase(
-      async () => {
-        const cleaned = stripForSupabase(data);
-        delete cleaned._id;
-        const { data: inserted, error } = await supabase
-          .from('artikel')
-          .insert([cleaned])
-          .select()
-          .single();
-        if (error) throw error;
-        return { ...inserted, _id: inserted._id };
-      },
-      async () => {
-        // MongoDB fallback
-        if (data.publishAt) data.publishAt = new Date(data.publishAt);
-        data.createdAt = new Date();
-        data.updatedAt = new Date();
-        const result = await fallbackCol.insertOne(data);
-        return { ...data, _id: result.insertedId };
+    try {
+      // Dual-write to both MongoDB and Supabase
+      const syncResult = await dualWrite(db, 'writings', 'artikel', null, data);
+      
+      if (!syncResult.success) {
+        return res.status(500).json({ error: 'Failed to save data' });
       }
-    );
 
-    res.status(201).json(result);
+      // Queue autosave if needed
+      if (data.id) {
+        queueAutosave('writings', data.id, data);
+      }
+
+      res.status(201).json({ ...data, _id: syncResult.data._id });
+    } catch (error) {
+      console.error('POST /writings error:', error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   router.put('/:id', authMiddleware, async (req, res) => {
-    const { _id, id, ...data } = req.body;
-    data.updatedAt = new Date().toISOString();
-    data.visible = data.visible !== false;
-    
-    if (data.publishAt === '') data.publishAt = null;
-    
-    const enabled = await isSectionEnabled(db, 'writings');
+    try {
+      const { _id, id, ...data } = req.body;
+      data.updatedAt = new Date().toISOString();
+      data.visible = data.visible !== false;
+      
+      if (data.publishAt === '') data.publishAt = null;
+      
+      const enabled = await isSectionEnabled(db, 'writings');
 
-    // Try supabase first
-    let handled = false;
-    if (supabase) {
-      try {
-        const lookupValue = _id || req.params.id;
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lookupValue);
-        
-        let existing = null;
-        let matchCol = '_id';
-        
-        if (isUUID) {
-          const { data: found, error } = await supabase.from('artikel').select('*').eq('_id', lookupValue).single();
-          if (!error) { existing = found; matchCol = '_id'; }
-        }
-        
-        if (!existing) {
-          const { data: found, error } = await supabase.from('artikel').select('*').eq('id', lookupValue).limit(1).single();
-          if (!error) { existing = found; matchCol = 'id'; }
-        }
-          
-        if (!existing) return res.status(404).json({ error: 'Not found' });
-
-        if (!enabled) {
-          const existingStatus = existing.status || 'draft';
-          const requestedStatus = data.status ?? existingStatus;
-          const existingIsPublic = existingStatus === 'published' || existingStatus === 'scheduled';
-          const requestedIsPublic = requestedStatus === 'published' || requestedStatus === 'scheduled';
-
-          if (!existingIsPublic && requestedIsPublic) {
-            return res.status(400).json({ error: 'Writings section is disabled. Publishing is not allowed.' });
-          }
-          if (existingIsPublic && requestedIsPublic && requestedStatus !== existingStatus) {
-            data.status = existingStatus;
-            if (existingStatus === 'scheduled') {
-              data.publishAt = existing.publishAt;
-            } else {
-              data.publishAt = null;
-            }
-          }
-          if (!existingIsPublic) {
-            data.status = 'draft';
-            data.publishAt = null;
-          }
-          if (existingIsPublic && requestedStatus === 'draft') {
-            data.status = 'draft';
-            data.publishAt = null;
-          }
-        }
-
-        const cleaned = stripForSupabase(data);
-        const { error } = await supabase
-          .from('artikel')
-          .update(cleaned)
-          .eq('_id', existing._id);
-          
-        if (error) throw error;
-        handled = true;
-        return res.json({ message: 'Updated' });
-      } catch (err) {
-        console.warn('[writings] PUT Supabase failed, falling back to MongoDB:', err?.message || err);
+      // Validate publishing permissions
+      if (!enabled && (data.status === 'published' || data.status === 'scheduled')) {
+        return res.status(400).json({ error: 'Writings section is disabled. Publishing not allowed.' });
       }
-    }
-    
-    if (!handled) {
-      // MongoDB fallback
-      const { ObjectId } = await import('mongodb');
-      const lookupValue = _id || req.params.id;
-      let filter;
-      try {
-        filter = { _id: new ObjectId(lookupValue) };
-      } catch {
-        filter = { id: lookupValue };
+
+      const lookupId = _id || req.params.id;
+
+      // Dual-write to both MongoDB and Supabase
+      const syncResult = await dualWrite(db, 'writings', 'artikel', lookupId, data);
+      
+      if (!syncResult.success) {
+        return res.status(500).json({ error: 'Failed to update data' });
       }
-      
-      const existing = await fallbackCol.findOne(filter);
-      if (!existing) return res.status(404).json({ error: 'Not found' });
-      
-      data.updatedAt = new Date();
-      if (data.publishAt) data.publishAt = new Date(data.publishAt);
-      
-      await fallbackCol.updateOne(filter, { $set: data });
-      res.json({ message: 'Updated' });
+
+      // Queue autosave if it's a patch update
+      if (data.id) {
+        queueAutosave('writings', data.id, data);
+      }
+
+      res.json({ message: 'Updated', data });
+    } catch (error) {
+      console.error('PUT /writings/:id error:', error);
+      res.status(500).json({ error: error.message });
     }
   });
 
@@ -291,32 +259,40 @@ export default function writingsRoutes(db) {
     }
   });
 
-  router.delete('/:id', authMiddleware, async (req, res) => {
-    const deleted = await trySupabase(
-      async () => {
-        const { error } = await supabase
-          .from('artikel')
-          .delete()
-          .eq('_id', req.params.id);
-        if (error) throw error;
-        return true;
-      },
-      async () => {
-        const { ObjectId } = await import('mongodb');
-        let filter;
-        try {
-          filter = { _id: new ObjectId(req.params.id) };
-        } catch {
-          filter = { id: req.params.id };
-        }
-        const result = await fallbackCol.deleteOne(filter);
-        if (result.deletedCount === 0) return false;
-        return true;
+  router.post('/admin/sync-to-supabase', authMiddleware, async (req, res) => {
+    try {
+      console.log('[Sync] Admin triggered sync: MongoDB → Supabase');
+      const syncResult = await syncMongoToSupabase(db, 'writings', 'artikel');
+      
+      if (!syncResult.success) {
+        return res.status(500).json({ error: 'Sync failed', ...syncResult });
       }
-    );
-    
-    if (!deleted) return res.status(404).json({ error: 'Not found' });
-    res.json({ message: 'Deleted' });
+
+      res.json({ 
+        message: 'Sync completed successfully',
+        successCount: syncResult.successCount,
+        errorCount: syncResult.errorCount 
+      });
+    } catch (error) {
+      console.error('Sync endpoint error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.delete('/:id', authMiddleware, async (req, res) => {
+    try {
+      // Dual-delete from both MongoDB and Supabase
+      const deleteResult = await dualDelete(db, 'writings', 'artikel', req.params.id);
+      
+      if (!deleteResult.success) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      res.json({ message: 'Deleted', deleted: deleteResult.deleted });
+    } catch (error) {
+      console.error('DELETE /writings/:id error:', error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   return router;

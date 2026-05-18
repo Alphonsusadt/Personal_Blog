@@ -176,4 +176,27 @@ export const api = {
     }
     return adminSettingsPromise;
   },
+
+  // Contact Messages & Email Client Wrappers
+  async submitPublicMessage(payload: { name?: string; email?: string; subject?: string; body: string; language: 'id' | 'en' }) {
+    const res = await fetch(`${API_BASE}/api/messages/public`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      let errMsg = 'Failed to submit message';
+      try { const errObj = await res.json(); errMsg = errObj.error || errMsg; } catch { /* ignore */ }
+      throw new Error(errMsg);
+    }
+    return res.json();
+  },
+
+  async getAdminMessages() {
+    return this.get('/api/messages');
+  },
+
+  async sendMessageReply(messageId: string, payload: { senderEmail: string; messageText: string }) {
+    return this.post(`/api/messages/${messageId}/reply`, payload);
+  },
 };

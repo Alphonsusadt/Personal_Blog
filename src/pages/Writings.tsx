@@ -114,17 +114,14 @@ export function Writings() {
         return false;
       }
 
-      // For bilingual content, check if the selected language has actual title text.
-      // If not, don't show it (avoids showing Indonesian content when user switched to English).
-      if (writing.contentLanguage === 'bilingual' || !writing.contentLanguage) {
-        const titleForLang = getExactLocalizedText(writing.title, language);
-        if (!titleForLang) return false;
-      }
-
+      // For bilingual content, allow showing even if specific language is missing
+      // (resolveLocalizedText will fallback to other language)
       const title = resolveLocalizedText(writing.title, language);
+      if (!title) return false; // Only filter if NO title exists at all
+
       const excerpt = resolveLocalizedText(writing.excerpt, language);
       const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           excerpt.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (excerpt?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
                            writing.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesCategory = selectedCategory === 'all' || writing.category === selectedCategory;
       return matchesSearch && matchesCategory;

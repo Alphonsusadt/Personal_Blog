@@ -156,14 +156,67 @@
   /* Invert primary colors for dark mode contrast */
   --color-primary: #ffffff;
   --color-on-primary: #000000;
+}
 
-  /* Dark mode variants for block colors to ensure text-ink (white) is readable */
-  --color-block-lime: #2d381c;
-  --color-block-lilac: #2a213f;
-  --color-block-cream: #362e1c;
-  --color-block-pink: #3d2323;
-  --color-block-mint: #1d3625;
-  --color-block-coral: #422317;
+/* Ensure color block sections remain extremely beautiful, bright, and legible in dark mode */
+.dark .color-block-section {
+  color: #000000 !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+.dark .color-block-section h1,
+.dark .color-block-section h2,
+.dark .color-block-section h3,
+.dark .color-block-section h4,
+.dark .color-block-section p,
+.dark .color-block-section label,
+.dark .color-block-section span,
+.dark .color-block-section svg,
+.dark .color-block-section .text-ink {
+  color: #000000 !important;
+}
+
+/* Ensure the success circle and other canvas elements inside color blocks stay clean and white */
+.dark .color-block-section .bg-canvas {
+  background-color: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Allow dynamic text-color helper utilities (like pink, sky, teal) to preserve their colors */
+.dark .color-block-section .text-pink-500 { color: #ec4899 !important; }
+.dark .color-block-section .text-sky-400 { color: #38bdf8 !important; }
+.dark .color-block-section .text-teal-500 { color: #14b8a6 !important; }
+
+.dark .color-block-section a {
+  color: #000000 !important;
+  opacity: 0.85;
+}
+
+.dark .color-block-section a:hover {
+  opacity: 1;
+}
+
+.dark .color-block-section input,
+.dark .color-block-section textarea {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+.dark .color-block-section input::placeholder,
+.dark .color-block-section textarea::placeholder {
+  color: rgba(0, 0, 0, 0.45) !important;
+}
+
+.dark .color-block-section button[type="submit"] {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+.dark .color-block-section button:not([type="submit"]) {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
 }
 
 .dark body {

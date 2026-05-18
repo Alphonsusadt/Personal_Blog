@@ -1,4 +1,4 @@
-import { Github, Linkedin, Mail, Heart } from 'lucide-react';
+import { Github, Linkedin, Mail, Heart, Instagram, Twitter, Globe } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
@@ -9,6 +9,22 @@ interface Settings {
   footerBio?: string;
   footerName?: string;
   siteTitle?: string;
+  socialLinks?: {
+    linkedin?: string;
+    github?: string;
+    instagram?: string;
+    twitter?: string;
+    researchgate?: string;
+    email?: string;
+  };
+  socialVisibility?: {
+    linkedin?: boolean;
+    github?: boolean;
+    instagram?: boolean;
+    twitter?: boolean;
+    researchgate?: boolean;
+    email?: boolean;
+  };
 }
 
 export function Footer() {
@@ -28,7 +44,7 @@ export function Footer() {
   useEffect(() => {
     api.getPublicSettings()
       .then((data) => {
-        if (data && data.footerBio) {
+        if (data) {
           setSettings(prev => ({ ...prev, ...data }));
         }
 
@@ -47,7 +63,22 @@ export function Footer() {
     { to: '/writings', label: t('nav.writings', language), enabled: sections.writings },
     { to: '/library', label: t('nav.library', language), enabled: sections.books },
     { to: '/about', label: t('nav.about', language) },
+    { to: '/contact', label: t('nav.contact', language) },
   ].filter((l) => l.enabled !== false);
+
+  const linkedinUrl = settings?.socialLinks?.linkedin || 'https://linkedin.com/in/alphonsusadt';
+  const githubUrl = settings?.socialLinks?.github || 'https://github.com/alphonsusadt';
+  const emailUrl = settings?.socialLinks?.email || 'alphonsus@example.com';
+  const instagramUrl = settings?.socialLinks?.instagram || 'https://instagram.com/alphonsusadt';
+  const twitterUrl = settings?.socialLinks?.twitter || 'https://twitter.com/alphonsusadt';
+  const researchGateUrl = settings?.socialLinks?.researchgate || 'https://researchgate.net';
+
+  const showLinkedin = settings?.socialVisibility?.linkedin !== false;
+  const showGithub = settings?.socialVisibility?.github !== false;
+  const showInstagram = settings?.socialVisibility?.instagram !== false;
+  const showTwitter = settings?.socialVisibility?.twitter !== false;
+  const showResearchGate = settings?.socialVisibility?.researchgate !== false;
+  const showEmail = settings?.socialVisibility?.email !== false;
 
   return (
     <footer className="bg-inverse-canvas text-inverse-ink mt-20 rounded-t-xl">
@@ -61,28 +92,71 @@ export function Footer() {
             <p className="body-sm text-inverse-ink opacity-80 mb-4 max-w-md">
               {settings.footerBio}
             </p>
-            <div className="flex items-center space-x-4">
-              <a 
-                href="https://github.com/alphonsusadt" 
-                className="text-inverse-ink opacity-60 hover:opacity-100 transition-opacity"
-                aria-label="GitHub"
-              >
-                <Github className="w-5 h-5" />
-              </a>
-              <a 
-                href="https://linkedin.com/in/alphonsusadt" 
-                className="text-inverse-ink opacity-60 hover:opacity-100 transition-opacity"
-                aria-label="LinkedIn"
-              >
-                <Linkedin className="w-5 h-5" />
-              </a>
-              <a 
-                href="mailto:alphonsus@example.com" 
-                className="text-inverse-ink opacity-60 hover:opacity-100 transition-opacity"
-                aria-label="Email"
-              >
-                <Mail className="w-5 h-5" />
-              </a>
+            <div className="flex flex-wrap items-center gap-4 mt-2">
+              {showLinkedin && (
+                <a 
+                  href={linkedinUrl} 
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-inverse-ink opacity-60 hover:opacity-100 transition-opacity"
+                  aria-label="LinkedIn"
+                >
+                  <Linkedin className="w-5 h-5" />
+                </a>
+              )}
+              {showGithub && (
+                <a 
+                  href={githubUrl} 
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-inverse-ink opacity-60 hover:opacity-100 transition-opacity"
+                  aria-label="GitHub"
+                >
+                  <Github className="w-5 h-5" />
+                </a>
+              )}
+              {showInstagram && (
+                <a 
+                  href={instagramUrl} 
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-inverse-ink opacity-60 hover:opacity-100 transition-opacity"
+                  aria-label="Instagram"
+                >
+                  <Instagram className="w-5 h-5 text-pink-400" />
+                </a>
+              )}
+              {showTwitter && (
+                <a 
+                  href={twitterUrl} 
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-inverse-ink opacity-60 hover:opacity-100 transition-opacity"
+                  aria-label="Twitter"
+                >
+                  <Twitter className="w-5 h-5 text-sky-400" />
+                </a>
+              )}
+              {showResearchGate && (
+                <a 
+                  href={researchGateUrl} 
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-inverse-ink opacity-60 hover:opacity-100 transition-opacity"
+                  aria-label="ResearchGate"
+                >
+                  <Globe className="w-5 h-5 text-teal-400" />
+                </a>
+              )}
+              {showEmail && (
+                <a 
+                  href={`mailto:${emailUrl}`} 
+                  className="text-inverse-ink opacity-60 hover:opacity-100 transition-opacity"
+                  aria-label="Email"
+                >
+                  <Mail className="w-5 h-5" />
+                </a>
+              )}
             </div>
           </div>
 
@@ -111,33 +185,82 @@ export function Footer() {
               {t('footer.connect', language)}
             </h4>
             <ul className="space-y-4">
-              <li>
-                <a 
-                  href="https://linkedin.com/in/alphonsusadt" 
-                  className="caption text-inverse-ink hover:opacity-70 transition-opacity flex items-center"
-                >
-                  <Linkedin className="w-4 h-4 mr-2" />
-                  LinkedIn
-                </a>
-              </li>
-              <li>
-                <a 
-                  href="https://github.com/alphonsusadt" 
-                  className="caption text-inverse-ink hover:opacity-70 transition-opacity flex items-center"
-                >
-                  <Github className="w-4 h-4 mr-2" />
-                  GitHub
-                </a>
-              </li>
-              <li>
-                <a 
-                  href="mailto:alphonsus@example.com" 
-                  className="caption text-inverse-ink hover:opacity-70 transition-opacity flex items-center"
-                >
-                  <Mail className="w-4 h-4 mr-2" />
-                  Email
-                </a>
-              </li>
+              {showLinkedin && (
+                <li>
+                  <a 
+                    href={linkedinUrl} 
+                    target="_blank"
+                    rel="noreferrer"
+                    className="caption text-inverse-ink hover:opacity-70 transition-opacity flex items-center"
+                  >
+                    <Linkedin className="w-4 h-4 mr-2" />
+                    LinkedIn
+                  </a>
+                </li>
+              )}
+              {showGithub && (
+                <li>
+                  <a 
+                    href={githubUrl} 
+                    target="_blank"
+                    rel="noreferrer"
+                    className="caption text-inverse-ink hover:opacity-70 transition-opacity flex items-center"
+                  >
+                    <Github className="w-4 h-4 mr-2" />
+                    GitHub
+                  </a>
+                </li>
+              )}
+              {showInstagram && (
+                <li>
+                  <a 
+                    href={instagramUrl} 
+                    target="_blank"
+                    rel="noreferrer"
+                    className="caption text-inverse-ink hover:opacity-70 transition-opacity flex items-center"
+                  >
+                    <Instagram className="w-4 h-4 mr-2 text-pink-400" />
+                    Instagram
+                  </a>
+                </li>
+              )}
+              {showTwitter && (
+                <li>
+                  <a 
+                    href={twitterUrl} 
+                    target="_blank"
+                    rel="noreferrer"
+                    className="caption text-inverse-ink hover:opacity-70 transition-opacity flex items-center"
+                  >
+                    <Twitter className="w-4 h-4 mr-2 text-sky-400" />
+                    Twitter
+                  </a>
+                </li>
+              )}
+              {showResearchGate && (
+                <li>
+                  <a 
+                    href={researchGateUrl} 
+                    target="_blank"
+                    rel="noreferrer"
+                    className="caption text-inverse-ink hover:opacity-70 transition-opacity flex items-center"
+                  >
+                    <Globe className="w-4 h-4 mr-2 text-teal-400" />
+                    ResearchGate
+                  </a>
+                </li>
+              )}
+              {showEmail && (
+                <li>
+                  <a 
+                    href={`mailto:${emailUrl}`} 
+                    className="caption text-inverse-ink hover:opacity-70 transition-opacity flex items-center"
+                  >
+                    <Mail className="w-4 h-4 mr-2" />
+                    Email
+                  </a>
+                </li>
+              )}
             </ul>
           </div>
         </div>

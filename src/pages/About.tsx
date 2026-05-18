@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Github, Linkedin, Mail, Heart, GraduationCap, Code, Users } from 'lucide-react';
+import { Github, Linkedin, Mail, Heart, GraduationCap, Code, Users, Send, AlertCircle, CheckCircle2, RefreshCw, Instagram, Twitter, Globe } from 'lucide-react';
 import { api } from '../lib/api';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 
@@ -179,7 +179,49 @@ const defaultData: AboutData = normalizeAboutData({});
 
 export function About() {
   const [data, setData] = useState<AboutData>(defaultData);
+  const [settings, setSettings] = useState<any>(null);
   const { language } = useSiteLanguage();
+
+  // Contact Form State
+  const [formName, setFormName] = useState('');
+  const [formEmail, setFormEmail] = useState('');
+  const [formSubject, setFormSubject] = useState('');
+  const [formBody, setFormBody] = useState('');
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  const [formSuccess, setFormSuccess] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formBody.trim()) {
+      setFormError(language === 'id' ? 'Mohon isi pesan terlebih dahulu.' : 'Please write your message first.');
+      return;
+    }
+
+    try {
+      setFormSubmitting(true);
+      setFormError('');
+      
+      await api.submitPublicMessage({
+        name: formName,
+        email: formEmail,
+        subject: formSubject,
+        body: formBody,
+        language: language as 'id' | 'en'
+      });
+
+      setFormSuccess(true);
+      setFormName('');
+      setFormEmail('');
+      setFormSubject('');
+      setFormBody('');
+    } catch (err: any) {
+      console.error(err);
+      setFormError(err?.message || (language === 'id' ? 'Gagal mengirim pesan.' : 'Failed to send message.'));
+    } finally {
+      setFormSubmitting(false);
+    }
+  };
 
   const hasText = (value: string) => value.trim().length > 0;
   const hasLocalizedText = (value: LocalizedText) => hasText(value[language]) || hasText(value.en) || hasText(value.id);
@@ -205,10 +247,31 @@ export function About() {
         }
       })
       .catch(console.error);
+
+    api
+      .getPublicSettings()
+      .then((s) => {
+        if (s) setSettings(s);
+      })
+      .catch(console.error);
   }, []);
 
   const hasHeader = hasText(data.title[language]) || hasText(data.subtitle[language]);
   const hasHeroCard = hasText(data.bio[language]) || hasText(data.profileImage) || hasText(data.gpa) || hasText(data.projectsCount);
+
+  const linkedinUrl = settings?.socialLinks?.linkedin || data.socialLinks?.linkedin || 'https://linkedin.com/in/alphonsusadt';
+  const githubUrl = settings?.socialLinks?.github || data.socialLinks?.github || 'https://github.com/alphonsusadt';
+  const emailUrl = settings?.socialLinks?.email || data.socialLinks?.email || 'alphonsus@example.com';
+  const instagramUrl = settings?.socialLinks?.instagram || 'https://instagram.com/alphonsusadt';
+  const twitterUrl = settings?.socialLinks?.twitter || 'https://twitter.com/alphonsusadt';
+  const researchGateUrl = settings?.socialLinks?.researchgate || 'https://researchgate.net';
+
+  const showLinkedin = settings?.socialVisibility?.linkedin !== false;
+  const showGithub = settings?.socialVisibility?.github !== false;
+  const showInstagram = settings?.socialVisibility?.instagram !== false;
+  const showTwitter = settings?.socialVisibility?.twitter !== false;
+  const showResearchGate = settings?.socialVisibility?.researchgate !== false;
+  const showEmail = settings?.socialVisibility?.email !== false;
 
   const storyItems = [
     {
@@ -497,50 +560,200 @@ export function About() {
         ) : null}
 
         {hasContactSection ? (
-        <div className="mb-[96px]">
+        <div className="mb-[96px] max-w-2xl mx-auto text-left">
           {hasText(data.contactHeading[language]) ? (
-            <h2 className="display-md text-ink mb-8">
+            <h2 className="display-md text-ink mb-8 text-center">
               {data.contactHeading[language]}
             </h2>
           ) : null}
 
-          <div className="bg-block-pink color-block-section rounded-[24px] p-8 lg:p-12">
-            {hasContactMessage ? (
-              <p className="display-sm text-ink mb-8 leading-relaxed serif-font text-center max-w-2xl mx-auto">
-                {data.contactMessage[language]}
-              </p>
-            ) : null}
-
-            <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
-              {hasLinkedin ? (
-                <a
-                  href={data.socialLinks.linkedin}
-                  className="flex items-center space-x-3 bg-canvas px-6 py-4 rounded-full border border-hairline shadow-sm hover:border-ink transition-colors"
+          <div className="bg-block-pink color-block-section rounded-[32px] p-8 md:p-10 border border-hairline shadow-sm relative overflow-hidden">
+            {formSuccess ? (
+              <div className="text-center py-10 space-y-6">
+                <div className="w-16 h-16 bg-canvas border border-hairline rounded-full mx-auto flex items-center justify-center text-primary shadow-sm">
+                  <CheckCircle2 className="w-8 h-8" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="card-title text-ink text-xl">
+                    {language === 'id' ? 'Pesan Terkirim!' : 'Message Sent!'}
+                  </h3>
+                  <p className="body text-ink opacity-80 max-w-md mx-auto serif-font leading-relaxed">
+                    {language === 'id' 
+                      ? 'Terima kasih telah menghubungi saya. Pesan Anda telah diterima dan akan segera ditinjau.' 
+                      : 'Thank you for reaching out. Your message has been received and will be reviewed shortly.'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setFormSuccess(false)}
+                  className="bg-canvas border border-hairline hover:border-ink text-ink font-semibold rounded-full px-6 py-2.5 shadow-sm text-sm transition-all"
                 >
-                  <Linkedin className="w-5 h-5 text-ink" />
-                  <span className="card-title text-ink">LinkedIn</span>
-                </a>
-              ) : null}
+                  {language === 'id' ? 'Kirim Pesan Lain' : 'Send Another Message'}
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleFormSubmit} className="space-y-6">
+                {hasContactMessage ? (
+                  <p className="body text-ink opacity-80 mb-6 leading-relaxed serif-font text-center max-w-lg mx-auto">
+                    {data.contactMessage[language]}
+                  </p>
+                ) : null}
 
-              {hasGithub ? (
-                <a
-                  href={data.socialLinks.github}
-                  className="flex items-center space-x-3 bg-canvas px-6 py-4 rounded-full border border-hairline shadow-sm hover:border-ink transition-colors"
-                >
-                  <Github className="w-5 h-5 text-ink" />
-                  <span className="card-title text-ink">GitHub</span>
-                </a>
-              ) : null}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label htmlFor="formName" className="caption text-ink font-semibold opacity-70">
+                      {language === 'id' ? 'Nama Anda (Opsional)' : 'Your Name (Optional)'}
+                    </label>
+                    <input
+                      type="text"
+                      id="formName"
+                      value={formName}
+                      onChange={(e) => setFormName(e.target.value)}
+                      placeholder={language === 'id' ? 'Nama Anda' : 'Your Name'}
+                      className="w-full bg-canvas text-ink rounded-[12px] px-4 py-3 text-sm border border-hairline focus:outline-none focus:border-ink transition-colors shadow-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor="formEmail" className="caption text-ink font-semibold opacity-70">
+                      {language === 'id' ? 'Email Anda (Opsional)' : 'Your Email (Optional)'}
+                    </label>
+                    <input
+                      type="email"
+                      id="formEmail"
+                      value={formEmail}
+                      onChange={(e) => setFormEmail(e.target.value)}
+                      placeholder="yourname@example.com"
+                      className="w-full bg-canvas text-ink rounded-[12px] px-4 py-3 text-sm border border-hairline focus:outline-none focus:border-ink transition-colors shadow-sm"
+                    />
+                    <p className="text-[10px] text-ink opacity-50 mt-1">
+                      {language === 'id' 
+                        ? '*Kosongkan jika hanya ingin memberi feedback baca-saja.' 
+                        : '*Leave blank for read-only anonymous feedback.'}
+                    </p>
+                  </div>
+                </div>
 
-              {hasEmail ? (
-                <a
-                  href={`mailto:${data.socialLinks.email}`}
-                  className="flex items-center space-x-3 bg-canvas px-6 py-4 rounded-full border border-hairline shadow-sm hover:border-ink transition-colors"
+                <div className="space-y-1">
+                  <label htmlFor="formSubject" className="caption text-ink font-semibold opacity-70">
+                    {language === 'id' ? 'Subjek (Opsional)' : 'Subject (Optional)'}
+                  </label>
+                  <input
+                    type="text"
+                    id="formSubject"
+                    value={formSubject}
+                    onChange={(e) => setFormSubject(e.target.value)}
+                    placeholder={language === 'id' ? 'Subjek pesan...' : 'Subject of message...'}
+                    className="w-full bg-canvas text-ink rounded-[12px] px-4 py-3 text-sm border border-hairline focus:outline-none focus:border-ink transition-colors shadow-sm"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="formBody" className="caption text-ink font-semibold opacity-70 flex justify-between">
+                    <span>{language === 'id' ? 'Isi Pesan (Wajib)' : 'Message (Required)'}</span>
+                    <span className="opacity-50 text-[11px] font-normal">{formBody.length} chars</span>
+                  </label>
+                  <textarea
+                    id="formBody"
+                    value={formBody}
+                    onChange={(e) => setFormBody(e.target.value)}
+                    rows={5}
+                    placeholder={language === 'id' ? 'Tulis pesan Anda di sini...' : 'Write your message here...'}
+                    className="w-full bg-canvas text-ink rounded-[12px] px-4 py-3 text-sm border border-hairline focus:outline-none focus:border-ink transition-colors shadow-sm leading-relaxed resize-none"
+                  />
+                </div>
+
+                {formError && (
+                  <div className="p-3 bg-canvas border border-red-500/20 text-red-500 text-xs rounded-[12px] flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{formError}</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={formSubmitting}
+                  className="w-full bg-ink hover:bg-ink/90 text-canvas font-semibold rounded-full py-4 text-sm transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  <Mail className="w-5 h-5 text-ink" />
-                  <span className="card-title text-ink">Email</span>
+                  {formSubmitting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      {language === 'id' ? 'Mengirim...' : 'Sending...'}
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      {language === 'id' ? 'Kirim Pesan' : 'Send Message'}
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+
+            {/* Social Links Bar */}
+            <div className="mt-8 pt-6 border-t border-hairline/30 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm">
+              {showLinkedin && (
+                <a
+                  href={linkedinUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center space-x-1.5 text-ink hover:opacity-85 transition-opacity"
+                >
+                  <Linkedin className="w-4 h-4" />
+                  <span className="font-medium">LinkedIn</span>
                 </a>
-              ) : null}
+              )}
+              {showGithub && (
+                <a
+                  href={githubUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center space-x-1.5 text-ink hover:opacity-85 transition-opacity"
+                >
+                  <Github className="w-4 h-4" />
+                  <span className="font-medium">GitHub</span>
+                </a>
+              )}
+              {showInstagram && (
+                <a
+                  href={instagramUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center space-x-1.5 text-ink hover:opacity-85 transition-opacity"
+                >
+                  <Instagram className="w-4 h-4 text-pink-500" />
+                  <span className="font-medium">Instagram</span>
+                </a>
+              )}
+              {showTwitter && (
+                <a
+                  href={twitterUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center space-x-1.5 text-ink hover:opacity-85 transition-opacity"
+                >
+                  <Twitter className="w-4 h-4 text-sky-400" />
+                  <span className="font-medium">Twitter</span>
+                </a>
+              )}
+              {showResearchGate && (
+                <a
+                  href={researchGateUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center space-x-1.5 text-ink hover:opacity-85 transition-opacity"
+                >
+                  <Globe className="w-4 h-4 text-teal-500" />
+                  <span className="font-medium">ResearchGate</span>
+                </a>
+              )}
+              {showEmail && (
+                <a
+                  href={`mailto:${emailUrl}`}
+                  className="flex items-center space-x-1.5 text-ink hover:opacity-85 transition-opacity"
+                >
+                  <Mail className="w-4 h-4" />
+                  <span className="font-medium">Email</span>
+                </a>
+              )}
             </div>
           </div>
         </div>

@@ -81,6 +81,7 @@ export async function translateGoogle(text, targetLanguage, sourceLanguage = '')
           q: text,
           target: targetLanguage,
           source: sourceLanguage || undefined,
+          format: 'text',
           key: process.env.GOOGLE_TRANSLATE_API_KEY,
         },
         timeout: 10000,

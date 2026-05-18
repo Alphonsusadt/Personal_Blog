@@ -471,7 +471,8 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
                     const parsed = JSON.parse(current);
                     return { ...parsed, [lang]: newText };
                   } catch {
-                    return { id: current, [lang]: newText };
+                    const srcLang = lang === 'en' ? 'id' : 'en';
+                    return { [srcLang]: current, [lang]: newText };
                   }
                 }
                 if (current && typeof current === 'object') {
@@ -480,8 +481,19 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
                 return { [lang]: newText };
               };
 
-              if (result.title) updatedWriting.title = applyTranslation(writing.title, result.title);
-              if (result.content) updatedWriting.content = applyTranslation(writing.content, result.content);
+              const translations = result.translations || {};
+              if (result.title) translations.title = result.title;
+              if (result.content) translations.content = result.content;
+
+              for (const [field, translatedText] of Object.entries(translations)) {
+                if (typeof translatedText === 'string') {
+                  if (field === 'metaTitle' || field === 'metaDescription' || field === 'keywords') {
+                    (updatedWriting as any)[field] = translatedText;
+                  } else {
+                    (updatedWriting as any)[field] = applyTranslation((writing as any)[field], translatedText);
+                  }
+                }
+              }
               
               onUpdate(updatedWriting);
             }}

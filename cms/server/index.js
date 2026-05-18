@@ -19,6 +19,7 @@ import fs from 'fs/promises';
 import spellCheckRoutes from './routes/spellCheck.js';
 import translationRoutes from './routes/translation.js';
 import { initQueue } from './utils/autosaveQueue.js';
+import messagesRoutes from './routes/messages.js';
 import { authMiddleware } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -161,6 +162,7 @@ async function start() {
   app.use('/api/settings', settingsRoutes(db));
   app.use('/api/media', mediaRoutes(db));
   app.use('/api/categories', categoriesRoutes(db));
+  app.use('/api/messages', messagesRoutes(db));
 
   // Translation routes (Translate, Hybrid, SmartAI buttons)
   app.use('/api', translationRoutes(db));
@@ -233,6 +235,9 @@ async function start() {
     db.collection('media').createIndex({ hash: 1 }),
     db.collection('media').createIndex({ uploadedAt: -1 }),
     db.collection('settings').createIndex({ key: 1 }, { unique: true }),
+    db.collection('messages').createIndex({ id: 1 }, { sparse: true }),
+    db.collection('messages').createIndex({ status: 1 }),
+    db.collection('messages').createIndex({ createdAt: -1 }),
   ]);
   console.log('Database indexes created');
 

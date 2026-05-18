@@ -117,18 +117,16 @@ export function Library() {
         return false;
       }
 
-      // For bilingual content, check if the selected language has actual title text.
-      if (book.contentLanguage === 'bilingual' || !book.contentLanguage) {
-        const titleForLang = getExactLocalizedText(book.title, language);
-        if (!titleForLang) return false;
-      }
-
+      // For bilingual content, allow showing even if specific language is missing
+      // (resolveLocalizedText will fallback to other language)
       const title = resolveLocalizedText(book.title, language);
+      if (!title) return false; // Only filter if NO title exists at all
+
       const author = resolveLocalizedText(book.author, language);
       const review = resolveLocalizedText(book.review, language);
       const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           author.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           review.toLowerCase().includes(searchTerm.toLowerCase());
+                           (author?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+                           (review?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
       const matchesCategory = selectedCategory === 'all' || book.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });

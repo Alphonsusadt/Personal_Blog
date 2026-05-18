@@ -26,6 +26,7 @@ async function getFileHash(filePath) {
 }
 
 import cloudinary from '../config/cloudinary.js';
+import { authMiddleware } from '../middleware/auth.js';
 
 // Ensure icons directory exists
 fs.mkdir(ICONS_DIR, { recursive: true }).catch(() => {});
