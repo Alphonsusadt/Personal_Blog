@@ -20,6 +20,88 @@ import {
 import { supabase } from '../config/supabase.js';
 import { ObjectId } from 'mongodb';
 
+// Heuristics-based language detector for plain strings
+function detectPlainStringLanguage(str) {
+  if (!str || typeof str !== 'string') return 'id'; // default to id
+  
+  const text = str.toLowerCase();
+  
+  // English common words
+  const enWords = ['the', 'and', 'of', 'in', 'to', 'for', 'with', 'is', 'it', 'this', 'that', 'my', 'project', 'writing', 'book', 'about', 'biomedical', 'engineering', 'student', 'hello', 'world', 'with'];
+  // Indonesian common words
+  const idWords = ['yang', 'dan', 'di', 'ke', 'untuk', 'pada', 'dengan', 'saya', 'adalah', 'ini', 'itu', 'proyek', 'tulisan', 'buku', 'tentang', 'teknik', 'mahasiswa', 'halo', 'dunia'];
+  
+  let enCount = 0;
+  let idCount = 0;
+  
+  // Tokenize
+  const tokens = text.match(/\b\w+\b/g) || [];
+  for (const token of tokens) {
+    if (enWords.includes(token)) enCount++;
+    if (idWords.includes(token)) idCount++;
+  }
+  
+  if (enCount > idCount) return 'en';
+  if (idCount > enCount) return 'id';
+  
+  return 'id'; // Default to Indonesian
+}
+
+// Extract fenced code blocks and markdown images into unique placeholders
+function extractPlaceholders(text) {
+  if (!text || typeof text !== 'string') return { text, placeholders: [] };
+
+  const placeholders = [];
+  let index = 0;
+  let processedText = text;
+
+  // 1. Extract fenced code blocks: ```...```
+  const codeBlockRegex = /```[\s\S]*?```/g;
+  processedText = processedText.replace(codeBlockRegex, (match) => {
+    const placeholder = `__CODE_BLOCK_PLACEHOLDER_${index}__`;
+    placeholders.push({ placeholder, original: match });
+    index++;
+    return placeholder;
+  });
+
+  // 2. Extract markdown images: ![alt](url)
+  const imageRegex = /!\[.*?\]\(.*?\)/g;
+  processedText = processedText.replace(imageRegex, (match) => {
+    const placeholder = `__IMAGE_PLACEHOLDER_${index}__`;
+    placeholders.push({ placeholder, original: match });
+    index++;
+    return placeholder;
+  });
+
+  return { text: processedText, placeholders };
+}
+
+// Restore placeholders in text
+function restorePlaceholders(text, placeholders) {
+  if (!text || typeof text !== 'string') return text;
+
+  let restoredText = text;
+  
+  // Restore placeholders by replacement
+  for (const { placeholder, original } of placeholders) {
+    // Escape string for RegExp pattern
+    const escapedPlaceholder = placeholder.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    // Also support variations that Google Translate might introduce (like spaces inside underscores or casing differences)
+    const cleanPattern = escapedPlaceholder.replace(/_/g, '\\s*_*\\s*');
+    const regex = new RegExp(cleanPattern, 'gi');
+    restoredText = restoredText.replace(regex, original);
+  }
+
+  // Fallback direct string replacement to ensure no placeholders are missed
+  for (const { placeholder, original } of placeholders) {
+    if (restoredText.includes(placeholder)) {
+      restoredText = restoredText.replaceAll(placeholder, original);
+    }
+  }
+
+  return restoredText;
+}
+
 // Helper: try supabase, fall back to mongo on any error
 async function trySupabase(supabaseFn, mongoFn) {
   if (supabase) {
@@ -151,13 +233,26 @@ export default function createTranslationRoutes(db) {
    * Helper: Determine Translation Direction and Select Source Texts
    * Automatically detects EN -> ID scenario, otherwise defaults to ID -> EN
    */
-  function determineTranslationDirection(doc, contentType) {
+  function determineTranslationDirection(doc, contentType, currentLanguage) {
+    if (currentLanguage === 'en') {
+      return {
+        srcLang: 'en',
+        tgtLang: 'id',
+      };
+    } else if (currentLanguage === 'id') {
+      return {
+        srcLang: 'id',
+        tgtLang: 'en',
+      };
+    }
+
     const safeParse = (val) => {
       if (typeof val === 'string') {
         try {
           return JSON.parse(val);
         } catch {
-          return { en: val };
+          const detected = detectPlainStringLanguage(val);
+          return { [detected]: val };
         }
       }
       return val || {};
@@ -214,29 +309,7 @@ export default function createTranslationRoutes(db) {
     const table = supabaseTableMap[contentType];
     const now = new Date();
 
-    if (contentType !== 'writing') {
-      // For MongoDB, format timestamps as Date objects
-      const mongoSetObj = { ...setObj };
-      if (mongoSetObj.translationMetadata) {
-        mongoSetObj.translationMetadata = {
-          ...mongoSetObj.translationMetadata,
-          timestamp: now,
-        };
-      }
-      mongoSetObj.updatedAt = now;
-
-      const orConditions = [{ id: postId }, { _id: postId }];
-      try {
-        orConditions.push({ _id: new ObjectId(postId) });
-      } catch {}
-      await db.collection(collection).updateOne(
-        { $or: orConditions },
-        { $set: mongoSetObj }
-      );
-      return;
-    }
-
-    // For writings (dual-write to Supabase)
+    // 1. Update MongoDB (always safe because we use $set to only update translated/meta fields)
     const mongoSetObj = { ...setObj };
     if (mongoSetObj.translationMetadata) {
       mongoSetObj.translationMetadata = {
@@ -246,33 +319,58 @@ export default function createTranslationRoutes(db) {
     }
     mongoSetObj.updatedAt = now;
 
-    await trySupabase(
-      async () => {
-        // Strip fields that are not in the Supabase schema
-        const supabaseUpdate = { ...setObj };
-        delete supabaseUpdate.translationStatus;
-        delete supabaseUpdate.translationMetadata;
-        supabaseUpdate.updatedAt = now.toISOString();
+    const orConditions = [{ id: doc.id || postId }, { _id: postId }];
+    try {
+      orConditions.push({ _id: new ObjectId(postId) });
+    } catch {}
+    
+    await db.collection(collection).updateOne(
+      { $or: orConditions },
+      { $set: mongoSetObj }
+    );
 
-        // Safe JSON serialization for Supabase upsert
-        const cleaned = { ...supabaseUpdate };
-        // Upsert onConflict _id to be resilient
+    // 2. Synchronize to Supabase if configured (for ALL content types: writing, project, and book)
+    if (supabase) {
+      try {
+        // Construct the full updated document to prevent partial upsert overwriting other columns
+        const fullUpdatedDoc = { ...doc, ...setObj };
+        
+        fullUpdatedDoc.updatedAt = now.toISOString();
+
+        const cleaned = { ...fullUpdatedDoc };
+        
+        // Strip MongoDB internal _id and other unsynced fields
+        delete cleaned._id;
+        delete cleaned.translationOfId;
+        delete cleaned.contentLanguage;
+        
+        // Strip metadata fields that are not part of the Supabase schema
+        delete cleaned.translationStatus;
+        delete cleaned.translationMetadata;
+
+        // Ensure bilingual fields are stringified JSON before upserting if necessary
+        const jsonFields = ['title', 'excerpt', 'content', 'description', 'review'];
+        for (const field of jsonFields) {
+          if (cleaned[field] && typeof cleaned[field] === 'object') {
+            cleaned[field] = JSON.stringify(cleaned[field]);
+          }
+        }
+
+        // Upsert to Supabase with conflict resolution on 'id' (slug field)
         const { error } = await supabase
           .from(table)
-          .upsert({ ...cleaned, _id: doc._id }, { onConflict: '_id' });
+          .upsert(cleaned, { onConflict: 'id' })
+          .select()
+          .maybeSingle();
+
         if (error) throw error;
-      },
-      async () => {
-        const orConditions = [{ id: postId }, { _id: postId }];
-        try {
-          orConditions.push({ _id: new ObjectId(postId) });
-        } catch {}
-        await db.collection(collection).updateOne(
-          { $or: orConditions },
-          { $set: mongoSetObj }
+        console.log(`[translation] Supabase translation sync success for ${contentType}/${postId}`);
+      } catch (err) {
+        console.warn(
+          `[translation] Supabase translation sync failed for ${contentType}/${postId}: ${err.message}`
         );
       }
-    );
+    }
   }
 
   /**
@@ -329,7 +427,7 @@ export default function createTranslationRoutes(db) {
     const startTime = Date.now();
 
     try {
-      const { postId, contentType } = req.body;
+      const { postId, contentType, currentLanguage } = req.body;
 
       if (!postId || !contentType) {
         return res.status(400).json({ error: 'postId and contentType required' });
@@ -344,7 +442,7 @@ export default function createTranslationRoutes(db) {
       }
 
       const doc = await getContent(contentType, postId);
-      const { srcLang, tgtLang } = determineTranslationDirection(doc, contentType);
+      const { srcLang, tgtLang } = determineTranslationDirection(doc, contentType, currentLanguage);
       const fields = getTranslatableFields(contentType);
 
       const responseData = {
@@ -370,8 +468,11 @@ export default function createTranslationRoutes(db) {
       for (const field of fields.localized) {
         const sourceText = resolveText(doc[field], srcLang);
         if (sourceText && sourceText.trim()) {
-          const rawTranslated = await translateGoogle(sourceText, tgtLang);
-          const translatedText = sanitizeTranslatedMarkdown(rawTranslated);
+          const { text: protectedText, placeholders } = extractPlaceholders(sourceText);
+          const rawTranslated = await translateGoogle(protectedText, tgtLang);
+          const sanitizedText = sanitizeTranslatedMarkdown(rawTranslated);
+          const translatedText = restorePlaceholders(sanitizedText, placeholders);
+          
           const currentObj = safeParse(doc[field], tgtLang);
           currentObj[tgtLang] = translatedText;
           setObj[field] = currentObj;
@@ -435,7 +536,7 @@ export default function createTranslationRoutes(db) {
     const startTime = Date.now();
 
     try {
-      const { postId, contentType } = req.body;
+      const { postId, contentType, currentLanguage } = req.body;
 
       if (!postId || !contentType) {
         return res.status(400).json({ error: 'postId and contentType required' });
@@ -450,7 +551,7 @@ export default function createTranslationRoutes(db) {
       }
 
       const doc = await getContent(contentType, postId);
-      const { srcLang, tgtLang } = determineTranslationDirection(doc, contentType);
+      const { srcLang, tgtLang } = determineTranslationDirection(doc, contentType, currentLanguage);
       const fields = getTranslatableFields(contentType);
 
       const responseData = {
@@ -476,7 +577,8 @@ export default function createTranslationRoutes(db) {
       for (const field of fields.localized) {
         const sourceText = resolveText(doc[field], srcLang);
         if (sourceText && sourceText.trim()) {
-          const rawTranslated = await translateGoogle(sourceText, tgtLang);
+          const { text: protectedText, placeholders } = extractPlaceholders(sourceText);
+          const rawTranslated = await translateGoogle(protectedText, tgtLang);
           const rawSanitized = sanitizeTranslatedMarkdown(rawTranslated);
           let polishedText = rawSanitized;
 
@@ -498,10 +600,11 @@ export default function createTranslationRoutes(db) {
             }
           }
 
+          const translatedText = restorePlaceholders(polishedText, placeholders);
           const currentObj = safeParse(doc[field], tgtLang);
-          currentObj[tgtLang] = polishedText;
+          currentObj[tgtLang] = translatedText;
           setObj[field] = currentObj;
-          responseData.translations[field] = polishedText;
+          responseData.translations[field] = translatedText;
         }
       }
 
@@ -561,7 +664,7 @@ export default function createTranslationRoutes(db) {
     const startTime = Date.now();
 
     try {
-      const { postId, contentType } = req.body;
+      const { postId, contentType, currentLanguage } = req.body;
 
       if (!postId || !contentType) {
         return res.status(400).json({ error: 'postId and contentType required' });
@@ -576,15 +679,18 @@ export default function createTranslationRoutes(db) {
       }
 
       const doc = await getContent(contentType, postId);
-      const { srcLang, tgtLang } = determineTranslationDirection(doc, contentType);
+      const { srcLang, tgtLang } = determineTranslationDirection(doc, contentType, currentLanguage);
       const fields = getTranslatableFields(contentType);
 
-      // Build JSON to translate
+      // Build JSON to translate and extract placeholders
       const sourceJson = {};
+      const allPlaceholders = {};
       for (const field of fields.localized) {
         const textVal = resolveText(doc[field], srcLang);
         if (textVal && textVal.trim()) {
-          sourceJson[field] = textVal;
+          const { text: protectedText, placeholders } = extractPlaceholders(textVal);
+          sourceJson[field] = protectedText;
+          allPlaceholders[field] = placeholders;
         }
       }
       for (const field of fields.plain) {
@@ -674,10 +780,11 @@ RULES:
       // Apply and save localized fields
       for (const field of fields.localized) {
         if (translatedFields[field]) {
+          const restoredText = restorePlaceholders(translatedFields[field], allPlaceholders[field] || []);
           const currentObj = safeParse(doc[field], tgtLang);
-          currentObj[tgtLang] = translatedFields[field];
+          currentObj[tgtLang] = restoredText;
           setObj[field] = currentObj;
-          responseData.translations[field] = translatedFields[field];
+          responseData.translations[field] = restoredText;
         }
       }
 

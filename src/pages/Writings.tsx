@@ -4,7 +4,7 @@ import { getLucideIcon } from '../lib/iconMap';
 import { WritingCard } from '../components/WritingCard';
 import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
-import { resolveLocalizedText, getExactLocalizedText } from '../lib/localized';
+import { resolveLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
 

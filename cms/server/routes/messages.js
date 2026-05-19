@@ -83,16 +83,31 @@ function getResendClient() {
   return new Resend(cleanKey);
 }
 
+// HTML-escape user content to prevent XSS in emails
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Outgoing email HTML template
 function renderReplyEmailHtml(visitorName, originalMessage, replyText) {
+  const safeName = escapeHtml(visitorName || 'Pengunjung');
+  const safeReply = escapeHtml(replyText);
+  const safeOriginal = escapeHtml(originalMessage);
+
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
       <h2 style="color: #0f172a; margin-top: 0; margin-bottom: 20px; font-size: 20px; font-weight: 700; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">Portofolio Aditya — Tanggapan Pesan</h2>
-      <p style="color: #334155; font-size: 15px; line-height: 1.6;">Halo <strong>${visitorName || 'Pengunjung'}</strong>,</p>
+      <p style="color: #334155; font-size: 15px; line-height: 1.6;">Halo <strong>${safeName}</strong>,</p>
       <p style="color: #334155; font-size: 15px; line-height: 1.6;">Terima kasih telah menghubungi saya. Berikut adalah tanggapan untuk pesan Anda:</p>
       
       <div style="margin: 24px 0; padding: 18px; background-color: #f8fafc; border-left: 4px solid #3b82f6; border-radius: 6px;">
-        <p style="color: #1e293b; font-size: 15px; line-height: 1.6; white-space: pre-wrap; margin: 0;">${replyText}</p>
+        <p style="color: #1e293b; font-size: 15px; line-height: 1.6; white-space: pre-wrap; margin: 0;">${safeReply}</p>
       </div>
 
       <p style="color: #475569; font-size: 14px; margin-bottom: 0;">Salam hangat,</p>
@@ -102,7 +117,7 @@ function renderReplyEmailHtml(visitorName, originalMessage, replyText) {
 
       <div style="padding: 16px; background-color: #f1f5f9; border-radius: 8px; font-size: 13.5px; color: #64748b;">
         <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">Pesan Asli Anda:</p>
-        <blockquote style="margin: 0; padding-left: 12px; border-left: 2px solid #cbd5e1; font-style: italic; color: #475569; white-space: pre-wrap;">${originalMessage}</blockquote>
+        <blockquote style="margin: 0; padding-left: 12px; border-left: 2px solid #cbd5e1; font-style: italic; color: #475569; white-space: pre-wrap;">${safeOriginal}</blockquote>
       </div>
       
       <p style="color: #94a3b8; font-size: 11px; margin-top: 32px; text-align: center; margin-bottom: 0;">

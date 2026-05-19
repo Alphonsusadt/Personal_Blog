@@ -8,7 +8,7 @@ import { LinkInsertDialog } from '../../components/LinkInsertDialog';
 import { FullPagePreview } from '../../components/FullPagePreview';
 import { sanitizeMarkdown } from '../../lib/mediaUploader';
 import { hasBase64Images } from '../../utils/media';
-import { ArrowLeft, Check, Clock, Maximize2, HardDrive, AlertCircle, RefreshCw, EyeOff, Eye } from 'lucide-react';
+import { ArrowLeft, Check, Maximize2, AlertCircle, EyeOff, Eye } from 'lucide-react';
 import { useRenderedMarkdown } from '../../hooks/useRenderedMarkdown';
 import { formatDraftTime } from '../../hooks/useLocalDraft';
 import { IsolatedContentEditor } from '../../components/IsolatedInput';
@@ -42,6 +42,7 @@ interface Writing {
   metaTitle?: string;
   contentLanguage?: 'en' | 'id' | 'bilingual';
   translationOfId?: string;
+  devStatus?: 'planning' | 'ongoing' | 'completed';
 }
 
 const emptyWriting: Writing = {
@@ -55,6 +56,7 @@ const emptyWriting: Writing = {
   content: '',
   status: 'draft',
   publishAt: '',
+  devStatus: 'planning',
 };
 
 function hasMeaningfulWritingDraft(data: Writing): boolean {
@@ -719,7 +721,7 @@ export function WritingEditor() {
                 onInsert={insertMarkdown}
                 onOpenImageDialog={() => setImageDialogOpen(true)}
                 onOpenLinkDialog={() => setLinkDialogOpen(true)}
-                onOpenAssetReuser={writing.contentLanguage === 'bilingual' ? () => setAssetReuserOpen(true) : undefined}
+                onOpenAssetReuser={() => setAssetReuserOpen(true)}
               />
 
               <div className="flex items-center gap-2">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Linkedin, Github, Send, AlertCircle, CheckCircle2, RefreshCw, MessageSquare, Instagram, Twitter, Globe } from 'lucide-react';
+import { Mail, Linkedin, Github, Send, AlertCircle, CheckCircle2, RefreshCw, Instagram, Twitter, Globe } from 'lucide-react';
 import { api } from '../lib/api';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 
@@ -11,6 +11,14 @@ interface SettingsData {
     instagram?: string;
     twitter?: string;
     researchgate?: string;
+  };
+  socialVisibility?: {
+    linkedin?: boolean;
+    github?: boolean;
+    instagram?: boolean;
+    twitter?: boolean;
+    researchgate?: boolean;
+    email?: boolean;
   };
   contactHeading?: { id: string; en: string };
   contactMessage?: { id: string; en: string };

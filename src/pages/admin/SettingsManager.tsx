@@ -4,15 +4,20 @@ import { Save, CheckCircle, Key, Clock, AlertCircle } from 'lucide-react';
 import { useAdminAutosave } from '../../hooks/useAdminAutosave';
 import { AutoFixButton } from '../../components/AutoFixButton';
 
+interface SectionSetting {
+  enabled: boolean;
+  status: 'visible' | 'hidden' | 'development';
+}
+
 interface SettingsData {
   siteTitle: string;
   footerName: string;
   footerBio: string;
   footerTagline: string;
   sections: {
-    writings: { enabled: boolean };
-    projects: { enabled: boolean };
-    books: { enabled: boolean };
+    writings: SectionSetting;
+    projects: SectionSetting;
+    books: SectionSetting;
   };
   senderEmails?: string[];
   activeSenderEmail?: string;
@@ -40,9 +45,9 @@ const hasMeaningfulSettingsData = (value: SettingsData): boolean => {
     value.footerName.trim() ||
     value.footerBio.trim() ||
     value.footerTagline.trim() ||
-    value.sections.writings.enabled ||
-    value.sections.projects.enabled ||
-    value.sections.books.enabled
+    value.sections.writings.status !== 'hidden' ||
+    value.sections.projects.status !== 'hidden' ||
+    value.sections.books.status !== 'hidden'
   );
 };
 
@@ -53,9 +58,9 @@ export function SettingsManager() {
     footerBio: '',
     footerTagline: '',
     sections: {
-      writings: { enabled: true },
-      projects: { enabled: true },
-      books: { enabled: true },
+      writings: { enabled: true, status: 'visible' },
+      projects: { enabled: true, status: 'visible' },
+      books: { enabled: true, status: 'visible' },
     },
     senderEmails: [],
     activeSenderEmail: '',
@@ -103,9 +108,18 @@ export function SettingsManager() {
         ...prev,
         ...d,
         sections: {
-          writings: { enabled: d.sections?.writings?.enabled !== false },
-          projects: { enabled: d.sections?.projects?.enabled !== false },
-          books: { enabled: d.sections?.books?.enabled !== false },
+          writings: {
+            enabled: d.sections?.writings?.status ? d.sections.writings.status !== 'hidden' : d.sections?.writings?.enabled !== false,
+            status: d.sections?.writings?.status || (d.sections?.writings?.enabled !== false ? 'visible' : 'hidden')
+          },
+          projects: {
+            enabled: d.sections?.projects?.status ? d.sections.projects.status !== 'hidden' : d.sections?.projects?.enabled !== false,
+            status: d.sections?.projects?.status || (d.sections?.projects?.enabled !== false ? 'visible' : 'hidden')
+          },
+          books: {
+            enabled: d.sections?.books?.status ? d.sections.books.status !== 'hidden' : d.sections?.books?.enabled !== false,
+            status: d.sections?.books?.status || (d.sections?.books?.enabled !== false ? 'visible' : 'hidden')
+          },
         },
         senderEmails: Array.isArray(d.senderEmails) ? d.senderEmails : [],
         activeSenderEmail: typeof d.activeSenderEmail === 'string' ? d.activeSenderEmail : '',
@@ -193,53 +207,242 @@ export function SettingsManager() {
         </section>
 
         <section className="bg-[#1E293B] border border-[#334155] rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-[#F8FAFC] mb-4">Homepage Section Visibility</h2>
-          <div className="space-y-3">
-            <label className="flex items-center justify-between rounded-lg border border-[#334155] bg-[#0F172A] px-4 py-3">
-              <span className="text-sm text-[#E2E8F0]">Show Writings Section</span>
-              <input
-                type="checkbox"
-                checked={data.sections.writings.enabled}
-                onChange={(e) => setData({
-                  ...data,
-                  sections: {
-                    ...data.sections,
-                    writings: { enabled: e.target.checked },
-                  },
-                })}
-                className="h-4 w-4 rounded border-[#334155] bg-[#0F172A] text-[#60A5FA]"
-              />
-            </label>
-            <label className="flex items-center justify-between rounded-lg border border-[#334155] bg-[#0F172A] px-4 py-3">
-              <span className="text-sm text-[#E2E8F0]">Show Projects Section</span>
-              <input
-                type="checkbox"
-                checked={data.sections.projects.enabled}
-                onChange={(e) => setData({
-                  ...data,
-                  sections: {
-                    ...data.sections,
-                    projects: { enabled: e.target.checked },
-                  },
-                })}
-                className="h-4 w-4 rounded border-[#334155] bg-[#0F172A] text-[#60A5FA]"
-              />
-            </label>
-            <label className="flex items-center justify-between rounded-lg border border-[#334155] bg-[#0F172A] px-4 py-3">
-              <span className="text-sm text-[#E2E8F0]">Show Library Section</span>
-              <input
-                type="checkbox"
-                checked={data.sections.books.enabled}
-                onChange={(e) => setData({
-                  ...data,
-                  sections: {
-                    ...data.sections,
-                    books: { enabled: e.target.checked },
-                  },
-                })}
-                className="h-4 w-4 rounded border-[#334155] bg-[#0F172A] text-[#60A5FA]"
-              />
-            </label>
+          <h2 className="text-lg font-semibold text-[#F8FAFC] mb-4">Homepage Section Visibility & Development Status</h2>
+          <p className="text-xs text-[#94A3B8] mb-6">Kelola visibilitas dan status pengembangan dari masing-masing seksi di portfolio publik kamu.</p>
+          <div className="space-y-6">
+            {/* Writings Section */}
+            <div className="border border-[#334155] rounded-xl p-4 bg-[#0F172A] space-y-3">
+              <span className="text-sm font-semibold text-[#E2E8F0] block">Writings Section Status</span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setData({
+                    ...data,
+                    sections: {
+                      ...data.sections,
+                      writings: { enabled: true, status: 'visible' }
+                    }
+                  })}
+                  className={`flex flex-col text-left p-3 rounded-lg border transition-all ${
+                    data.sections.writings.status === 'visible'
+                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+                      : 'bg-[#1E293B] border-[#334155] text-[#94A3B8] hover:border-[#475569] hover:bg-[#334155]/20'
+                  }`}
+                >
+                  <span className="text-xs font-semibold flex items-center gap-1.5 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    Visible (Aktif)
+                  </span>
+                  <span className="text-[11px] leading-tight text-[#94A3B8]">
+                    Seksi aktif sepenuhnya. Semua konten published dapat diakses publik.
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setData({
+                    ...data,
+                    sections: {
+                      ...data.sections,
+                      writings: { enabled: true, status: 'development' }
+                    }
+                  })}
+                  className={`flex flex-col text-left p-3 rounded-lg border transition-all ${
+                    data.sections.writings.status === 'development'
+                      ? 'bg-amber-500/10 border-amber-500 text-amber-400'
+                      : 'bg-[#1E293B] border-[#334155] text-[#94A3B8] hover:border-[#475569] hover:bg-[#334155]/20'
+                  }`}
+                >
+                  <span className="text-xs font-semibold flex items-center gap-1.5 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    Dev (Pengembangan)
+                  </span>
+                  <span className="text-[11px] leading-tight text-[#94A3B8]">
+                    Muncul dengan badge Dev. Halaman publik menampilkan "Under Construction".
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setData({
+                    ...data,
+                    sections: {
+                      ...data.sections,
+                      writings: { enabled: false, status: 'hidden' }
+                    }
+                  })}
+                  className={`flex flex-col text-left p-3 rounded-lg border transition-all ${
+                    data.sections.writings.status === 'hidden'
+                      ? 'bg-red-500/10 border-red-500 text-red-400'
+                      : 'bg-[#1E293B] border-[#334155] text-[#94A3B8] hover:border-[#475569] hover:bg-[#334155]/20'
+                  }`}
+                >
+                  <span className="text-xs font-semibold flex items-center gap-1.5 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                    Hidden (Tersembunyi)
+                  </span>
+                  <span className="text-[11px] leading-tight text-[#94A3B8]">
+                    Disembunyikan sepenuhnya dari publik, navigasi, dan beranda.
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Projects Section */}
+            <div className="border border-[#334155] rounded-xl p-4 bg-[#0F172A] space-y-3">
+              <span className="text-sm font-semibold text-[#E2E8F0] block">Projects Section Status</span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setData({
+                    ...data,
+                    sections: {
+                      ...data.sections,
+                      projects: { enabled: true, status: 'visible' }
+                    }
+                  })}
+                  className={`flex flex-col text-left p-3 rounded-lg border transition-all ${
+                    data.sections.projects.status === 'visible'
+                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+                      : 'bg-[#1E293B] border-[#334155] text-[#94A3B8] hover:border-[#475569] hover:bg-[#334155]/20'
+                  }`}
+                >
+                  <span className="text-xs font-semibold flex items-center gap-1.5 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    Visible (Aktif)
+                  </span>
+                  <span className="text-[11px] leading-tight text-[#94A3B8]">
+                    Seksi aktif sepenuhnya. Semua konten published dapat diakses publik.
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setData({
+                    ...data,
+                    sections: {
+                      ...data.sections,
+                      projects: { enabled: true, status: 'development' }
+                    }
+                  })}
+                  className={`flex flex-col text-left p-3 rounded-lg border transition-all ${
+                    data.sections.projects.status === 'development'
+                      ? 'bg-amber-500/10 border-amber-500 text-amber-400'
+                      : 'bg-[#1E293B] border-[#334155] text-[#94A3B8] hover:border-[#475569] hover:bg-[#334155]/20'
+                  }`}
+                >
+                  <span className="text-xs font-semibold flex items-center gap-1.5 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    Dev (Pengembangan)
+                  </span>
+                  <span className="text-[11px] leading-tight text-[#94A3B8]">
+                    Muncul dengan badge Dev. Halaman publik menampilkan "Under Construction".
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setData({
+                    ...data,
+                    sections: {
+                      ...data.sections,
+                      projects: { enabled: false, status: 'hidden' }
+                    }
+                  })}
+                  className={`flex flex-col text-left p-3 rounded-lg border transition-all ${
+                    data.sections.projects.status === 'hidden'
+                      ? 'bg-red-500/10 border-red-500 text-red-400'
+                      : 'bg-[#1E293B] border-[#334155] text-[#94A3B8] hover:border-[#475569] hover:bg-[#334155]/20'
+                  }`}
+                >
+                  <span className="text-xs font-semibold flex items-center gap-1.5 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                    Hidden (Tersembunyi)
+                  </span>
+                  <span className="text-[11px] leading-tight text-[#94A3B8]">
+                    Disembunyikan sepenuhnya dari publik, navigasi, dan beranda.
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Books Section */}
+            <div className="border border-[#334155] rounded-xl p-4 bg-[#0F172A] space-y-3">
+              <span className="text-sm font-semibold text-[#E2E8F0] block">Library/Books Section Status</span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setData({
+                    ...data,
+                    sections: {
+                      ...data.sections,
+                      books: { enabled: true, status: 'visible' }
+                    }
+                  })}
+                  className={`flex flex-col text-left p-3 rounded-lg border transition-all ${
+                    data.sections.books.status === 'visible'
+                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+                      : 'bg-[#1E293B] border-[#334155] text-[#94A3B8] hover:border-[#475569] hover:bg-[#334155]/20'
+                  }`}
+                >
+                  <span className="text-xs font-semibold flex items-center gap-1.5 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    Visible (Aktif)
+                  </span>
+                  <span className="text-[11px] leading-tight text-[#94A3B8]">
+                    Seksi aktif sepenuhnya. Semua konten published dapat diakses publik.
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setData({
+                    ...data,
+                    sections: {
+                      ...data.sections,
+                      books: { enabled: true, status: 'development' }
+                    }
+                  })}
+                  className={`flex flex-col text-left p-3 rounded-lg border transition-all ${
+                    data.sections.books.status === 'development'
+                      ? 'bg-amber-500/10 border-amber-500 text-amber-400'
+                      : 'bg-[#1E293B] border-[#334155] text-[#94A3B8] hover:border-[#475569] hover:bg-[#334155]/20'
+                  }`}
+                >
+                  <span className="text-xs font-semibold flex items-center gap-1.5 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    Dev (Pengembangan)
+                  </span>
+                  <span className="text-[11px] leading-tight text-[#94A3B8]">
+                    Muncul dengan badge Dev. Halaman publik menampilkan "Under Construction".
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setData({
+                    ...data,
+                    sections: {
+                      ...data.sections,
+                      books: { enabled: false, status: 'hidden' }
+                    }
+                  })}
+                  className={`flex flex-col text-left p-3 rounded-lg border transition-all ${
+                    data.sections.books.status === 'hidden'
+                      ? 'bg-red-500/10 border-red-500 text-red-400'
+                      : 'bg-[#1E293B] border-[#334155] text-[#94A3B8] hover:border-[#475569] hover:bg-[#334155]/20'
+                  }`}
+                >
+                  <span className="text-xs font-semibold flex items-center gap-1.5 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                    Hidden (Tersembunyi)
+                  </span>
+                  <span className="text-[11px] leading-tight text-[#94A3B8]">
+                    Disembunyikan sepenuhnya dari publik, navigasi, dan beranda.
+                  </span>
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 

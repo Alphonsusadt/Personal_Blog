@@ -6,7 +6,7 @@ import { WritingCard } from '../components/WritingCard';
 import { BookCard } from '../components/BookCard';
 import { api } from '../lib/api';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
-import { getExactLocalizedText, resolveLocalizedText } from '../lib/localized';
+import { resolveLocalizedText } from '../lib/localized';
 import { t } from '../lib/translations';
 import type { Project } from '../data/projects';
 import type { Writing } from '../data/writings';
@@ -29,9 +29,9 @@ interface HomeData {
 
 interface PublicSettings {
   sections?: {
-    writings?: { enabled?: boolean };
-    projects?: { enabled?: boolean };
-    books?: { enabled?: boolean };
+    writings?: { enabled?: boolean; status?: 'visible' | 'hidden' | 'development' };
+    projects?: { enabled?: boolean; status?: 'visible' | 'hidden' | 'development' };
+    books?: { enabled?: boolean; status?: 'visible' | 'hidden' | 'development' };
   };
   socialLinks?: {
     linkedin?: string;
@@ -255,9 +255,9 @@ export function Home() {
   const [allBooks, setAllBooks] = useState<Book[]>([]);
   const [homeData, setHomeData] = useState<HomeData>(defaultHomeData);
   const [sectionVisibility, setSectionVisibility] = useState({
-    writings: true,
-    projects: true,
-    books: true,
+    writings: { enabled: true, status: 'visible' as 'visible' | 'hidden' | 'development' },
+    projects: { enabled: true, status: 'visible' as 'visible' | 'hidden' | 'development' },
+    books: { enabled: true, status: 'visible' as 'visible' | 'hidden' | 'development' },
   });
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const { language } = useSiteLanguage();
@@ -312,9 +312,18 @@ export function Home() {
     api.getPublicSettings().then((settings: PublicSettings) => {
       setSettings(settings);
       setSectionVisibility({
-        writings: settings.sections?.writings?.enabled !== false,
-        projects: settings.sections?.projects?.enabled !== false,
-        books: settings.sections?.books?.enabled !== false,
+        writings: {
+          enabled: settings.sections?.writings?.status ? settings.sections.writings.status !== 'hidden' : settings.sections?.writings?.enabled !== false,
+          status: settings.sections?.writings?.status || (settings.sections?.writings?.enabled !== false ? 'visible' : 'hidden')
+        },
+        projects: {
+          enabled: settings.sections?.projects?.status ? settings.sections.projects.status !== 'hidden' : settings.sections?.projects?.enabled !== false,
+          status: settings.sections?.projects?.status || (settings.sections?.projects?.enabled !== false ? 'visible' : 'hidden')
+        },
+        books: {
+          enabled: settings.sections?.books?.status ? settings.sections.books.status !== 'hidden' : settings.sections?.books?.enabled !== false,
+          status: settings.sections?.books?.status || (settings.sections?.books?.enabled !== false ? 'visible' : 'hidden')
+        },
       });
     }).catch(console.error);
   }, []);
@@ -322,9 +331,9 @@ export function Home() {
   const linkedinUrl = settings?.socialLinks?.linkedin || homeData.socialLinks?.linkedin || 'https://linkedin.com/in/alphonsusadt';
   const githubUrl = settings?.socialLinks?.github || homeData.socialLinks?.github || 'https://github.com/alphonsusadt';
   const emailUrl = settings?.socialLinks?.email || homeData.socialLinks?.email || 'alphonsus@example.com';
-  const instagramUrl = settings?.socialLinks?.instagram || homeData.socialLinks?.instagram || 'https://instagram.com/alphonsusadt';
-  const twitterUrl = settings?.socialLinks?.twitter || homeData.socialLinks?.twitter || 'https://twitter.com/alphonsusadt';
-  const researchGateUrl = settings?.socialLinks?.researchgate || homeData.socialLinks?.researchgate || 'https://researchgate.net';
+  const instagramUrl = settings?.socialLinks?.instagram || 'https://instagram.com/alphonsusadt';
+  const twitterUrl = settings?.socialLinks?.twitter || 'https://twitter.com/alphonsusadt';
+  const researchGateUrl = settings?.socialLinks?.researchgate || 'https://researchgate.net';
 
   const showLinkedin = settings?.socialVisibility?.linkedin !== false;
   const showGithub = settings?.socialVisibility?.github !== false;
@@ -736,7 +745,7 @@ export function Home() {
       </section>
 
       {/* Recent Projects Section */}
-      {sectionVisibility.projects ? (
+      {sectionVisibility.projects.status !== 'hidden' ? (
       <section className="mb-[96px]">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-block-lime color-block-section">
@@ -749,28 +758,59 @@ export function Home() {
               </p>
             </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {recentProjects.map((project) => (
-              <ProjectCard key={project.id} project={project} />
-            ))}
-          </div>
+            {sectionVisibility.projects.status === 'development' ? (
+              <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-[#0F172A] p-8 md:p-12 text-center flex flex-col items-center justify-center space-y-6 shadow-xl">
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent pointer-events-none" />
+                <div className="relative flex items-center justify-center w-16 h-16 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
+                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div className="space-y-3 max-w-lg z-10">
+                  <h3 className="text-xl md:text-2xl font-bold text-[#F8FAFC]">
+                    {language === 'en' ? 'Section Under Construction' : 'Seksi dalam Pengembangan'}
+                  </h3>
+                  <p className="text-sm text-[#94A3B8] leading-relaxed">
+                    {language === 'en' 
+                      ? 'I am currently designing and building this section to showcase exciting new content. Direct access is disabled until it goes live, but stay tuned!'
+                      : 'Saya sedang merancang dan membangun bagian ini untuk menampilkan konten baru yang menarik. Akses penuh dinonaktifkan sementara waktu.'
+                    }
+                  </p>
+                </div>
+                <Link
+                  to="/engineering"
+                  className="btn btn-secondary inline-flex items-center space-x-2 text-amber-400 border-amber-500/30 hover:bg-amber-500/10 z-10"
+                >
+                  <span>{language === 'en' ? 'Preview Section' : 'Pratinjau Seksi'}</span>
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {recentProjects.map((project) => (
+                    <ProjectCard key={project.id} project={project} />
+                  ))}
+                </div>
 
-            <div className="text-center mt-12">
-              <Link
-                to="/engineering"
-                className="btn btn-primary inline-flex items-center space-x-2"
-              >
-                <span>{t('home.viewAllProjects', language)}</span>
-                <ChevronRight className="w-4 h-4" />
-              </Link>
-            </div>
+                <div className="text-center mt-12">
+                  <Link
+                    to="/engineering"
+                    className="btn btn-primary inline-flex items-center space-x-2"
+                  >
+                    <span>{t('home.viewAllProjects', language)}</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </section>
       ) : null}
 
       {/* Recent Writings Section */}
-      {sectionVisibility.writings ? (
+      {sectionVisibility.writings.status !== 'hidden' ? (
       <section className="mb-[96px]">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-block-lilac color-block-section">
@@ -783,28 +823,59 @@ export function Home() {
               </p>
             </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {recentWritings.map((writing) => (
-              <WritingCard key={writing.id} writing={writing} />
-            ))}
-          </div>
+            {sectionVisibility.writings.status === 'development' ? (
+              <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-[#0F172A] p-8 md:p-12 text-center flex flex-col items-center justify-center space-y-6 shadow-xl">
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent pointer-events-none" />
+                <div className="relative flex items-center justify-center w-16 h-16 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
+                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div className="space-y-3 max-w-lg z-10">
+                  <h3 className="text-xl md:text-2xl font-bold text-[#F8FAFC]">
+                    {language === 'en' ? 'Section Under Construction' : 'Seksi dalam Pengembangan'}
+                  </h3>
+                  <p className="text-sm text-[#94A3B8] leading-relaxed">
+                    {language === 'en' 
+                      ? 'I am currently designing and building this section to showcase exciting new content. Direct access is disabled until it goes live, but stay tuned!'
+                      : 'Saya sedang merancang dan membangun bagian ini untuk menampilkan konten baru yang menarik. Akses penuh dinonaktifkan sementara waktu.'
+                    }
+                  </p>
+                </div>
+                <Link
+                  to="/writings"
+                  className="btn btn-secondary inline-flex items-center space-x-2 text-amber-400 border-amber-500/30 hover:bg-amber-500/10 z-10"
+                >
+                  <span>{language === 'en' ? 'Preview Section' : 'Pratinjau Seksi'}</span>
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {recentWritings.map((writing) => (
+                    <WritingCard key={writing.id} writing={writing} />
+                  ))}
+                </div>
 
-            <div className="text-center mt-12">
-              <Link
-                to="/writings"
-                className="btn btn-primary inline-flex items-center space-x-2"
-              >
-                <span>{t('home.readAllWritings', language)}</span>
-                <ChevronRight className="w-4 h-4" />
-              </Link>
-            </div>
+                <div className="text-center mt-12">
+                  <Link
+                    to="/writings"
+                    className="btn btn-primary inline-flex items-center space-x-2"
+                  >
+                    <span>{t('home.readAllWritings', language)}</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </section>
       ) : null}
 
       {/* Featured Books Section */}
-      {sectionVisibility.books ? (
+      {sectionVisibility.books.status !== 'hidden' ? (
       <section className="mb-[96px]">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-block-cream color-block-section">
@@ -817,21 +888,52 @@ export function Home() {
               </p>
             </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {featuredBooks.map((book) => (
-              <BookCard key={book.id} book={book} />
-            ))}
-          </div>
+            {sectionVisibility.books.status === 'development' ? (
+              <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-[#0F172A] p-8 md:p-12 text-center flex flex-col items-center justify-center space-y-6 shadow-xl">
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent pointer-events-none" />
+                <div className="relative flex items-center justify-center w-16 h-16 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
+                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div className="space-y-3 max-w-lg z-10">
+                  <h3 className="text-xl md:text-2xl font-bold text-[#F8FAFC]">
+                    {language === 'en' ? 'Section Under Construction' : 'Seksi dalam Pengembangan'}
+                  </h3>
+                  <p className="text-sm text-[#94A3B8] leading-relaxed">
+                    {language === 'en' 
+                      ? 'I am currently designing and building this section to showcase exciting new content. Direct access is disabled until it goes live, but stay tuned!'
+                      : 'Saya sedang merancang dan membangun bagian ini untuk menampilkan konten baru yang menarik. Akses penuh dinonaktifkan sementara waktu.'
+                    }
+                  </p>
+                </div>
+                <Link
+                  to="/library"
+                  className="btn btn-secondary inline-flex items-center space-x-2 text-amber-400 border-amber-500/30 hover:bg-amber-500/10 z-10"
+                >
+                  <span>{language === 'en' ? 'Preview Section' : 'Pratinjau Seksi'}</span>
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {featuredBooks.map((book) => (
+                    <BookCard key={book.id} book={book} />
+                  ))}
+                </div>
 
-            <div className="text-center mt-12">
-              <Link
-                to="/library"
-                className="btn btn-primary inline-flex items-center space-x-2"
-              >
-                <span>{t('home.browseLibrary', language)}</span>
-                <ChevronRight className="w-4 h-4" />
-              </Link>
-            </div>
+                <div className="text-center mt-12">
+                  <Link
+                    to="/library"
+                    className="btn btn-primary inline-flex items-center space-x-2"
+                  >
+                    <span>{t('home.browseLibrary', language)}</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </section>

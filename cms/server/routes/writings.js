@@ -1,13 +1,10 @@
 import { Router } from 'express';
+import { ObjectId } from 'mongodb';
 import { authMiddleware } from '../middleware/auth.js';
 import { supabase } from '../config/supabase.js';
 import { queueAutosave } from '../utils/autosaveQueue.js';
-import { dualWrite, dualDelete, syncMongoToSupabase } from '../utils/dataSync.js';
-
-async function isSectionEnabled(db, sectionKey) {
-  const settings = await db.collection('settings').findOne({ key: 'settings' });
-  return settings?.sections?.[sectionKey]?.enabled !== false;
-}
+import { dualWrite, syncMongoToSupabase } from '../utils/dataSync.js';
+import { isSectionEnabled } from '../utils/settingsCache.js';
 
 // Helper: try supabase, fall back to mongo on any error
 async function trySupabase(supabaseFn, mongoFn) {
@@ -143,12 +140,13 @@ export default function writingsRoutes(db) {
         const { data, error } = await supabase
           .from('artikel')
           .select('*')
+          .neq('status', 'deleted')
           .order('updatedAt', { ascending: false });
         if (error) throw error;
         return data.map(d => parseSupabaseJson({ ...d, _id: d._id }));
       },
       async () => {
-        const items = await fallbackCol.find().sort({ updatedAt: -1, createdAt: -1, date: -1 }).toArray();
+        const items = await fallbackCol.find({ status: { $ne: 'deleted' } }).sort({ updatedAt: -1, createdAt: -1, date: -1 }).toArray();
         // Apply same transformation for consistency
         return items.map(d => parseSupabaseJson({ ...d, _id: d._id }));
       }
@@ -281,14 +279,38 @@ export default function writingsRoutes(db) {
 
   router.delete('/:id', authMiddleware, async (req, res) => {
     try {
-      // Dual-delete from both MongoDB and Supabase
-      const deleteResult = await dualDelete(db, 'writings', 'artikel', req.params.id);
-      
-      if (!deleteResult.success) {
-        return res.status(404).json({ error: 'Not found' });
+      const lookupId = req.params.id;
+      const mongoId = new ObjectId(lookupId);
+
+      const existing = await fallbackCol.findOne({ _id: mongoId });
+      if (!existing) {
+        return res.status(404).json({ error: 'Writing not found' });
       }
 
-      res.json({ message: 'Deleted', deleted: deleteResult.deleted });
+      const updateData = {
+        ...existing,
+        status: 'deleted',
+        visible: false,
+        deletedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // 1. Update MongoDB by _id
+      await fallbackCol.updateOne({ _id: mongoId }, { $set: updateData });
+
+      // 2. Update Supabase by 'id' field (the client-side slug string)
+      if (supabase) {
+        try {
+          const cleaned = stripForSupabase(updateData);
+          await supabase
+            .from('artikel')
+            .upsert(cleaned, { onConflict: 'id' });
+        } catch (err) {
+          console.warn('[writings] Supabase soft-delete update failed:', err.message);
+        }
+      }
+
+      res.json({ message: 'Deleted' });
     } catch (error) {
       console.error('DELETE /writings/:id error:', error);
       res.status(500).json({ error: error.message });

@@ -7,6 +7,7 @@ import { useAutoFixLanguage } from '../hooks/useAutoFixLanguage';
 import { resolveLocalizedText, setLocalizedText, type LocalizedTextValue } from '../lib/localized';
 import { TranslationButtonGroup } from './TranslationButtonGroup';
 import { TranslationStatusBadge } from './TranslationStatusBadge';
+import { api } from '../lib/api';
 
 interface Project {
   _id?: string;
@@ -44,7 +45,18 @@ interface ProjectSidebarProps {
   sectionEnabled?: boolean;
 }
 
-const categories = ['signal-processing', 'control', 'data-analysis'];
+interface CategoryItem {
+  value: string;
+  label: string | { en: string; id: string };
+  enabled?: boolean;
+}
+
+const DEFAULT_CATEGORIES: CategoryItem[] = [
+  { value: 'signal-processing', label: { en: 'Signal Processing', id: 'Pemrosesan Sinyal' } },
+  { value: 'control', label: { en: 'Control', id: 'Kontrol' } },
+  { value: 'data-analysis', label: { en: 'Data Analysis', id: 'Analisis Data' } },
+];
+
 const devStatuses = [
   { value: 'planning', label: 'Planning', color: 'bg-blue-500' },
   { value: 'ongoing', label: 'Ongoing', color: 'bg-yellow-500' },
@@ -82,6 +94,52 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const [translationStatus, setTranslationStatus] = React.useState<any>(null);
   const { language, setLanguage } = useAutoFixLanguage();
+  const [categoriesList, setCategoriesList] = React.useState<CategoryItem[]>(DEFAULT_CATEGORIES);
+
+  React.useEffect(() => {
+    let active = true;
+    api.get('/api/categories?section=projects')
+      .then((data: any) => {
+        if (!active) return;
+        if (Array.isArray(data)) {
+          const serverCats = data.map((item: any) => ({
+            value: item.value,
+            label: item.label,
+            enabled: item.enabled !== false,
+          }));
+
+          const mergedMap = new Map<string, CategoryItem>();
+          DEFAULT_CATEGORIES.forEach(c => mergedMap.set(c.value, c));
+          
+          serverCats.forEach(c => {
+            if (c.enabled || c.value === project.category) {
+              mergedMap.set(c.value, c);
+            }
+          });
+
+          if (project.category && !mergedMap.has(project.category)) {
+            const formattedLabel = project.category.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            mergedMap.set(project.category, {
+              value: project.category,
+              label: { en: formattedLabel, id: formattedLabel }
+            });
+          }
+
+          setCategoriesList(Array.from(mergedMap.values()));
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch categories:', err);
+      });
+    return () => { active = false; };
+  }, [project.category]);
+
+  const getCategoryLabelText = (label: string | { en: string; id: string }) => {
+    if (typeof label === 'string') return label;
+    if (language === 'id') return label.id || label.en;
+    return label.en || label.id;
+  };
+
   void onSave;
   void isSaving;
   
@@ -389,8 +447,8 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
           onChange={e => onUpdate({ ...project, category: e.target.value })}
           className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
         >
-          {categories.map(c => (
-            <option key={c} value={c}>{c.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</option>
+          {categoriesList.map(c => (
+            <option key={c.value} value={c.value}>{getCategoryLabelText(c.label)}</option>
           ))}
         </select>
       </SidebarCard>
@@ -534,6 +592,7 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
           <TranslationButtonGroup
             postId={project._id}
             contentType="project"
+            currentLanguage={language}
             onTranslationStart={() => {
               // Optional: show loading state
             }}

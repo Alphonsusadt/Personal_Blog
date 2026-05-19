@@ -21,6 +21,7 @@ import translationRoutes from './routes/translation.js';
 import { initQueue } from './utils/autosaveQueue.js';
 import messagesRoutes from './routes/messages.js';
 import { authMiddleware } from './middleware/auth.js';
+import trashRoutes, { run30DayAutoCleanup } from './routes/trash.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -106,6 +107,9 @@ async function start() {
     );
   }
 
+  // Run background 30-day auto-cleanup task
+  run30DayAutoCleanup(db).catch(err => console.error('[Trash Cleanup] Startup cleanup failed:', err));
+
   const app = express();
 
   // Enable gzip/deflate compression for responses
@@ -163,6 +167,7 @@ async function start() {
   app.use('/api/media', mediaRoutes(db));
   app.use('/api/categories', categoriesRoutes(db));
   app.use('/api/messages', messagesRoutes(db));
+  app.use('/api/trash', trashRoutes(db));
 
   // Translation routes (Translate, Hybrid, SmartAI buttons)
   app.use('/api', translationRoutes(db));

@@ -1,11 +1,7 @@
 import { Router } from 'express';
 import { ObjectId } from 'mongodb';
 import { authMiddleware } from '../middleware/auth.js';
-
-async function isSectionEnabled(db, sectionKey) {
-  const settings = await db.collection('settings').findOne({ key: 'settings' });
-  return settings?.sections?.[sectionKey]?.enabled !== false;
-}
+import { isSectionEnabled } from '../utils/settingsCache.js';
 
 export default function projectsRoutes(db) {
   const router = Router();
@@ -45,7 +41,7 @@ export default function projectsRoutes(db) {
 
   // Admin CRUD
   router.get('/', authMiddleware, async (_req, res) => {
-    const items = await col.find().sort({ updatedAt: -1, createdAt: -1, _id: -1 }).toArray();
+    const items = await col.find({ status: { $ne: 'deleted' } }).sort({ updatedAt: -1, createdAt: -1, _id: -1 }).toArray();
     res.json(items);
   });
 
@@ -128,8 +124,12 @@ export default function projectsRoutes(db) {
   });
 
   router.delete('/:id', authMiddleware, async (req, res) => {
-    const result = await col.deleteOne({ _id: new ObjectId(req.params.id) });
-    if (result.deletedCount === 0) return res.status(404).json({ error: 'Not found' });
+    const targetId = new ObjectId(req.params.id);
+    const result = await col.updateOne(
+      { _id: targetId },
+      { $set: { status: 'deleted', visible: false, deletedAt: new Date(), updatedAt: new Date() } }
+    );
+    if (result.matchedCount === 0) return res.status(404).json({ error: 'Not found' });
     res.json({ message: 'Deleted' });
   });
 

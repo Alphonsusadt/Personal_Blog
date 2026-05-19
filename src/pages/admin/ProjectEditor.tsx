@@ -386,7 +386,6 @@ export function ProjectEditor() {
         const current = getExactLocalizedText(prev.content, autoFixLanguage);
         const newText = current + before + after;
         const nextProject = { ...prev, content: setLocalizedText(prev.content, autoFixLanguage, newText) };
-        persistDraftNow(nextProject);
         return nextProject;
       });
       return;
@@ -403,7 +402,6 @@ export function ProjectEditor() {
 
     setProject(prev => {
       const nextProject = { ...prev, content: setLocalizedText(prev.content, autoFixLanguage, newText) };
-      persistDraftNow(nextProject);
       return nextProject;
     });
 
@@ -418,8 +416,14 @@ export function ProjectEditor() {
     const textarea = textareaRef.current;
     if (!textarea) {
       setProject(prev => {
-        const nextProject = { ...prev, content: `${getExactLocalizedText(prev.content, autoFixLanguage)}\n${imageMarkdown}\n` };
-        persistDraftNow(nextProject);
+        const nextProject = {
+          ...prev,
+          content: setLocalizedText(
+            prev.content,
+            autoFixLanguage,
+            `${getExactLocalizedText(prev.content, autoFixLanguage)}\n${imageMarkdown}\n`
+          )
+        };
         return nextProject;
       });
       return;
@@ -429,9 +433,15 @@ export function ProjectEditor() {
     const end = textarea.selectionEnd;
     const text = textarea.value;
     const newText = `${text.substring(0, start)}${imageMarkdown}${text.substring(end)}`;
+    
+    // Update textarea directly FIRST for instant feedback
+    textarea.value = newText;
+
     setProject(prev => {
-      const nextProject = { ...prev, content: newText };
-      persistDraftNow(nextProject);
+      const nextProject = {
+        ...prev,
+        content: setLocalizedText(prev.content, autoFixLanguage, newText)
+      };
       return nextProject;
     });
 
@@ -440,15 +450,23 @@ export function ProjectEditor() {
       const cursorPos = start + imageMarkdown.length;
       textarea.selectionStart = cursorPos;
       textarea.selectionEnd = cursorPos;
-    });
+    }, 0);
   };
 
   const insertLinkMarkdown = (linkMarkdown: string) => {
     const textarea = textareaRef.current;
     if (!textarea) {
       setProject(prev => {
-        const nextProject = { ...prev, content: `${getExactLocalizedText(prev.content, autoFixLanguage)}${getExactLocalizedText(prev.content, autoFixLanguage) ? '\n' : ''}${linkMarkdown}` };
-        persistDraftNow(nextProject);
+        const nextProject = {
+          ...prev,
+          content: setLocalizedText(
+            prev.content,
+            autoFixLanguage,
+            `${getExactLocalizedText(prev.content, autoFixLanguage)}${
+              getExactLocalizedText(prev.content, autoFixLanguage) ? '\n' : ''
+            }${linkMarkdown}`
+          )
+        };
         return nextProject;
       });
       return;
@@ -458,9 +476,15 @@ export function ProjectEditor() {
     const end = textarea.selectionEnd;
     const text = textarea.value;
     const newText = `${text.substring(0, start)}${linkMarkdown}${text.substring(end)}`;
+    
+    // Update textarea directly FIRST for instant feedback
+    textarea.value = newText;
+
     setProject(prev => {
-      const nextProject = { ...prev, content: newText };
-      persistDraftNow(nextProject);
+      const nextProject = {
+        ...prev,
+        content: setLocalizedText(prev.content, autoFixLanguage, newText)
+      };
       return nextProject;
     });
 
@@ -716,7 +740,7 @@ export function ProjectEditor() {
                 onInsertImage={insertImageMarkdown}
                 onOpenImageDialog={() => setImageDialogOpen(true)}
                 onOpenLinkDialog={() => setLinkDialogOpen(true)}
-                onOpenAssetReuser={project.contentLanguage === 'bilingual' ? () => setAssetReuserOpen(true) : undefined}
+                onOpenAssetReuser={() => setAssetReuserOpen(true)}
               />
 
               <div className="flex items-center gap-2">

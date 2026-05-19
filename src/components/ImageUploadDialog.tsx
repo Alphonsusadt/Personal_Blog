@@ -116,7 +116,7 @@ export function ImageUploadDialog({
       formData.append('altText', altText);
 
       // Upload to server
-      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
       const uploadResponse = await fetch(`${apiBaseUrl}/api/media/upload`, {
         method: 'POST',
         body: formData,

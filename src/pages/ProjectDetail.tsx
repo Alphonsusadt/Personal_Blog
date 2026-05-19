@@ -91,6 +91,13 @@ async function renderMarkdown(content: string): Promise<string> {
   const katex = await getKatex();
   let html = content;
 
+  // Process images first
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => {
+    const safeAlt = alt.replace(/"/g, '&quot;');
+    const safeUrl = url.replace(/"/g, '&quot;');
+    return `<img src="${safeUrl}" alt="${safeAlt}" class="my-6 rounded-[16px] max-w-full h-auto border border-hairline block mx-auto" onerror="this.onerror=null; this.src='/placeholder-image.svg'; this.classList.add('opacity-50');" loading="lazy" />`;
+  });
+
   // Process block LaTeX equations ($$...$$)
   html = html.replace(/\$\$([\s\S]*?)\$\$/g, (_, tex) => {
     try {
@@ -122,7 +129,7 @@ async function renderMarkdown(content: string): Promise<string> {
   // Process markdown links
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">$1</a>');
 
-  html = html.replace(/^(?!<[hul]|<div|<li|<a|```)([\w\S].*)$/gm, '<p class="body text-ink opacity-80 leading-relaxed mb-4">$1</p>');
+  html = html.replace(/^(?!<[hul]|<div|<li|<a|<img|```)([\w\S].*)$/gm, '<p class="body text-ink opacity-80 leading-relaxed mb-4">$1</p>');
 
   // Embed YouTube videos from links and bare URLs
   html = embedYouTube(html);

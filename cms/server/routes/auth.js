@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET } from '../middleware/auth.js';
+import { JWT_SECRET, authMiddleware } from '../middleware/auth.js';
 
 export default function authRoutes(db) {
   const router = Router();
@@ -30,17 +30,26 @@ export default function authRoutes(db) {
     }
   });
 
-  router.post('/change-password', async (req, res) => {
+  router.post('/change-password', authMiddleware, async (req, res) => {
     try {
       const { username, oldPassword, newPassword } = req.body;
+
+      if (req.user.username !== username) {
+        return res.status(403).json({ error: 'You can only change your own password' });
+      }
+
       const user = await db.collection('users').findOne({ username });
       if (!user) return res.status(404).json({ error: 'User not found' });
 
       const valid = await bcrypt.compare(oldPassword, user.password);
       if (!valid) return res.status(401).json({ error: 'Wrong current password' });
 
+      if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({ error: 'New password must be at least 6 characters' });
+      }
+
       const hashed = await bcrypt.hash(newPassword, 10);
-      await db.collection('users').updateOne({ _id: user._id }, { $set: { password: hashed } });
+      await db.collection('users').updateOne({ _id: user._id }, { $set: { password: hashed, updatedAt: new Date() } });
       res.json({ message: 'Password updated' });
     } catch (err) {
       res.status(500).json({ error: 'Server error' });

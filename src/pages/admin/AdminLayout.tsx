@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../../lib/api';
 import {
-  LayoutDashboard, FolderKanban, PenLine, BookOpen, UserCircle, Home, Settings, LogOut, Menu, X, ChevronRight, Tags, Mail
+  LayoutDashboard, FolderKanban, PenLine, BookOpen, UserCircle, Home, Settings, LogOut, Menu, X, ChevronRight, Tags, Mail, Trash2
 } from 'lucide-react';
 
 const sidebarItems = [
@@ -15,6 +15,7 @@ const sidebarItems = [
   { path: '/admin/home', label: 'Home Page', icon: Home },
   { path: '/admin/messages', label: 'Messages', icon: Mail },
   { path: '/admin/settings', label: 'Settings', icon: Settings },
+  { path: '/admin/trash', label: 'Trash Bin', icon: Trash2 },
 ];
 
 export function AdminLayout() {

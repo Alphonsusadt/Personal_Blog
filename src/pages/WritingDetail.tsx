@@ -90,7 +90,7 @@ async function renderMarkdown(content: string): Promise<string> {
   html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => {
     const safeAlt = alt.replace(/"/g, '&quot;');
     const safeUrl = url.replace(/"/g, '&quot;');
-    return `<img src="${safeUrl}" alt="${safeAlt}" class="my-6 rounded-[16px] max-w-full h-auto border border-hairline" onerror="this.onerror=null; this.src='/placeholder-image.svg'; this.classList.add('opacity-50');" loading="lazy" />`;
+    return `<img src="${safeUrl}" alt="${safeAlt}" class="my-6 rounded-[16px] max-w-full h-auto border border-hairline block mx-auto" onerror="this.onerror=null; this.src='/placeholder-image.svg'; this.classList.add('opacity-50');" loading="lazy" />`;
   });
 
   // Process block LaTeX equations ($$...$$)

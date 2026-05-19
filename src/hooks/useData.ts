@@ -3,7 +3,7 @@ import { projects as staticProjects, type Project } from '../data/projects';
 import { writings as staticWritings, type Writing } from '../data/writings';
 import { books as staticBooks, type Book } from '../data/library';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
 async function fetchPublic<T>(path: string, fallback: T[]): Promise<T[]> {
   try {

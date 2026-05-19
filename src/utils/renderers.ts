@@ -1,7 +1,7 @@
 let katexModule: typeof import('katex') | null = null;
 let mermaidModule: typeof import('mermaid') | null = null;
 let mermaidInitialized = false;
-let prismModule: typeof import('prismjs') | null = null;
+let prismModule: any = null;
 
 async function getKatex() {
   if (!katexModule) katexModule = await import('katex');
@@ -53,30 +53,50 @@ async function getMermaid() {
 
 async function getPrism() {
   if (!prismModule) {
+    // @ts-ignore
     prismModule = await import('prismjs');
     await Promise.all([
+      // @ts-ignore
       import('prismjs/components/prism-markup-templating'),
+      // @ts-ignore
       import('prismjs/components/prism-javascript'),
+      // @ts-ignore
       import('prismjs/components/prism-typescript'),
+      // @ts-ignore
       import('prismjs/components/prism-python'),
+      // @ts-ignore
       import('prismjs/components/prism-css'),
+      // @ts-ignore
       import('prismjs/components/prism-json'),
+      // @ts-ignore
       import('prismjs/components/prism-bash'),
+      // @ts-ignore
       import('prismjs/components/prism-markup'),
+      // @ts-ignore
       import('prismjs/components/prism-c'),
+      // @ts-ignore
       import('prismjs/components/prism-cpp'),
+      // @ts-ignore
       import('prismjs/components/prism-java'),
+      // @ts-ignore
       import('prismjs/components/prism-matlab'),
+      // @ts-ignore
       import('prismjs/components/prism-sql'),
+      // @ts-ignore
       import('prismjs/components/prism-csharp'),
+      // @ts-ignore
       import('prismjs/components/prism-go'),
+      // @ts-ignore
       import('prismjs/components/prism-rust'),
+      // @ts-ignore
       import('prismjs/components/prism-php'),
+      // @ts-ignore
       import('prismjs/components/prism-ruby'),
+      // @ts-ignore
       import('prismjs/components/prism-yaml'),
     ]);
   }
-  return prismModule.default;
+  return prismModule;
 }
 
 const LANG_MAP: Record<string, string> = {
@@ -150,7 +170,7 @@ export async function renderLaTeX(content: string): Promise<string> {
 
 export async function renderMermaid(content: string): Promise<string> {
   const mermaid = await getMermaid();
-  const mermaidRegex = /```mermaid\n([\s\S]*?)\n```/g;
+  const mermaidRegex = /```mermaid\r?\n([\s\S]*?)\r?\n```/g;
   const matches = [...content.matchAll(mermaidRegex)];
 
   for (const match of matches) {
@@ -181,11 +201,11 @@ export async function renderContent(content: string): Promise<string> {
 
 /** Highlight code blocks with Prism.js and wrap in styled HTML using table layout for alignment */
 async function renderCodeBlocks(content: string): Promise<string> {
-  const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
+  const codeBlockRegex = /```(\w*)\r?\n([\s\S]*?)```/g;
   const matches = [...content.matchAll(codeBlockRegex)];
   if (matches.length === 0) return content;
 
-  let Prism: typeof import('prismjs').default | null = null;
+  let Prism: any = null;
   try {
     Prism = await getPrism();
   } catch (e) {
@@ -257,7 +277,7 @@ export function markdownToHtml(content: string): string {
   content = content.replace(/^# (.*$)/gim, '<h1 class="text-3xl font-bold mt-10 mb-6">$1</h1>');
 
   // Images - render before links to prevent conflicts
-  content = content.replace(/!\[([^\]]*)\]\(([^\)]+)\)/g, '<img src="$2" alt="$1" class="max-w-full h-auto rounded-lg my-4 shadow-md" loading="lazy" />');
+  content = content.replace(/!\[([^\]]*)\]\(([^\)]+)\)/g, '<img src="$2" alt="$1" class="max-w-full h-auto rounded-lg my-4 shadow-md block mx-auto" loading="lazy" />');
 
   // Bold
   content = content.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
@@ -273,7 +293,7 @@ export function markdownToHtml(content: string): string {
 
   // Code blocks are now handled by renderCodeBlocks() before this function runs.
   // This regex only catches any remaining code blocks without language identifiers:
-  content = content.replace(/```\n([\s\S]*?)```/g, '<pre class="bg-[#F1F5F9] dark:bg-[#1E293B] p-4 rounded-lg overflow-x-auto mono-font text-sm my-4"><code>$1</code></pre>');
+  content = content.replace(/```\r?\n([\s\S]*?)```/g, '<pre class="bg-[#F1F5F9] dark:bg-[#1E293B] p-4 rounded-lg overflow-x-auto mono-font text-sm my-4"><code>$1</code></pre>');
 
   // Inline code
   content = content.replace(/`([^`]+)`/g, '<code class="bg-[#F1F5F9] dark:bg-[#1E293B] px-1.5 py-0.5 rounded text-sm mono-font">$1</code>');

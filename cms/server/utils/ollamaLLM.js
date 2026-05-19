@@ -18,7 +18,7 @@ export async function isOllamaAvailable() {
   try {
     const response = await fetch(`${baseURL}/api/tags`, {
       method: 'GET',
-      timeout: 2000,
+      signal: AbortSignal.timeout(2000),
     });
     return response.ok;
   } catch (error) {
@@ -62,7 +62,7 @@ export async function callOllamaLLM(text, systemPrompt, model = 'llama2:7b') {
         temperature: 0.7,
         top_p: 0.95,
       }),
-      timeout: 60000, // Ollama can be slow locally
+      signal: AbortSignal.timeout(60000), // Ollama can be slow locally
     });
 
     if (!response.ok) {
@@ -127,7 +127,7 @@ export async function pullOllamaModel(model) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: model }),
-      timeout: 300000, // 5 min timeout for download
+      signal: AbortSignal.timeout(300000), // 5 min timeout for download
     });
 
     if (!response.ok) {
@@ -151,7 +151,7 @@ export async function checkOllamaHealth() {
   try {
     const response = await fetch(`${baseURL}/api/tags`, {
       method: 'GET',
-      timeout: 3000,
+      signal: AbortSignal.timeout(3000),
     });
 
     if (!response.ok) {

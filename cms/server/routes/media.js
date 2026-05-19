@@ -48,7 +48,7 @@ async function persistUpload(db, file, altText, uploadedBy) {
     };
   }
 
-  const baseUrl = process.env.PUBLIC_URL || 'http://localhost:5000';
+  const baseUrl = process.env.PUBLIC_URL || `http://localhost:${process.env.CMS_PORT || 5000}`;
   let imageUrl = `${baseUrl}/uploads/${file.filename}`;
   let finalThumbUrl = '';
   let isCloudinary = false;
@@ -188,7 +188,7 @@ export default function mediaRoutes(db) {
    *     uploadedAt: string
    *   }
    */
-  router.post('/upload', upload.single('file'), async (req, res) => {
+  router.post('/upload', authMiddleware, upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({
@@ -242,7 +242,7 @@ export default function mediaRoutes(db) {
    *     ]
    *   }
    */
-  router.post('/batch-upload', upload.array('files', 10), async (req, res) => {
+  router.post('/batch-upload', authMiddleware, upload.array('files', 10), async (req, res) => {
     try {
       if (!req.files || req.files.length === 0) {
         return res.status(400).json({
@@ -290,7 +290,7 @@ export default function mediaRoutes(db) {
    *   - offset?: number (default: 0)
    *   - sort?: 'recent' | 'oldest' (default: 'recent')
    */
-  router.get('/list', async (req, res) => {
+  router.get('/list', authMiddleware, async (req, res) => {
     try {
       const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
       const offset = Math.max(parseInt(req.query.offset) || 0, 0);
@@ -338,7 +338,7 @@ export default function mediaRoutes(db) {
    * DELETE /api/media/:filename
    * Delete uploaded image
    */
-  router.delete('/:filename', async (req, res) => {
+  router.delete('/:filename', authMiddleware, async (req, res) => {
     try {
       const { filename } = req.params;
 

@@ -10,9 +10,9 @@ export function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [sections, setSections] = useState({
-    writings: true,
-    projects: true,
-    books: true,
+    writings: { enabled: true, status: 'visible' },
+    projects: { enabled: true, status: 'visible' },
+    books: { enabled: true, status: 'visible' },
   });
   const location = useLocation();
   const { language, setLanguage } = useSiteLanguage();
@@ -21,14 +21,27 @@ export function Navigation() {
     api.getPublicSettings()
       .then((settings: any) => {
         setSections({
-          writings: settings?.sections?.writings?.enabled !== false,
-          projects: settings?.sections?.projects?.enabled !== false,
-          books: settings?.sections?.books?.enabled !== false,
+          writings: {
+            enabled: settings?.sections?.writings?.status ? settings.sections.writings.status !== 'hidden' : settings?.sections?.writings?.enabled !== false,
+            status: settings?.sections?.writings?.status || (settings?.sections?.writings?.enabled !== false ? 'visible' : 'hidden')
+          },
+          projects: {
+            enabled: settings?.sections?.projects?.status ? settings.sections.projects.status !== 'hidden' : settings?.sections?.projects?.enabled !== false,
+            status: settings?.sections?.projects?.status || (settings?.sections?.projects?.enabled !== false ? 'visible' : 'hidden')
+          },
+          books: {
+            enabled: settings?.sections?.books?.status ? settings.sections.books.status !== 'hidden' : settings?.sections?.books?.enabled !== false,
+            status: settings?.sections?.books?.status || (settings?.sections?.books?.enabled !== false ? 'visible' : 'hidden')
+          },
         });
       })
       .catch(() => {
         // If settings fail to load, default to showing all nav items.
-        setSections({ writings: true, projects: true, books: true });
+        setSections({
+          writings: { enabled: true, status: 'visible' },
+          projects: { enabled: true, status: 'visible' },
+          books: { enabled: true, status: 'visible' },
+        });
       });
   }, []);
 
@@ -43,12 +56,12 @@ export function Navigation() {
 
   const navItems = useMemo(() => {
     const items = [
-      { path: '/', label: t('nav.home', language) },
-      { path: '/engineering', label: t('nav.engineering', language), enabled: sections.projects },
-      { path: '/writings', label: t('nav.writings', language), enabled: sections.writings },
-      { path: '/library', label: t('nav.library', language), enabled: sections.books },
-      { path: '/about', label: t('nav.about', language) },
-      { path: '/contact', label: t('nav.contact', language) },
+      { path: '/', label: t('nav.home', language), isDev: false, enabled: true },
+      { path: '/engineering', label: t('nav.engineering', language), isDev: sections.projects.status === 'development', enabled: sections.projects.status !== 'hidden' },
+      { path: '/writings', label: t('nav.writings', language), isDev: sections.writings.status === 'development', enabled: sections.writings.status !== 'hidden' },
+      { path: '/library', label: t('nav.library', language), isDev: sections.books.status === 'development', enabled: sections.books.status !== 'hidden' },
+      { path: '/about', label: t('nav.about', language), isDev: false, enabled: true },
+      { path: '/contact', label: t('nav.contact', language), isDev: false, enabled: true },
     ];
     return items.filter((item) => item.enabled !== false);
   }, [sections.books, sections.projects, sections.writings, language]);
@@ -77,12 +90,17 @@ export function Navigation() {
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  'nav-link',
+                  'nav-link flex items-center gap-1.5',
                   location.pathname === item.path && 'text-primary font-[540]'
                 )}
                 onClick={scrollPageToTop}
               >
-                {item.label}
+                <span>{item.label}</span>
+                {item.isDev && (
+                  <span className="text-[9px] tracking-wide uppercase px-1.5 py-0.5 rounded font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/20 leading-none">
+                    Dev
+                  </span>
+                )}
               </Link>
             ))}
 
@@ -189,7 +207,7 @@ export function Navigation() {
                   key={item.path}
                   to={item.path}
                   className={cn(
-                    'nav-link py-2 text-[20px]',
+                    'nav-link py-2 text-[20px] flex items-center gap-2',
                     location.pathname === item.path && 'text-primary font-[540]'
                   )}
                   onClick={() => {
@@ -197,7 +215,12 @@ export function Navigation() {
                     setIsMenuOpen(false);
                   }}
                 >
-                  {item.label}
+                  <span>{item.label}</span>
+                  {item.isDev && (
+                    <span className="text-[10px] tracking-wide uppercase px-1.5 py-0.5 rounded font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/20 leading-none">
+                      Dev
+                    </span>
+                  )}
                 </Link>
               ))}
               

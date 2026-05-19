@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Navigation } from './components/Navigation';
 import { Footer } from './components/Footer';
 import { PageLoader } from './components/PageLoader';
+import { SectionGuard } from './components/SectionGuard';
 
 const Home = lazy(() => import('./pages/Home').then(m => ({ default: m.Home })));
 const Engineering = lazy(() => import('./pages/Engineering').then(m => ({ default: m.Engineering })));
@@ -28,6 +29,7 @@ const HomeManager = lazy(() => import('./pages/admin/HomeManager').then(m => ({ 
 const SettingsManager = lazy(() => import('./pages/admin/SettingsManager').then(m => ({ default: m.SettingsManager })));
 const CategoriesManager = lazy(() => import('./pages/admin/CategoriesManager').then(m => ({ default: m.CategoriesManager })));
 const MessagesManager = lazy(() => import('./pages/admin/MessagesManager').then(m => ({ default: m.MessagesManager })));
+const TrashManager = lazy(() => import('./pages/admin/TrashManager').then(m => ({ default: m.TrashManager })));
 
 function ScrollToTop() {
   const location = useLocation();
@@ -48,12 +50,12 @@ function PublicLayout() {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/engineering" element={<Engineering />} />
-            <Route path="/engineering/:id" element={<ProjectDetail />} />
-            <Route path="/writings" element={<Writings />} />
-            <Route path="/writings/:id" element={<WritingDetail />} />
-            <Route path="/library" element={<Library />} />
-            <Route path="/library/:id" element={<BookDetail />} />
+            <Route path="/engineering" element={<SectionGuard sectionKey="projects"><Engineering /></SectionGuard>} />
+            <Route path="/engineering/:id" element={<SectionGuard sectionKey="projects"><ProjectDetail /></SectionGuard>} />
+            <Route path="/writings" element={<SectionGuard sectionKey="writings"><Writings /></SectionGuard>} />
+            <Route path="/writings/:id" element={<SectionGuard sectionKey="writings"><WritingDetail /></SectionGuard>} />
+            <Route path="/library" element={<SectionGuard sectionKey="books"><Library /></SectionGuard>} />
+            <Route path="/library/:id" element={<SectionGuard sectionKey="books"><BookDetail /></SectionGuard>} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
           </Routes>
@@ -84,6 +86,7 @@ export function App() {
             <Route path="settings" element={<SettingsManager />} />
             <Route path="categories" element={<CategoriesManager />} />
             <Route path="messages" element={<MessagesManager />} />
+            <Route path="trash" element={<TrashManager />} />
           </Route>
 
           {/* Public Routes */}

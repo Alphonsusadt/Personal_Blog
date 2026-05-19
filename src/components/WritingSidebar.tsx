@@ -7,6 +7,7 @@ import { useAutoFixLanguage } from '../hooks/useAutoFixLanguage';
 import { resolveLocalizedText, setLocalizedText, type LocalizedTextValue } from '../lib/localized';
 import { TranslationButtonGroup } from './TranslationButtonGroup';
 import { TranslationStatusBadge } from './TranslationStatusBadge';
+import { api } from '../lib/api';
 
 interface Writing {
   _id?: string;
@@ -29,6 +30,7 @@ interface Writing {
   metaTitle?: string;
   contentLanguage?: 'en' | 'id' | 'bilingual';
   translationOfId?: string;
+  devStatus?: 'planning' | 'ongoing' | 'completed';
 }
 
 interface WritingSidebarProps {
@@ -41,7 +43,23 @@ interface WritingSidebarProps {
   sectionEnabled?: boolean;
 }
 
-const categories = ['reflections', 'stories', 'fiction'];
+interface CategoryItem {
+  value: string;
+  label: string | { en: string; id: string };
+  enabled?: boolean;
+}
+
+const DEFAULT_CATEGORIES: CategoryItem[] = [
+  { value: 'reflections', label: { en: 'Reflections', id: 'Refleksi' } },
+  { value: 'stories', label: { en: 'Stories', id: 'Cerita' } },
+  { value: 'fiction', label: { en: 'Fiction', id: 'Fiksi' } },
+];
+
+const devStatuses = [
+  { value: 'planning', label: 'Planning', color: 'bg-blue-500' },
+  { value: 'ongoing', label: 'Ongoing', color: 'bg-amber-500' },
+  { value: 'completed', label: 'Completed', color: 'bg-green-500' },
+];
 
 function SidebarCard({
   title,
@@ -74,6 +92,54 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const [translationStatus, setTranslationStatus] = React.useState<any>(null);
   const { language, setLanguage } = useAutoFixLanguage();
+  const [categoriesList, setCategoriesList] = React.useState<CategoryItem[]>(DEFAULT_CATEGORIES);
+
+  const currentDevStatus = devStatuses.find(s => s.value === writing.devStatus) || devStatuses[0];
+
+  React.useEffect(() => {
+    let active = true;
+    api.get('/api/categories?section=writings')
+      .then((data: any) => {
+        if (!active) return;
+        if (Array.isArray(data)) {
+          const serverCats = data.map((item: any) => ({
+            value: item.value,
+            label: item.label,
+            enabled: item.enabled !== false,
+          }));
+
+          const mergedMap = new Map<string, CategoryItem>();
+          DEFAULT_CATEGORIES.forEach(c => mergedMap.set(c.value, c));
+          
+          serverCats.forEach(c => {
+            if (c.enabled || c.value === writing.category) {
+              mergedMap.set(c.value, c);
+            }
+          });
+
+          if (writing.category && !mergedMap.has(writing.category)) {
+            const formattedLabel = writing.category.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            mergedMap.set(writing.category, {
+              value: writing.category,
+              label: { en: formattedLabel, id: formattedLabel }
+            });
+          }
+
+          setCategoriesList(Array.from(mergedMap.values()));
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch categories:', err);
+      });
+    return () => { active = false; };
+  }, [writing.category]);
+
+  const getCategoryLabelText = (label: string | { en: string; id: string }) => {
+    if (typeof label === 'string') return label;
+    if (language === 'id') return label.id || label.en;
+    return label.en || label.id;
+  };
+
   void onSave;
   void isSaving;
   
@@ -261,6 +327,25 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
         </div>
       </SidebarCard>
 
+      {/* Development Status Card */}
+      <SidebarCard title="Development Status" cardKey="devStatus" collapsed={collapsed} onToggle={toggleCard}>
+        <div className="space-y-3">
+          <select
+            value={writing.devStatus || 'planning'}
+            onChange={e => onUpdate({ ...writing, devStatus: e.target.value as 'planning' | 'ongoing' | 'completed' })}
+            className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+          >
+            {devStatuses.map(s => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+          <div className="flex items-center gap-2 p-2 bg-[#0F172A] rounded-lg border border-[#334155]">
+            <span className={`inline-block w-2.5 h-2.5 rounded-full ${currentDevStatus.color}`}></span>
+            <span className="text-xs text-[#94A3B8]">{currentDevStatus.label}</span>
+          </div>
+        </div>
+      </SidebarCard>
+
       {/* Writing Stats */}
       <SidebarCard title="Writing Stats" cardKey="stats" collapsed={collapsed} onToggle={toggleCard}>
         <div className="grid grid-cols-2 gap-2">
@@ -293,8 +378,8 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
           onChange={e => onUpdate({ ...writing, category: e.target.value })}
           className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
         >
-          {categories.map(c => (
-            <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+          {categoriesList.map(c => (
+            <option key={c.value} value={c.value}>{getCategoryLabelText(c.label)}</option>
           ))}
         </select>
       </SidebarCard>
@@ -450,6 +535,7 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
           <TranslationButtonGroup
             postId={writing._id}
             contentType="writing"
+            currentLanguage={language}
             onTranslationStart={() => {
               // Optional: show loading state
             }}

@@ -28,7 +28,7 @@ export async function uploadImage(
   config: UploadConfig = {}
 ): Promise<string> {
   const {
-    apiBaseUrl = process.env.VITE_API_URL || 'http://localhost:5000',
+    apiBaseUrl = process.env.VITE_API_URL || 'http://localhost:5001',
     onProgress,
     onError,
     maxSizeMB = 5,
@@ -299,7 +299,7 @@ export async function sanitizeMarkdown(
   _authToken?: string,
   onProgress?: (progress: number) => void
 ): Promise<string> {
-  const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
   
   return sanitizeContent(markdownContent, {
     apiBaseUrl,

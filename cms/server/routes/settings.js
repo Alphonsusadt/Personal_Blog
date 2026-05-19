@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
-import { invalidateSettingsCache, setCachedSettings } from '../utils/settingsCache.js';
+import { setCachedSettings } from '../utils/settingsCache.js';
 
 function withSectionDefaults(doc = {}) {
   const sections = doc.sections && typeof doc.sections === 'object' ? doc.sections : {};
@@ -9,13 +9,16 @@ function withSectionDefaults(doc = {}) {
     sections: {
       ...sections,
       writings: {
-        enabled: sections.writings?.enabled !== false,
+        enabled: sections.writings?.status ? sections.writings.status !== 'hidden' : (sections.writings?.enabled !== false),
+        status: sections.writings?.status || (sections.writings?.enabled !== false ? 'visible' : 'hidden'),
       },
       projects: {
-        enabled: sections.projects?.enabled !== false,
+        enabled: sections.projects?.status ? sections.projects.status !== 'hidden' : (sections.projects?.enabled !== false),
+        status: sections.projects?.status || (sections.projects?.enabled !== false ? 'visible' : 'hidden'),
       },
       books: {
-        enabled: sections.books?.enabled !== false,
+        enabled: sections.books?.status ? sections.books.status !== 'hidden' : (sections.books?.enabled !== false),
+        status: sections.books?.status || (sections.books?.enabled !== false ? 'visible' : 'hidden'),
       },
     },
   };

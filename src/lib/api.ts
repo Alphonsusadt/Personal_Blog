@@ -5,9 +5,9 @@ export interface PublicSettings {
   footerName?: string;
   siteTitle?: string;
   sections?: {
-    writings?: { enabled?: boolean };
-    projects?: { enabled?: boolean };
-    books?: { enabled?: boolean };
+    writings?: { enabled?: boolean; status?: 'visible' | 'hidden' | 'development' };
+    projects?: { enabled?: boolean; status?: 'visible' | 'hidden' | 'development' };
+    books?: { enabled?: boolean; status?: 'visible' | 'hidden' | 'development' };
   };
 }
 

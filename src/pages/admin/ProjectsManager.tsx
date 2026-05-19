@@ -19,6 +19,7 @@ interface Project {
   publishAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  devStatus?: 'planning' | 'ongoing' | 'completed';
 }
 
 const formatDateTime = (dateStr?: string) => {
@@ -137,7 +138,16 @@ export function ProjectsManager() {
                     <p className="text-[#94A3B8] text-xs line-clamp-1">{resolveLocalizedText(item.description, 'id') || resolveLocalizedText(item.description, 'en')}</p>
                   </td>
                   <td className="px-6 py-4 hidden md:table-cell">
-                    <span className="text-xs bg-[#334155] text-[#94A3B8] px-2 py-1 rounded">{item.category}</span>
+                    <div className="flex flex-col gap-1.5 items-start">
+                      <span className="text-xs bg-[#334155] text-[#94A3B8] px-2.5 py-1 rounded font-medium">{item.category}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold border ${
+                        (item.devStatus || 'planning') === 'completed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                        (item.devStatus || 'planning') === 'ongoing' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                        'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                      }`}>
+                        {(item.devStatus || 'planning') === 'completed' ? 'Completed' : (item.devStatus || 'planning') === 'ongoing' ? 'Ongoing' : 'Planning'}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-6 py-4 hidden lg:table-cell">
                     <div className="text-xs text-[#94A3B8] space-y-1">

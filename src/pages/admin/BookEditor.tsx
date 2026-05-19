@@ -40,6 +40,7 @@ interface Book {
   metaTitle?: string;
   contentLanguage?: 'en' | 'id' | 'bilingual';
   translationOfId?: string;
+  devStatus?: 'planning' | 'ongoing' | 'completed';
 }
 
 const emptyBook: Book = {
@@ -52,6 +53,7 @@ const emptyBook: Book = {
   takeaways: [],
   review: '',
   status: 'draft',
+  devStatus: 'planning',
 };
 
 function hasMeaningfulBookDraft(data: Book): boolean {
@@ -375,7 +377,6 @@ export function BookEditor() {
         const current = getExactLocalizedText(prev.review, autoFixLanguage);
         const newText = current + before + after;
         const nextBook = { ...prev, review: setLocalizedText(prev.review, autoFixLanguage, newText) };
-        persistDraftNow(nextBook);
         return nextBook;
       });
       return;
@@ -392,7 +393,6 @@ export function BookEditor() {
 
     setBook(prev => {
       const nextBook = { ...prev, review: setLocalizedText(prev.review, autoFixLanguage, newText) };
-      persistDraftNow(nextBook);
       return nextBook;
     });
 
@@ -408,7 +408,6 @@ export function BookEditor() {
     if (!textarea) {
       setBook(prev => {
         const nextBook = { ...prev, review: setLocalizedText(prev.review, autoFixLanguage, `${getExactLocalizedText(prev.review, autoFixLanguage)}\n${imageMarkdown}\n`) };
-        persistDraftNow(nextBook);
         return nextBook;
       });
       return;
@@ -420,7 +419,6 @@ export function BookEditor() {
     const newText = `${text.substring(0, start)}${imageMarkdown}${text.substring(end)}`;
     setBook(prev => {
       const nextBook = { ...prev, review: setLocalizedText(prev.review, autoFixLanguage, newText) };
-      persistDraftNow(nextBook);
       return nextBook;
     });
 
@@ -437,7 +435,6 @@ export function BookEditor() {
     if (!textarea) {
       setBook(prev => {
         const nextBook = { ...prev, review: setLocalizedText(prev.review, autoFixLanguage, `${getExactLocalizedText(prev.review, autoFixLanguage)}${getExactLocalizedText(prev.review, autoFixLanguage) ? '\n' : ''}${linkMarkdown}`) };
-        persistDraftNow(nextBook);
         return nextBook;
       });
       return;
@@ -449,7 +446,6 @@ export function BookEditor() {
     const newText = `${text.substring(0, start)}${linkMarkdown}${text.substring(end)}`;
     setBook(prev => {
       const nextBook = { ...prev, review: setLocalizedText(prev.review, autoFixLanguage, newText) };
-      persistDraftNow(nextBook);
       return nextBook;
     });
 
@@ -708,7 +704,7 @@ export function BookEditor() {
                 onInsertImage={insertImageMarkdown}
                 onOpenImageDialog={() => setImageDialogOpen(true)}
                 onOpenLinkDialog={() => setLinkDialogOpen(true)}
-                onOpenAssetReuser={book.contentLanguage === 'bilingual' ? () => setAssetReuserOpen(true) : undefined}
+                onOpenAssetReuser={() => setAssetReuserOpen(true)}
               />
 
               <div className="flex items-center gap-2">

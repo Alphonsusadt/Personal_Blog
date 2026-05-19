@@ -7,6 +7,7 @@ import { useAutoFixLanguage } from '../hooks/useAutoFixLanguage';
 import { resolveLocalizedText, setLocalizedText, type LocalizedTextValue } from '../lib/localized';
 import { TranslationButtonGroup } from './TranslationButtonGroup';
 import { TranslationStatusBadge } from './TranslationStatusBadge';
+import { api } from '../lib/api';
 
 interface Book {
   _id?: string;
@@ -29,6 +30,7 @@ interface Book {
   metaTitle?: string;
   contentLanguage?: 'en' | 'id' | 'bilingual';
   translationOfId?: string;
+  devStatus?: 'planning' | 'ongoing' | 'completed';
 }
 
 interface BookSidebarProps {
@@ -41,7 +43,24 @@ interface BookSidebarProps {
   sectionEnabled?: boolean;
 }
 
-const categories = ['technical', 'biography', 'spiritual', 'philosophy'];
+interface CategoryItem {
+  value: string;
+  label: string | { en: string; id: string };
+  enabled?: boolean;
+}
+
+const DEFAULT_CATEGORIES: CategoryItem[] = [
+  { value: 'technical', label: { en: 'Technical', id: 'Teknis' } },
+  { value: 'biography', label: { en: 'Biography', id: 'Biografi' } },
+  { value: 'spiritual', label: { en: 'Spiritual', id: 'Spiritual' } },
+  { value: 'philosophy', label: { en: 'Philosophy', id: 'Filosofi' } },
+];
+
+const devStatuses = [
+  { value: 'planning', label: 'Planning', color: 'bg-blue-500' },
+  { value: 'ongoing', label: 'Ongoing', color: 'bg-amber-500' },
+  { value: 'completed', label: 'Completed', color: 'bg-green-500' },
+];
 
 function SidebarCard({
   title,
@@ -74,6 +93,54 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, c
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const [translationStatus, setTranslationStatus] = React.useState<any>(null);
   const { language, setLanguage } = useAutoFixLanguage();
+  const [categoriesList, setCategoriesList] = React.useState<CategoryItem[]>(DEFAULT_CATEGORIES);
+
+  const currentDevStatus = devStatuses.find(s => s.value === book.devStatus) || devStatuses[0];
+
+  React.useEffect(() => {
+    let active = true;
+    api.get('/api/categories?section=books')
+      .then((data: any) => {
+        if (!active) return;
+        if (Array.isArray(data)) {
+          const serverCats = data.map((item: any) => ({
+            value: item.value,
+            label: item.label,
+            enabled: item.enabled !== false,
+          }));
+
+          const mergedMap = new Map<string, CategoryItem>();
+          DEFAULT_CATEGORIES.forEach(c => mergedMap.set(c.value, c));
+          
+          serverCats.forEach(c => {
+            if (c.enabled || c.value === book.category) {
+              mergedMap.set(c.value, c);
+            }
+          });
+
+          if (book.category && !mergedMap.has(book.category)) {
+            const formattedLabel = book.category.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            mergedMap.set(book.category, {
+              value: book.category,
+              label: { en: formattedLabel, id: formattedLabel }
+            });
+          }
+
+          setCategoriesList(Array.from(mergedMap.values()));
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch categories:', err);
+      });
+    return () => { active = false; };
+  }, [book.category]);
+
+  const getCategoryLabelText = (label: string | { en: string; id: string }) => {
+    if (typeof label === 'string') return label;
+    if (language === 'id') return label.id || label.en;
+    return label.en || label.id;
+  };
+
   void onSave;
   void isSaving;
   
@@ -277,6 +344,25 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, c
         </div>
       </SidebarCard>
 
+      {/* Development Status Card */}
+      <SidebarCard title="Development Status" cardKey="devStatus" collapsed={collapsed} onToggle={toggleCard}>
+        <div className="space-y-3">
+          <select
+            value={book.devStatus || 'planning'}
+            onChange={e => onUpdate({ ...book, devStatus: e.target.value as 'planning' | 'ongoing' | 'completed' })}
+            className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
+          >
+            {devStatuses.map(s => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+          <div className="flex items-center gap-2 p-2 bg-[#0F172A] rounded-lg border border-[#334155]">
+            <span className={`inline-block w-2.5 h-2.5 rounded-full ${currentDevStatus.color}`}></span>
+            <span className="text-xs text-[#94A3B8]">{currentDevStatus.label}</span>
+          </div>
+        </div>
+      </SidebarCard>
+
       {/* Category Card */}
       <SidebarCard title="Category" cardKey="category" collapsed={collapsed} onToggle={toggleCard}>
         <select
@@ -284,8 +370,8 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, c
           onChange={e => onUpdate({ ...book, category: e.target.value })}
           className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
         >
-          {categories.map(c => (
-            <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+          {categoriesList.map(c => (
+            <option key={c.value} value={c.value}>{getCategoryLabelText(c.label)}</option>
           ))}
         </select>
       </SidebarCard>
@@ -441,6 +527,7 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, c
           <TranslationButtonGroup
             postId={book._id}
             contentType="book"
+            currentLanguage={language}
             onTranslationStart={() => {
               // Optional: show loading state
             }}

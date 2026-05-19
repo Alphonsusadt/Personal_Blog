@@ -7,10 +7,14 @@ import { supabase } from '../config/supabase.js';
 
 const STRIP_FIELDS = ['translationOfId', 'contentLanguage'];
 
-function stripForSupabase(data) {
+function stripForSupabase(tableName, data) {
   const cleaned = { ...data };
   for (const field of STRIP_FIELDS) {
     delete cleaned[field];
+  }
+  // Strip devStatus if not projects table (writings, books) to avoid schema errors on Supabase
+  if (tableName !== 'projects') {
+    delete cleaned.devStatus;
   }
   // Remove _id for insert operations
   delete cleaned._id;
@@ -60,7 +64,7 @@ export async function upsertSupabase(tableName, id, data) {
   }
 
   try {
-    const cleaned = stripForSupabase(data);
+    const cleaned = stripForSupabase(tableName, data);
 
     // Use native Supabase upsert with conflict resolution on 'id' and maybeSingle()
     // to handle both inserts and updates safely, avoiding the fragile PGRST116 single() error.

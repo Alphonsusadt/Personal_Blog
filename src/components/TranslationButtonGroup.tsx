@@ -10,6 +10,7 @@ import { API_BASE } from '../lib/api';
 export function TranslationButtonGroup({
   postId,
   contentType,
+  currentLanguage,
   onTranslationStart,
   onTranslationComplete,
   onError,
@@ -46,7 +47,7 @@ export function TranslationButtonGroup({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('cms_token')}`,
         },
-        body: JSON.stringify({ postId, contentType }),
+        body: JSON.stringify({ postId, contentType, currentLanguage }),
       });
 
       if (!response.ok) {

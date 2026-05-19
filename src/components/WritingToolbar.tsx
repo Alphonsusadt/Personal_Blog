@@ -14,7 +14,7 @@ export function WritingToolbar({ textareaRef, onInsert, onOpenImageDialog, onOpe
     { icon: Italic, label: 'Italic', action: () => onInsert('*', '*') },
     { icon: Underline, label: 'Underline', action: () => onInsert('__', '__') },
     { icon: Heading1, label: 'Heading', action: () => onInsert('## ') },
-    { icon: Code, label: 'Code', action: () => onInsert('`', '`') },
+    { icon: Code, label: 'Code Block', action: () => onInsert('\n```javascript\n', '\n```\n') },
     { icon: Quote, label: 'Quote', action: () => onInsert('> ') },
     { icon: Link, label: 'Link', action: onOpenLinkDialog ? () => onOpenLinkDialog() : () => onInsert('[text](', ')') },
     {
@@ -33,7 +33,6 @@ export function WritingToolbar({ textareaRef, onInsert, onOpenImageDialog, onOpe
           onClick={action}
           onMouseDown={(e) => {
             e.preventDefault();
-            action();
             textareaRef.current?.focus();
           }}
           title={label}
