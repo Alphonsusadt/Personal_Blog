@@ -27,3 +27,7 @@ Thumbs.db
 # Markdown files (Ignore all development/internal docs, keep only README.md at the root)
 **/*.md
 !/README.md
+
+# Uploaded media and icons
+cms/public/uploads/
+
