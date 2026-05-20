@@ -101,19 +101,50 @@ Login menggunakan kredensial yang sudah dikonfigurasi di `cms/.env`:
 
 ---
 
-## 📋 Fitur CMS
+## 📋 Fitur Lengkap CMS & Portal Publik
 
-Setelah login, kamu bisa mengelola:
+Sistem ini didesain sebagai portofolio premium dengan Content Management System (CMS) mandiri yang memiliki fitur-fitur canggih:
 
-| Menu | Fungsi |
-|------|--------|
-| **Dashboard** | Ringkasan statistik konten |
-| **Projects** | Kelola proyek engineering |
-| **Writings** | Kelola artikel/tulisan |
-| **Books** | Kelola ulasan buku |
-| **About Page** | Edit halaman tentang saya |
-| **Home Page** | Edit konten halaman utama |
-| **Settings** | Pengaturan umum website |
+### 🌐 1. Penerjemahan Dwibahasa (Bilingual Translation Engine)
+* **Mesin Multi-Mode**: Mendukung 3 mode penerjemahan canggih:
+  * **Google Translate API**: Cepat, akurat, dan stabil untuk teks dasar.
+  * **Smart AI (DeepSeek)**: Penerjemahan kontekstual cerdas menggunakan model LLM pihak ketiga melalui OpenRouter.
+  * **Hybrid Mode**: Menggabungkan kecepatan Google Translate dengan polesan tata bahasa natural (polishing) oleh LLM AI.
+* **Auto-Detection Arah Bahasa**: Server secara otomatis mendeteksi arah penerjemahan (Indonesia ⇄ Inggris) berdasarkan field konten yang sudah terisi.
+* **Short-Text LLM Bypass**: Menghindari halusinasi AI pada teks pendek seperti judul/tag dengan menerjemahkannya secara presisi lewat Google Translate, sementara teks panjang seperti konten draf tetap dipoles secara mendalam oleh AI.
+* **Sinkronisasi Pra-Translate**: Secara otomatis memicu penyimpanan draf (autosave) sebelum proses translate berjalan, sehingga mencegah hilangnya teks terbaru yang belum sempat terkirim ke server.
+
+### 💾 2. Autosave & Pencegahan Konten Ganda (Anti-Duplication)
+* **Debounced Autosave**: Menyimpan perubahan konten secara cerdas setiap kali pengguna berhenti mengetik selama 6,5 detik tanpa membebani server (memakai debounce 800ms di level input editor).
+* **Idempotensi Rute Baru**: Saat membuat dokumen baru, editor secara transparan dialihkan ke rute edit spesifik `/edit/:id` setelah penyimpanan pertama sukses dilakukan.
+* **Server-Side Idempotence**: Backend secara aktif memfilter permintaan penyimpanan baru dengan mengecek keberadaan slug ID draf yang sama untuk mencegah terjadinya dokumen ganda.
+* **Pemetaan Filter Upsert MongoDB**: Modifikasi penanganan database agar `upsert` MongoDB secara akurat mencari kecocokan data menggunakan `_id` bertipe `ObjectId`, menjamin penyimpanan data yang aman dan cepat.
+
+### 🏷️ 3. Pengelolaan Kategori Dinamis (Dynamic Category Manager)
+* **Custom Category Creator**: Admin bebas membuat, menyortir, mengaktifkan/menonaktifkan kategori baru untuk Proyek, Artikel, maupun Buku.
+* **Penyematan Ikon Kustom**: Mendukung 3 format ikon kategori yang akan langsung dirender secara indah pada kartu publik:
+  * **Lucide Icon**: Cukup ketik nama ikon Lucide (misal: `Terminal`, `Cpu`, `BookOpen`).
+  * **Emoji**: Mendukung karakter emoji langsung (misal: 💻, 📚, 🔬).
+  * **Image URL**: Mendukung URL eksternal atau gambar yang diunggah ke CMS.
+* **Sinkronisasi Cache Instan**: Memperbarui cache memori runtime editor secara langsung dan menghapus cache list publik saat kategori diubah atau postingan dihapus, sehingga data baru langsung tampil di halaman depan tanpa lag.
+
+### 📂 4. Manajemen Konten Lengkap
+* **Dashboard**: Berisi ringkasan statistik jumlah postingan secara keseluruhan.
+* **Engineering Projects**: Portofolio proyek lengkap dengan gambar, deskripsi, tag teknologi, kategori, dan link.
+* **Writings**: Blog personal pendukung markdown dengan perkiraan waktu baca (*read time*).
+* **Books Review**: Review ulasan buku dilengkapi bintang rating dinamis (1-5), detail penulis, sampul buku, dan poin intisari penting (*key takeaways*).
+* **Custom Editors**: Editor visual khusus untuk menyunting konten halaman **Home** (banner hero, perkenalan singkat) dan halaman **About** secara interaktif.
+
+### 🗑️ 5. Trash Bin & Pembersihan Otomatis
+* **Soft Delete**: Item yang dihapus tidak langsung hilang secara permanen melainkan dikirim ke halaman **Trash Manager**.
+* **Auto-Cleanup**: CMS menjalankan fungsi pembersihan otomatis di latar belakang untuk menghapus item di dalam Trash yang sudah berumur lebih dari 30 hari.
+
+### 🛠️ 6. Infrastruktur Pengujian Otomatis (E2E Diagnostic Suite)
+* **Automated Diagnostics**: Menyediakan skrip tes `cms/e2e_diagnostic.js` untuk memvalidasi koneksi MongoDB, login token admin, penulisan data, dan pengetesan endpoint API.
+* **Browser Automation (Puppeteer)**: Menyediakan skrip `cms/test_browser.js` yang menyimulasikan 3 skenario tes secara otomatis pada browser nyata:
+  1. Pembuatan draf konten baru dan keluar langsung tanpa tombol simpan.
+  2. Penerjemahan konten dari Indonesia ke Inggris.
+  3. Penerjemahan konten dari Inggris ke Indonesia.
 
 ---
 
