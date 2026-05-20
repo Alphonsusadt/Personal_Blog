@@ -155,6 +155,11 @@ Sistem ini didesain sebagai portofolio premium dengan Content Management System 
 * **Template Email Profesional**: Tanggapan email dikirimkan menggunakan template HTML yang elegan dengan visualisasi pesan asli dan tanggapan admin yang rapi.
 * **Konfigurasi API**: Menggunakan variabel lingkungan `RESEND_API_KEY` di dalam `cms/.env` untuk keamanan autentikasi pengiriman email.
 
+### ☁️ 8. Integrasi Layanan Cloud (Supabase & Cloudinary)
+* **Supabase (Dual-Write Database)**: Melakukan sinkronisasi data draf, tulisan, ulasan buku, proyek engineering, dan pesan secara real-time dari MongoDB lokal ke tabel database PostgreSQL Supabase di cloud sebagai cadangan data.
+* **Cloudinary (Manajemen Aset Media)**: Unggah file media gambar, sampul ulasan buku, dan ikon kustom secara instan dan aman ke Cloudinary CDN, lengkap dengan pengoptimalan ukuran berkas secara dinamis.
+* **Konfigurasi API Keamanan**: Menggunakan variabel lingkungan (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`) di dalam berkas `.env` lokal untuk keamanan autentikasi.
+
 ---
 
 ## 🔑 Ganti Password Admin
