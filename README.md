@@ -146,6 +146,15 @@ Sistem ini didesain sebagai portofolio premium dengan Content Management System 
   2. Penerjemahan konten dari Indonesia ke Inggris.
   3. Penerjemahan konten dari Inggris ke Indonesia.
 
+### ✉️ 7. Integrasi Layanan Email (Resend.com)
+* **Hubungi Saya (Contact Submission)**: Portal publik menyediakan formulir kontak bagi pengunjung untuk mengirimkan nama, email, subjek, dan pesan.
+* **Filter Status Pesan**: 
+  * Jika pengunjung menyertakan alamat email, status pesan diatur sebagai `pending_reply` (menunggu tanggapan).
+  * Jika tidak menyertakan email, pesan diatur sebagai `read_only` (hanya baca).
+* **Fitur Balas Email Langsung**: Melalui CMS, admin dapat langsung menulis dan mengirimkan tanggapan email kepada pengunjung menggunakan layanan **Resend**.
+* **Template Email Profesional**: Tanggapan email dikirimkan menggunakan template HTML yang elegan dengan visualisasi pesan asli dan tanggapan admin yang rapi.
+* **Konfigurasi API**: Menggunakan variabel lingkungan `RESEND_API_KEY` di dalam `cms/.env` untuk keamanan autentikasi pengiriman email.
+
 ---
 
 ## 🔑 Ganti Password Admin
