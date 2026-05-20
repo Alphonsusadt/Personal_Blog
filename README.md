@@ -30,7 +30,7 @@ JWT_SECRET=isi_dengan_secret_panjang_dan_acak_minimal_32_karakter
 
 # Kredensial login CMS admin
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=ganti_dengan_password_aman_anda
+ADMIN_PASSWORD=ganti_dengan_password_aman
 
 # URI koneksi MongoDB
 MONGODB_URI=mongodb://localhost:27017
@@ -97,7 +97,7 @@ http://localhost:5173/admin/login
 
 Login menggunakan kredensial yang sudah dikonfigurasi di `cms/.env`:
 - **Username:** nilai `ADMIN_USERNAME` (contoh: `admin`)
-- **Password:** nilai `ADMIN_PASSWORD` yang kamu set
+- **Password:** nilai `ADMIN_PASSWORD` yang telah dikonfigurasi
 
 ---
 
