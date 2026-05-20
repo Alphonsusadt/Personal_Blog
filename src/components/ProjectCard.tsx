@@ -1,71 +1,120 @@
-import { ExternalLink, Calendar } from 'lucide-react';
+import { useState } from 'react';
+import { ExternalLink, Calendar, Code } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Project } from '../data/projects';
 import { cn } from '../utils/cn';
 import { resolveLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
+import { getLucideIcon } from '../lib/iconMap';
+import { API_BASE } from '../lib/api';
 
 interface ProjectCardProps {
   project: Project;
   featured?: boolean;
+  categoryIcon?: string;
 }
 
-function CategoryIcon({ category }: { category: Project['category'] }) {
-  if (category === 'signal-processing') {
-    return (
-      <div className="w-16 h-16 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 transition-colors">
-        <svg viewBox="0 0 40 28" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-10 h-7">
-          <polyline
-            points="0,14 6,14 10,4 14,24 18,10 22,18 26,14 34,14 38,14"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-blue-500 dark:text-blue-400"
+function resolveIconSrc(icon: string): string {
+  if (icon.startsWith('/')) return `${API_BASE}${icon}`;
+  if (icon.startsWith('http') && !icon.includes('/uploads/')) {
+    return `${API_BASE}/api/media/icon-proxy?url=${encodeURIComponent(icon)}`;
+  }
+  return icon;
+}
+
+function CategoryIcon({ category, icon }: { category: Project['category']; icon?: string }) {
+  const [imgError, setImgError] = useState(false);
+
+  // If no custom icon is provided, fall back to default hardcoded icons
+  if (!icon) {
+    if (category === 'signal-processing') {
+      return (
+        <div className="w-16 h-16 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 transition-colors">
+          <svg viewBox="0 0 40 28" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-10 h-7">
+            <polyline
+              points="0,14 6,14 10,4 14,24 18,10 22,18 26,14 34,14 38,14"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-blue-500 dark:text-blue-400"
+            />
+          </svg>
+        </div>
+      );
+    }
+    if (category === 'control') {
+      return (
+        <div className="w-16 h-16 rounded-xl bg-green-50 dark:bg-green-900/30 flex items-center justify-center group-hover:bg-green-100 dark:group-hover:bg-green-900/50 transition-colors">
+          <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8">
+            <circle cx="14" cy="14" r="5" stroke="currentColor" strokeWidth="1.8" className="text-green-500 dark:text-green-400" />
+            <path d="M14 4 A10 10 0 0 1 24 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-green-500 dark:text-green-400" />
+            <polyline points="21,10 24,14 20,15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-green-500 dark:text-green-400" />
+            <path d="M14 24 A10 10 0 0 1 4 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-green-500 dark:text-green-400" />
+            <polyline points="7,18 4,14 8,13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-green-500 dark:text-green-400" />
+          </svg>
+        </div>
+      );
+    }
+    if (category === 'data-analysis') {
+      return (
+        <div className="w-16 h-16 rounded-xl bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center group-hover:bg-purple-100 dark:group-hover:bg-purple-900/50 transition-colors">
+          <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8">
+            <rect x="3" y="17" width="5" height="8" rx="1" className="fill-purple-400 dark:fill-purple-500" />
+            <rect x="11" y="11" width="5" height="14" rx="1" className="fill-purple-500 dark:fill-purple-400" />
+            <rect x="19" y="5" width="5" height="20" rx="1" className="fill-purple-600 dark:fill-purple-300" />
+            <line x1="2" y1="25.5" x2="26" y2="25.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-purple-400 dark:text-purple-500" />
+          </svg>
+        </div>
+      );
+    }
+  }
+
+  // If we have a custom icon URL, Emoji, or Lucide name
+  if (icon) {
+    const isUrl = icon.startsWith('http') || icon.startsWith('/');
+    const isEmoji = /\p{Emoji}/u.test(icon) && !icon.startsWith('http') && icon.length <= 4;
+
+    if (isUrl && !imgError) {
+      return (
+        <div className="w-16 h-16 rounded-xl bg-gray-50 dark:bg-gray-900/30 flex items-center justify-center group-hover:bg-gray-100 dark:group-hover:bg-gray-900/50 transition-colors border border-hairline">
+          <img
+            src={resolveIconSrc(icon)}
+            alt=""
+            className="w-8 h-8 object-contain"
+            onError={() => setImgError(true)}
           />
-        </svg>
-      </div>
-    );
+        </div>
+      );
+    }
+    if (isEmoji) {
+      return (
+        <div className="w-16 h-16 rounded-xl bg-gray-50 dark:bg-gray-900/30 flex items-center justify-center group-hover:bg-gray-100 dark:group-hover:bg-gray-900/50 transition-colors border border-hairline">
+          <span style={{ fontSize: 24, lineHeight: 1 }}>{icon}</span>
+        </div>
+      );
+    }
+    const LucideComp = getLucideIcon(icon);
+    if (LucideComp) {
+      return (
+        <div className="w-16 h-16 rounded-xl bg-gray-50 dark:bg-gray-900/30 flex items-center justify-center group-hover:bg-gray-100 dark:group-hover:bg-gray-900/50 transition-colors border border-hairline">
+          <LucideComp className="w-8 h-8 text-ink opacity-80" />
+        </div>
+      );
+    }
   }
-  if (category === 'control') {
-    return (
-      <div className="w-16 h-16 rounded-xl bg-green-50 dark:bg-green-900/30 flex items-center justify-center group-hover:bg-green-100 dark:group-hover:bg-green-900/50 transition-colors">
-        <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8">
-          {/* Control loop / feedback arrow */}
-          <circle cx="14" cy="14" r="5" stroke="currentColor" strokeWidth="1.8" className="text-green-500 dark:text-green-400" />
-          <path d="M14 4 A10 10 0 0 1 24 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-green-500 dark:text-green-400" />
-          <polyline points="21,10 24,14 20,15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-green-500 dark:text-green-400" />
-          <path d="M14 24 A10 10 0 0 1 4 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-green-500 dark:text-green-400" />
-          <polyline points="7,18 4,14 8,13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-green-500 dark:text-green-400" />
-        </svg>
-      </div>
-    );
-  }
-  if (category === 'data-analysis') {
-    return (
-      <div className="w-16 h-16 rounded-xl bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center group-hover:bg-purple-100 dark:group-hover:bg-purple-900/50 transition-colors">
-        <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8">
-          <rect x="3" y="17" width="5" height="8" rx="1" className="fill-purple-400 dark:fill-purple-500" />
-          <rect x="11" y="11" width="5" height="14" rx="1" className="fill-purple-500 dark:fill-purple-400" />
-          <rect x="19" y="5" width="5" height="20" rx="1" className="fill-purple-600 dark:fill-purple-300" />
-          <line x1="2" y1="25.5" x2="26" y2="25.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-purple-400 dark:text-purple-500" />
-        </svg>
-      </div>
-    );
-  }
+
+  // Generic Fallback code brackets
   return (
     <div className="w-16 h-16 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-      <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8">
-        <polyline points="8,10 4,14 8,18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400" />
-        <polyline points="20,10 24,14 20,18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400" />
-        <line x1="16" y1="7" x2="12" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-gray-400" />
-      </svg>
+      <Code className="w-8 h-8 text-gray-400" />
     </div>
   );
 }
 
-export function ProjectCard({ project, featured = false }: ProjectCardProps) {
+
+export function ProjectCard({ project, featured = false, categoryIcon }: ProjectCardProps) {
   const { language } = useSiteLanguage();
   const getCategoryColor = (category: Project['category']) => {
     switch (category) {
@@ -119,7 +168,7 @@ export function ProjectCard({ project, featured = false }: ProjectCardProps) {
               </h3>
             </div>
             <div className="ml-4 flex-shrink-0">
-              <CategoryIcon category={project.category} />
+              <CategoryIcon category={project.category} icon={categoryIcon} />
             </div>
           </div>
 

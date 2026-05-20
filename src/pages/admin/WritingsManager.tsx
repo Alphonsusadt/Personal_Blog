@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, getRuntimeCache, setRuntimeCache } from '../../lib/api';
+import { api, getRuntimeCache, setRuntimeCache, invalidateRuntimeCache } from '../../lib/api';
 import { Plus, Pencil, Trash2, Clock, Calendar, Eye, EyeOff, Filter } from 'lucide-react';
 import { resolveLocalizedText, getTranslationStatus, type LocalizedTextValue } from '../../lib/localized';
 
@@ -69,7 +69,13 @@ export function WritingsManager() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Hapus writing ini?')) return;
-    await api.del(`/api/writings/${id}`); load();
+    await api.del(`/api/writings/${id}`);
+    invalidateRuntimeCache('admin:writings:list');
+    const item = items.find(i => i._id === id);
+    if (item?.id) {
+      invalidateRuntimeCache(`admin:writings:item:${item.id}`);
+    }
+    load();
   };
 
   const handleToggleVisibility = async (item: Writing) => {
@@ -78,6 +84,10 @@ export function WritingsManager() {
       ...item,
       visible: item.visible === false,
     });
+    invalidateRuntimeCache('admin:writings:list');
+    if (item.id) {
+      invalidateRuntimeCache(`admin:writings:item:${item.id}`);
+    }
     load();
   };
 

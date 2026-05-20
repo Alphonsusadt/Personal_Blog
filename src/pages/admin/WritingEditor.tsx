@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api, getRuntimeCache, setRuntimeCache } from '../../lib/api';
+import { api, getRuntimeCache, setRuntimeCache, invalidateRuntimeCache } from '../../lib/api';
 import { WritingToolbar } from '../../components/WritingToolbar';
 import { WritingSidebar } from '../../components/WritingSidebar';
 import { ImageUploadDialog } from '../../components/ImageUploadDialog';
@@ -60,10 +60,13 @@ const emptyWriting: Writing = {
 };
 
 function hasMeaningfulWritingDraft(data: Writing): boolean {
+  const hasTitle = resolveLocalizedText(data.title, 'en').trim() || resolveLocalizedText(data.title, 'id').trim();
+  const hasExcerpt = resolveLocalizedText(data.excerpt, 'en').trim() || resolveLocalizedText(data.excerpt, 'id').trim();
+  const hasContent = resolveLocalizedText(data.content, 'en').trim() || resolveLocalizedText(data.content, 'id').trim();
   return Boolean(
-    resolveLocalizedText(data.title, 'en').trim() ||
-    resolveLocalizedText(data.excerpt, 'en').trim() ||
-    resolveLocalizedText(data.content, 'en').trim() ||
+    hasTitle ||
+    hasExcerpt ||
+    hasContent ||
     data.tags?.length ||
     data.metaDescription?.trim() ||
     data.ogImage?.trim() ||
@@ -102,8 +105,15 @@ export function WritingEditor() {
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingCreateRef = useRef(false);
+  const dbIdRef = useRef<string | undefined>(undefined);
+  const justCreatedRef = useRef(false);
 
   const [writing, setWriting] = useState<Writing>(emptyWriting);
+
+  // Sync dbIdRef with writing._id whenever it changes
+  useEffect(() => {
+    dbIdRef.current = writing._id;
+  }, [writing._id]);
   const [localTitle, setLocalTitle] = useState('');
   const [loading, setLoading] = useState(!!slug);
   const [isSaving, setIsSaving] = useState(false);
@@ -216,15 +226,33 @@ export function WritingEditor() {
     enabled: !loading,
     hasMeaningfulData: hasMeaningfulWritingDraft,
     saveToServer: async (snapshot) => {
-      if (snapshot._id) {
+      const currentDbId = dbIdRef.current || snapshot._id;
+      if (currentDbId) {
         // ATOMIC WRITE via PATCH — only sends changed fields
-        await api.patch(`/api/writings/${snapshot._id}`, snapshot);
+        await api.patch(`/api/writings/${currentDbId}`, { ...snapshot, _id: currentDbId });
+        const updated = { ...snapshot, _id: currentDbId };
+        if (updated.id) {
+          setRuntimeCache(`admin:writings:item:${updated.id}`, updated);
+        }
+        invalidateRuntimeCache('admin:writings:list');
+        setWriting(updated);
+        return updated;
       } else if (!pendingCreateRef.current) {
         pendingCreateRef.current = true;
         const draftId = snapshot.id || createAutosaveDraftId(resolveLocalizedText(snapshot.title, autoFixLanguage), resolveLocalizedText(snapshot.content, autoFixLanguage), 'writing');
         const response = await api.post('/api/writings', { ...snapshot, id: draftId });
-        setWriting(prev => ({ ...prev, _id: response._id }));
-        pendingCreateRef.current = false;
+        if (response._id) {
+          dbIdRef.current = response._id;
+          const updated = { ...snapshot, _id: response._id, id: response.id || draftId };
+          setRuntimeCache(`admin:writings:item:${response.id || draftId}`, updated);
+          invalidateRuntimeCache('admin:writings:list');
+          justCreatedRef.current = true;
+          setWriting(updated);
+          navigate(`/admin/writings/edit/${response.id || draftId}`, { replace: true });
+          pendingCreateRef.current = false;
+          return updated;
+        }
+        // If _id is still undefined, keep pendingCreateRef=true to prevent duplicate POSTs
       }
     },
     localDebounceMs: 800,
@@ -296,6 +324,10 @@ export function WritingEditor() {
   useEffect(() => {
     if (!slug || slug === 'new') {
       setLoading(false);
+      return;
+    }
+    if (justCreatedRef.current) {
+      justCreatedRef.current = false;
       return;
     }
     const cacheKey = `admin:writings:item:${slug}`;
@@ -531,20 +563,31 @@ export function WritingEditor() {
     setIsSaving(true);
     try {
       console.log('Making API call...');
-      if (writing._id) {
-        console.log('Updating existing writing with _id:', writing._id);
-        await api.put(`/api/writings/${writing._id}`, payload);
-        setWriting(payload as Writing);
-        autosave.markAsSaved(payload as Writing);
+      const currentDbId = dbIdRef.current || writing._id;
+      if (currentDbId) {
+        console.log('Updating existing writing with _id:', currentDbId);
+        await api.put(`/api/writings/${currentDbId}`, { ...payload, _id: currentDbId });
+        const updatedWriting = { ...payload, _id: currentDbId } as Writing;
+        if (updatedWriting.id) {
+          setRuntimeCache(`admin:writings:item:${updatedWriting.id}`, updatedWriting);
+        }
+        invalidateRuntimeCache('admin:writings:list');
+        setWriting(updatedWriting);
+        autosave.markAsSaved(updatedWriting);
       } else {
         console.log('Creating new writing...');
         // Create new writing and capture the _id from response
         const response = await api.post('/api/writings', payload);
         console.log('API response:', response);
         // Update state with the _id returned from server
-        const newWriting = { ...payload, _id: response._id };
+        dbIdRef.current = response._id;
+        const newWriting = { ...payload, _id: response._id } as Writing;
+        if (newWriting.id) {
+          setRuntimeCache(`admin:writings:item:${newWriting.id}`, newWriting);
+        }
+        invalidateRuntimeCache('admin:writings:list');
         setWriting(newWriting);
-        autosave.markAsSaved(newWriting as Writing);
+        autosave.markAsSaved(newWriting);
       }
       
       alert('Writing saved successfully!');
@@ -840,6 +883,7 @@ export function WritingEditor() {
                 wordCount={wordCount}
                 characterCount={characterCount}
                 sectionEnabled={writingsSectionEnabled}
+                onBeforeTranslate={autosave.saveNow}
               />
             </div>
           </div>

@@ -253,6 +253,8 @@ export function Home() {
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [allWritings, setAllWritings] = useState<Writing[]>([]);
   const [allBooks, setAllBooks] = useState<Book[]>([]);
+  const [projectCategories, setProjectCategories] = useState<any[]>([]);
+  const [writingCategories, setWritingCategories] = useState<any[]>([]);
   const [homeData, setHomeData] = useState<HomeData>(defaultHomeData);
   const [sectionVisibility, setSectionVisibility] = useState({
     writings: { enabled: true, status: 'visible' as 'visible' | 'hidden' | 'development' },
@@ -308,6 +310,8 @@ export function Home() {
     api.getPublicProjects().then((data: Project[]) => setAllProjects(data)).catch(console.error);
     api.getPublicWritings().then((data: Writing[]) => setAllWritings(data)).catch(console.error);
     api.getPublicBooks().then((data: Book[]) => setAllBooks(data)).catch(console.error);
+    api.getPublicCategories('projects').then(setProjectCategories).catch(console.error);
+    api.getPublicCategories('writings').then(setWritingCategories).catch(console.error);
 
     api.getPublicSettings().then((settings: PublicSettings) => {
       setSettings(settings);
@@ -788,9 +792,16 @@ export function Home() {
             ) : (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {recentProjects.map((project) => (
-                    <ProjectCard key={project.id} project={project} />
-                  ))}
+                  {recentProjects.map((project) => {
+                    const catItem = projectCategories.find(c => c.value === project.category);
+                    return (
+                      <ProjectCard 
+                        key={project.id} 
+                        project={project} 
+                        categoryIcon={catItem?.icon}
+                      />
+                    );
+                  })}
                 </div>
 
                 <div className="text-center mt-12">
@@ -853,9 +864,16 @@ export function Home() {
             ) : (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {recentWritings.map((writing) => (
-                    <WritingCard key={writing.id} writing={writing} />
-                  ))}
+                  {recentWritings.map((writing) => {
+                    const catItem = writingCategories.find(c => c.value === writing.category);
+                    return (
+                      <WritingCard 
+                        key={writing.id} 
+                        writing={writing} 
+                        categoryIcon={catItem?.icon}
+                      />
+                    );
+                  })}
                 </div>
 
                 <div className="text-center mt-12">

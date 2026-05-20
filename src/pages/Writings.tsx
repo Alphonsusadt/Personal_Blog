@@ -2,19 +2,28 @@ import { useState, useMemo, useEffect } from 'react';
 import { Search, BookOpen } from 'lucide-react';
 import { getLucideIcon } from '../lib/iconMap';
 import { WritingCard } from '../components/WritingCard';
-import { api } from '../lib/api';
+import { api, API_BASE } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { resolveLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
 
+function resolveIconSrc(icon: string): string {
+  if (icon.startsWith('/')) return `${API_BASE}${icon}`;
+  if (icon.startsWith('http') && !icon.includes('/uploads/')) {
+    return `${API_BASE}/api/media/icon-proxy?url=${encodeURIComponent(icon)}`;
+  }
+  return icon;
+}
+
 function CategoryIcon({ icon, className, inverted }: { icon: string; className?: string; inverted?: boolean }) {
+  const [imgError, setImgError] = useState(false);
   const isUrl = icon.startsWith('http') || icon.startsWith('/');
   const isEmoji = /\p{Emoji}/u.test(icon) && !icon.startsWith('http') && icon.length <= 4;
 
   const invertClass = inverted ? '[filter:brightness(0)_invert(1)]' : '';
 
-  if (isUrl) return <img src={icon} alt="" className={`object-contain ${invertClass} ${className || ''}`} style={{ width: 16, height: 16 }} />;
+  if (isUrl && !imgError) return <img src={resolveIconSrc(icon)} alt="" className={`object-contain ${invertClass} ${className || ''}`} style={{ width: 16, height: 16 }} onError={() => setImgError(true)} />;
   if (isEmoji) return <span className={className} style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>;
 
   const Comp = getLucideIcon(icon);
@@ -192,9 +201,16 @@ export function Writings() {
 
         {/* Writings Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {filteredWritings.map((writing) => (
-            <WritingCard key={writing.id} writing={writing} />
-          ))}
+          {filteredWritings.map((writing) => {
+            const catItem = dynamicCategories.find(c => c.value === writing.category);
+            return (
+              <WritingCard 
+                key={writing.id} 
+                writing={writing} 
+                categoryIcon={catItem?.icon}
+              />
+            );
+          })}
         </div>
 
         {/* No Results */}

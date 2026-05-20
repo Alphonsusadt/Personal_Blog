@@ -1,4 +1,10 @@
 import 'dotenv/config';
+// Defensively trim env variables to remove any leading/trailing whitespace
+for (const key of Object.keys(process.env)) {
+  if (typeof process.env[key] === 'string') {
+    process.env[key] = process.env[key].trim();
+  }
+}
 import express from 'express';
 import compression from 'compression';
 import cors from 'cors';

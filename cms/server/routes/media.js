@@ -441,5 +441,65 @@ export default function mediaRoutes(db) {
     }
   });
 
+  // ── GET proxy for external icon images (avoids hotlink/CORS blocks) ──
+  // Usage: GET /api/media/icon-proxy?url=https://cdn-icons-png.flaticon.com/...
+  router.get('/icon-proxy', async (req, res) => {
+    const { url } = req.query;
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: 'url query param is required' });
+    }
+
+    const allowedHosts = [
+      'cdn-icons-png.flaticon.com',
+      'cdn.iconscout.com',
+      'cdn.jsdelivr.net',
+    ];
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return res.status(400).json({ error: 'Invalid URL' });
+    }
+    if (!allowedHosts.some((h) => parsedUrl.hostname.endsWith(h) || parsedUrl.hostname === h)) {
+      return res.status(400).json({ error: 'Domain not allowed' });
+    }
+
+    try {
+      const urlHash = crypto.createHash('md5').update(url).digest('hex').slice(0, 12);
+      const ext = parsedUrl.pathname.endsWith('.svg') ? '.svg' : '.png';
+      const localPath = path.join(ICONS_DIR, `${urlHash}${ext}`);
+
+      // Serve from cache if already downloaded
+      try {
+        await fs.access(localPath);
+        const data = await fs.readFile(localPath);
+        const contentType = ext === '.svg' ? 'image/svg+xml' : 'image/png';
+        res.set('Content-Type', contentType);
+        res.set('Cache-Control', 'public, max-age=86400');
+        return res.end(data);
+      } catch { /* not cached */ }
+
+      // Download and cache
+      const response = await fetch(url, {
+        headers: { 'User-Agent': 'AlphonsusCMS/1.0' },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) {
+        return res.status(502).json({ error: `Failed to fetch icon: ${response.status}` });
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      await fs.writeFile(localPath, buffer);
+
+      const contentType = ext === '.svg' ? 'image/svg+xml' : 'image/png';
+      res.set('Content-Type', contentType);
+      res.set('Cache-Control', 'public, max-age=86400');
+      res.end(buffer);
+    } catch (error) {
+      console.error('[icon-proxy] Error:', error.message);
+      res.status(500).json({ error: 'Failed to fetch icon' });
+    }
+  });
+
   return router;
 }

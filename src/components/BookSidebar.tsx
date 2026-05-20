@@ -41,6 +41,7 @@ interface BookSidebarProps {
   wordCount?: number;
   characterCount?: number;
   sectionEnabled?: boolean;
+  onBeforeTranslate?: () => Promise<void>;
 }
 
 interface CategoryItem {
@@ -89,7 +90,7 @@ function SidebarCard({
   );
 }
 
-export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, sectionEnabled = true }: BookSidebarProps) {
+export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, sectionEnabled = true, onBeforeTranslate }: BookSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const [translationStatus, setTranslationStatus] = React.useState<any>(null);
   const { language, setLanguage } = useAutoFixLanguage();
@@ -528,6 +529,7 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, c
             postId={book._id}
             contentType="book"
             currentLanguage={language}
+            onBeforeTranslate={onBeforeTranslate}
             onTranslationStart={() => {
               // Optional: show loading state
             }}

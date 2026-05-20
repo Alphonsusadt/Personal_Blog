@@ -24,5 +24,6 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Deployment Documentation (contains instructions with sensitive keys/information)
-DEPLOYMENT_RENDER.md
+# Markdown files (Ignore all development/internal docs, keep only README.md at the root)
+**/*.md
+!/README.md

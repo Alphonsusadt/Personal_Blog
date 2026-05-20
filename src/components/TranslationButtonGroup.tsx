@@ -14,6 +14,7 @@ export function TranslationButtonGroup({
   onTranslationStart,
   onTranslationComplete,
   onError,
+  onBeforeTranslate,
   disabled = false,
   className = '',
 }) {
@@ -30,11 +31,14 @@ export function TranslationButtonGroup({
     setError(null);
     setResult(null);
 
-    if (onTranslationStart) {
-      onTranslationStart(action);
-    }
-
     try {
+      if (onBeforeTranslate) {
+        await onBeforeTranslate();
+      }
+
+      if (onTranslationStart) {
+        onTranslationStart(action);
+      }
       const endpoint = {
         translate: `${API_BASE}/api/translate`,
         hybrid: `${API_BASE}/api/translate-hybrid`,

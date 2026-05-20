@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api, getRuntimeCache, setRuntimeCache } from '../../lib/api';
+import { api, getRuntimeCache, setRuntimeCache, invalidateRuntimeCache } from '../../lib/api';
 import { ProjectToolbar } from '../../components/ProjectToolbar';
 import { ProjectSidebar } from '../../components/ProjectSidebar';
 import { ImageUploadDialog } from '../../components/ImageUploadDialog';
@@ -62,10 +62,13 @@ const emptyProject: Project = {
 };
 
 function hasMeaningfulProjectDraft(data: Project): boolean {
+  const hasTitle = resolveLocalizedText(data.title, 'en').trim() || resolveLocalizedText(data.title, 'id').trim();
+  const hasDesc = resolveLocalizedText(data.description, 'en').trim() || resolveLocalizedText(data.description, 'id').trim();
+  const hasContent = resolveLocalizedText(data.content, 'en').trim() || resolveLocalizedText(data.content, 'id').trim();
   return Boolean(
-    resolveLocalizedText(data.title, 'en').trim() ||
-    resolveLocalizedText(data.description, 'en').trim() ||
-    resolveLocalizedText(data.content, 'en').trim() ||
+    hasTitle ||
+    hasDesc ||
+    hasContent ||
     data.tags?.length ||
     data.githubUrl?.trim() ||
     data.paperUrl?.trim() ||
@@ -117,7 +120,15 @@ export function ProjectEditor() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const pendingCreateRef = useRef(false);
+  const dbIdRef = useRef<string | undefined>(undefined);
+  const justCreatedRef = useRef(false);
   const [project, setProject] = useState<Project>(emptyProject);
+
+  // Sync dbIdRef with project._id whenever it changes
+  useEffect(() => {
+    dbIdRef.current = project._id;
+  }, [project._id]);
   const [localTitle, setLocalTitle] = useState(''); // Local state for smooth title typing
   const [loading, setLoading] = useState(!!slug);
   const [isSaving, setIsSaving] = useState(false);
@@ -209,16 +220,35 @@ export function ProjectEditor() {
     enabled: !loading,
     hasMeaningfulData: hasMeaningfulProjectDraft,
     saveToServer: async (snapshot) => {
-      if (snapshot._id) {
-        await api.put(`/api/projects/${snapshot._id}`, snapshot);
-      } else {
+      const currentDbId = dbIdRef.current || snapshot._id;
+      if (currentDbId) {
+        await api.put(`/api/projects/${currentDbId}`, { ...snapshot, _id: currentDbId });
+        const updated = { ...snapshot, _id: currentDbId };
+        if (updated.id) {
+          setRuntimeCache(`admin:projects:item:${updated.id}`, updated);
+        }
+        invalidateRuntimeCache('admin:projects:list');
+        setProject(updated);
+        return updated;
+      } else if (!pendingCreateRef.current) {
+        pendingCreateRef.current = true;
         const autoSlug = snapshot.id || createAutosaveDraftId(
           resolveLocalizedText(snapshot.title, autoFixLanguage), 
           resolveLocalizedText(snapshot.content, autoFixLanguage), 
           'project'
         );
         const response = await api.post('/api/projects', { ...snapshot, id: autoSlug });
-        setProject(prev => ({ ...prev, _id: response._id }));
+        if (response._id) {
+          dbIdRef.current = response._id;
+          const updated = { ...snapshot, _id: response._id, id: response.id || autoSlug };
+          setRuntimeCache(`admin:projects:item:${response.id || autoSlug}`, updated);
+          invalidateRuntimeCache('admin:projects:list');
+          justCreatedRef.current = true;
+          setProject(updated);
+          navigate(`/admin/projects/edit/${response.id || autoSlug}`, { replace: true });
+          pendingCreateRef.current = false;
+          return updated;
+        }
       }
     },
     localDebounceMs: 800,
@@ -266,6 +296,10 @@ export function ProjectEditor() {
   useEffect(() => {
     if (!slug || slug === 'new') {
       setLoading(false);
+      return;
+    }
+    if (justCreatedRef.current) {
+      justCreatedRef.current = false;
       return;
     }
     const cacheKey = `admin:projects:item:${slug}`;
@@ -538,18 +572,29 @@ export function ProjectEditor() {
     setIsSaving(true);
     try {
       console.log('Making API call...');
-      if (project._id) {
-        console.log('Updating existing project with _id:', project._id);
-        await api.put(`/api/projects/${project._id}`, payload);
-        setProject(payload);
-        autosave.markAsSaved(payload);
+      const currentDbId = dbIdRef.current || project._id;
+      if (currentDbId) {
+        console.log('Updating existing project with _id:', currentDbId);
+        await api.put(`/api/projects/${currentDbId}`, { ...payload, _id: currentDbId });
+        const updatedProject = { ...payload, _id: currentDbId } as Project;
+        if (updatedProject.id) {
+          setRuntimeCache(`admin:projects:item:${updatedProject.id}`, updatedProject);
+        }
+        invalidateRuntimeCache('admin:projects:list');
+        setProject(updatedProject);
+        autosave.markAsSaved(updatedProject);
       } else {
         console.log('Creating new project...');
         // Create new project and capture the _id from response
         const response = await api.post('/api/projects', payload);
         console.log('API response:', response);
         // Update state with the _id returned from server
-        const newProject = { ...payload, _id: response._id };
+        dbIdRef.current = response._id;
+        const newProject = { ...payload, _id: response._id } as Project;
+        if (newProject.id) {
+          setRuntimeCache(`admin:projects:item:${newProject.id}`, newProject);
+        }
+        invalidateRuntimeCache('admin:projects:list');
         setProject(newProject);
         autosave.markAsSaved(newProject);
       }
@@ -859,6 +904,7 @@ export function ProjectEditor() {
                 wordCount={wordCount}
                 characterCount={characterCount}
                 sectionEnabled={projectsSectionEnabled}
+                onBeforeTranslate={autosave.saveNow}
               />
             </div>
           </div>

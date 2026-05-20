@@ -157,8 +157,8 @@ export default function writingsRoutes(db) {
 
   router.post('/', authMiddleware, async (req, res) => {
     const data = req.body;
-    data.createdAt = new Date().toISOString();
-    data.updatedAt = new Date().toISOString();
+    data.createdAt = new Date();
+    data.updatedAt = new Date();
     data.visible = data.visible !== false; 
     
     if (data.publishAt === '') data.publishAt = null;
@@ -172,6 +172,25 @@ export default function writingsRoutes(db) {
     }
 
     try {
+      if (data.id) {
+        const existing = await fallbackCol.findOne({ id: data.id });
+        if (existing) {
+          if (data.id.includes('-draft-') || existing.status === 'draft') {
+            // Re-use existing document and update it to maintain idempotency and prevent duplicates
+            const syncResult = await dualWrite(db, 'writings', 'artikel', existing._id.toString(), data);
+            if (!syncResult.success) {
+              return res.status(500).json({ error: 'Failed to save data' });
+            }
+            if (data.id) {
+              queueAutosave('writings', data.id, data);
+            }
+            return res.status(201).json({ ...data, _id: existing._id.toString() });
+          } else {
+            return res.status(400).json({ error: 'A writing with this slug already exists' });
+          }
+        }
+      }
+
       // Dual-write to both MongoDB and Supabase
       const syncResult = await dualWrite(db, 'writings', 'artikel', null, data);
       
@@ -184,7 +203,7 @@ export default function writingsRoutes(db) {
         queueAutosave('writings', data.id, data);
       }
 
-      res.status(201).json({ ...data, _id: syncResult.data._id });
+      res.status(201).json({ ...data, _id: syncResult.data?._id || syncResult.data?.insertedId });
     } catch (error) {
       console.error('POST /writings error:', error);
       res.status(500).json({ error: error.message });
@@ -194,7 +213,7 @@ export default function writingsRoutes(db) {
   router.put('/:id', authMiddleware, async (req, res) => {
     try {
       const { _id, id, ...data } = req.body;
-      data.updatedAt = new Date().toISOString();
+      data.updatedAt = new Date();
       data.visible = data.visible !== false;
       
       if (data.publishAt === '') data.publishAt = null;
@@ -237,7 +256,7 @@ export default function writingsRoutes(db) {
 
       const $setDoc = {
         ...fields,
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date(),
         ...(clientVersion != null ? { _clientVersion: clientVersion } : {}),
       };
 
@@ -291,8 +310,8 @@ export default function writingsRoutes(db) {
         ...existing,
         status: 'deleted',
         visible: false,
-        deletedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        deletedAt: new Date(),
+        updatedAt: new Date(),
       };
 
       // 1. Update MongoDB by _id

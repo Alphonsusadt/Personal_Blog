@@ -41,6 +41,7 @@ interface WritingSidebarProps {
   wordCount?: number;
   characterCount?: number;
   sectionEnabled?: boolean;
+  onBeforeTranslate?: () => Promise<void>;
 }
 
 interface CategoryItem {
@@ -88,7 +89,7 @@ function SidebarCard({
   );
 }
 
-export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, sectionEnabled = true }: WritingSidebarProps) {
+export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, sectionEnabled = true, onBeforeTranslate }: WritingSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const [translationStatus, setTranslationStatus] = React.useState<any>(null);
   const { language, setLanguage } = useAutoFixLanguage();
@@ -536,6 +537,7 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
             postId={writing._id}
             contentType="writing"
             currentLanguage={language}
+            onBeforeTranslate={onBeforeTranslate}
             onTranslationStart={() => {
               // Optional: show loading state
             }}

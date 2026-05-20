@@ -146,18 +146,34 @@ export const IsolatedContentEditor = React.memo(function IsolatedContentEditor({
     }
   }, [id, initialValue]);
 
-  // Commit immediately while typing to avoid losing fast edits on navigation
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const debouncedCommit = useCallback((val: string) => {
+    clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      onCommitRef.current(val);
+    }, 800);
+  }, []);
+
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     e.stopPropagation();
     const newValue = e.target.value;
     setValue(newValue);
     lastInitialValueRef.current = newValue; // Track user edits
-    onCommitRef.current(newValue);
-  }, []);
+    debouncedCommit(newValue);
+  }, [debouncedCommit]);
 
   const handleBlur = useCallback(() => {
+    clearTimeout(debounceTimerRef.current);
     onCommitRef.current(value);
   }, [value]);
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(debounceTimerRef.current);
+      onCommitRef.current(lastInitialValueRef.current);
+    };
+  }, []);
 
   return (
     <textarea

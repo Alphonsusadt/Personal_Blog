@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api, getRuntimeCache, setRuntimeCache } from '../../lib/api';
+import { api, getRuntimeCache, setRuntimeCache, invalidateRuntimeCache } from '../../lib/api';
 import { BookToolbar } from '../../components/BookToolbar';
 import { BookSidebar } from '../../components/BookSidebar';
 import { ImageUploadDialog } from '../../components/ImageUploadDialog';
@@ -57,11 +57,14 @@ const emptyBook: Book = {
 };
 
 function hasMeaningfulBookDraft(data: Book): boolean {
+  const hasTitle = resolveLocalizedText(data.title, 'en').trim() || resolveLocalizedText(data.title, 'id').trim();
+  const hasAuthor = resolveLocalizedText(data.author, 'en').trim() || resolveLocalizedText(data.author, 'id').trim();
+  const hasReview = resolveLocalizedText(data.review, 'en').trim() || resolveLocalizedText(data.review, 'id').trim();
   return Boolean(
-    resolveLocalizedText(data.title, 'en').trim() ||
-    resolveLocalizedText(data.author, 'en').trim() ||
+    hasTitle ||
+    hasAuthor ||
     data.cover?.trim() ||
-    resolveLocalizedText(data.review, 'en').trim() ||
+    hasReview ||
     data.takeaways?.length ||
     data.metaDescription?.trim() ||
     data.ogImage?.trim() ||
@@ -110,7 +113,15 @@ export function BookEditor() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const pendingCreateRef = useRef(false);
+  const dbIdRef = useRef<string | undefined>(undefined);
+  const justCreatedRef = useRef(false);
   const [book, setBook] = useState<Book>(emptyBook);
+
+  // Sync dbIdRef with book._id whenever it changes
+  useEffect(() => {
+    dbIdRef.current = book._id;
+  }, [book._id]);
   const [localTitle, setLocalTitle] = useState(''); // Local state for smooth title typing
   const [loading, setLoading] = useState(!!slug);
   const [isSaving, setIsSaving] = useState(false);
@@ -202,16 +213,35 @@ export function BookEditor() {
     enabled: !loading,
     hasMeaningfulData: hasMeaningfulBookDraft,
     saveToServer: async (snapshot) => {
-      if (snapshot._id) {
-        await api.put(`/api/books/${snapshot._id}`, snapshot);
-      } else {
+      const currentDbId = dbIdRef.current || snapshot._id;
+      if (currentDbId) {
+        await api.put(`/api/books/${currentDbId}`, { ...snapshot, _id: currentDbId });
+        const updated = { ...snapshot, _id: currentDbId };
+        if (updated.id) {
+          setRuntimeCache(`admin:books:item:${updated.id}`, updated);
+        }
+        invalidateRuntimeCache('admin:books:list');
+        setBook(updated);
+        return updated;
+      } else if (!pendingCreateRef.current) {
+        pendingCreateRef.current = true;
         const autoSlug = snapshot.id || createAutosaveDraftId(
           resolveLocalizedText(snapshot.title, autoFixLanguage), 
           resolveLocalizedText(snapshot.review, autoFixLanguage), 
           'book'
         );
         const response = await api.post('/api/books', { ...snapshot, id: autoSlug });
-        setBook(prev => ({ ...prev, _id: response._id }));
+        if (response._id) {
+          dbIdRef.current = response._id;
+          const updated = { ...snapshot, _id: response._id, id: response.id || autoSlug };
+          setRuntimeCache(`admin:books:item:${response.id || autoSlug}`, updated);
+          invalidateRuntimeCache('admin:books:list');
+          justCreatedRef.current = true;
+          setBook(updated);
+          navigate(`/admin/books/edit/${response.id || autoSlug}`, { replace: true });
+          pendingCreateRef.current = false;
+          return updated;
+        }
       }
     },
     localDebounceMs: 800,
@@ -259,6 +289,10 @@ export function BookEditor() {
   useEffect(() => {
     if (!slug || slug === 'new') {
       setLoading(false);
+      return;
+    }
+    if (justCreatedRef.current) {
+      justCreatedRef.current = false;
       return;
     }
     const cacheKey = `admin:books:item:${slug}`;
@@ -499,15 +533,27 @@ export function BookEditor() {
     setIsSaving(true);
     try {
       console.log('Making API call...');
-      if (book._id) {
-        console.log('Updating existing book with _id:', book._id);
-        await api.put(`/api/books/${book._id}`, payload);
-        setBook(payload);
-        autosave.markAsSaved(payload);
+      const currentDbId = dbIdRef.current || book._id;
+      if (currentDbId) {
+        console.log('Updating existing book with _id:', currentDbId);
+        await api.put(`/api/books/${currentDbId}`, { ...payload, _id: currentDbId });
+        const updatedBook = { ...payload, _id: currentDbId } as Book;
+        if (updatedBook.id) {
+          setRuntimeCache(`admin:books:item:${updatedBook.id}`, updatedBook);
+        }
+        invalidateRuntimeCache('admin:books:list');
+        setBook(updatedBook);
+        autosave.markAsSaved(updatedBook);
       } else {
         console.log('Creating new book...');
         const response = await api.post('/api/books', payload);
-        const newBook = { ...payload, _id: response._id };
+        // Update state with the _id returned from server
+        dbIdRef.current = response._id;
+        const newBook = { ...payload, _id: response._id } as Book;
+        if (newBook.id) {
+          setRuntimeCache(`admin:books:item:${newBook.id}`, newBook);
+        }
+        invalidateRuntimeCache('admin:books:list');
         setBook(newBook);
         autosave.markAsSaved(newBook);
       }
@@ -822,6 +868,7 @@ export function BookEditor() {
               wordCount={wordCount}
               characterCount={characterCount}
               sectionEnabled={booksSectionEnabled}
+              onBeforeTranslate={autosave.saveNow}
             />
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Writing } from '../data/writings';
 import { Calendar, Clock, BookOpen, Edit3, PenTool } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -5,15 +6,56 @@ import { cn } from '../utils/cn';
 import { resolveLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
+import { getLucideIcon } from '../lib/iconMap';
+import { API_BASE } from '../lib/api';
 
 interface WritingCardProps {
   writing: Writing;
+  categoryIcon?: string;
 }
 
-export function WritingCard({ writing }: WritingCardProps) {
+function resolveIconSrc(icon: string): string {
+  if (icon.startsWith('/')) return `${API_BASE}${icon}`;
+  if (icon.startsWith('http') && !icon.includes('/uploads/')) {
+    return `${API_BASE}/api/media/icon-proxy?url=${encodeURIComponent(icon)}`;
+  }
+  return icon;
+}
+
+export function WritingCard({ writing, categoryIcon }: WritingCardProps) {
   const { language } = useSiteLanguage();
-  const getIcon = (category: Writing['category']) => {
-    switch (category) {
+  const [imgError, setImgError] = useState(false);
+
+  const getIcon = () => {
+    if (categoryIcon) {
+      const isUrl = categoryIcon.startsWith('http') || categoryIcon.startsWith('/');
+      const isEmoji = /\p{Emoji}/u.test(categoryIcon) && !categoryIcon.startsWith('http') && categoryIcon.length <= 4;
+
+      if (isUrl && !imgError) {
+        return (
+          <img
+            src={resolveIconSrc(categoryIcon)}
+            alt=""
+            className="w-5 h-5 object-contain"
+            onError={() => setImgError(false)}
+          />
+        );
+      }
+      if (isEmoji) {
+        return (
+          <span style={{ fontSize: 16, lineHeight: 1 }} className="w-5 h-5 flex items-center justify-center">
+            {categoryIcon}
+          </span>
+        );
+      }
+      const LucideComp = getLucideIcon(categoryIcon);
+      if (LucideComp) {
+        return <LucideComp className="w-5 h-5" />;
+      }
+    }
+
+    // Default hardcoded fallback
+    switch (writing.category) {
       case 'reflections':
         return <BookOpen className="w-5 h-5" />;
       case 'stories':
@@ -24,6 +66,7 @@ export function WritingCard({ writing }: WritingCardProps) {
         return <BookOpen className="w-5 h-5" />;
     }
   };
+
 
   const getCategoryColor = (category: Writing['category']) => {
     switch (category) {
@@ -69,7 +112,7 @@ export function WritingCard({ writing }: WritingCardProps) {
             <div className="flex-1 min-w-0 pr-4">
               <div className="flex items-center flex-wrap gap-2 mb-2">
                 <div className={cn('p-2 rounded-[6px]', getCategoryColor(writing.category))}>
-                  {getIcon(writing.category)}
+                  {getIcon()}
                 </div>
                 <div>
                   <span className={cn('inline-flex items-center px-2.5 py-1 rounded-[6px] text-xs', getCategoryColor(writing.category))}>

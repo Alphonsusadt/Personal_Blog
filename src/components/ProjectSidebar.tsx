@@ -43,6 +43,7 @@ interface ProjectSidebarProps {
   wordCount?: number;
   characterCount?: number;
   sectionEnabled?: boolean;
+  onBeforeTranslate?: () => Promise<void>;
 }
 
 interface CategoryItem {
@@ -90,7 +91,7 @@ function SidebarCard({
   );
 }
 
-export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, sectionEnabled = true }: ProjectSidebarProps) {
+export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount = 0, characterCount = 0, sectionEnabled = true, onBeforeTranslate }: ProjectSidebarProps) {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const [translationStatus, setTranslationStatus] = React.useState<any>(null);
   const { language, setLanguage } = useAutoFixLanguage();
@@ -593,6 +594,7 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
             postId={project._id}
             contentType="project"
             currentLanguage={language}
+            onBeforeTranslate={onBeforeTranslate}
             onTranslationStart={() => {
               // Optional: show loading state
             }}

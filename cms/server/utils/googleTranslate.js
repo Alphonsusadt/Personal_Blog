@@ -18,7 +18,8 @@ export async function detectLanguageGoogle(text) {
     return { language: 'unknown', confidence: 0 };
   }
 
-  if (!process.env.GOOGLE_TRANSLATE_API_KEY || process.env.GOOGLE_TRANSLATE_API_KEY === 'YOUR_GOOGLE_TRANSLATE_API_KEY_HERE') {
+  const apiKey = (process.env.GOOGLE_TRANSLATE_API_KEY || '').trim();
+  if (!apiKey || apiKey === 'YOUR_GOOGLE_TRANSLATE_API_KEY_HERE') {
     console.warn('[Google] API key not configured, using fallback detection');
     return { language: 'unknown', confidence: 0 };
   }
@@ -26,17 +27,18 @@ export async function detectLanguageGoogle(text) {
   try {
     const response = await axios.post(
       GOOGLE_DETECT_API_URL,
-      {},
+      {
+        q: text,
+      },
       {
         params: {
-          q: text,
-          key: process.env.GOOGLE_TRANSLATE_API_KEY,
+          key: apiKey,
         },
         timeout: 5000,
       }
     );
 
-    const detection = response.data.detections?.[0]?.[0];
+    const detection = response.data.data?.detections?.[0]?.[0];
     if (!detection) {
       return { language: 'unknown', confidence: 0 };
     }
@@ -66,7 +68,8 @@ export async function translateGoogle(text, targetLanguage, sourceLanguage = '')
     return '';
   }
 
-  if (!process.env.GOOGLE_TRANSLATE_API_KEY || process.env.GOOGLE_TRANSLATE_API_KEY === 'YOUR_GOOGLE_TRANSLATE_API_KEY_HERE') {
+  const apiKey = (process.env.GOOGLE_TRANSLATE_API_KEY || '').trim();
+  if (!apiKey || apiKey === 'YOUR_GOOGLE_TRANSLATE_API_KEY_HERE') {
     const error = new Error('Google Translate API key not configured');
     error.code = 'NO_API_KEY';
     throw error;
@@ -75,14 +78,15 @@ export async function translateGoogle(text, targetLanguage, sourceLanguage = '')
   try {
     const response = await axios.post(
       GOOGLE_TRANSLATE_API_URL,
-      {},
+      {
+        q: text,
+        target: targetLanguage,
+        source: sourceLanguage || undefined,
+        format: 'text',
+      },
       {
         params: {
-          q: text,
-          target: targetLanguage,
-          source: sourceLanguage || undefined,
-          format: 'text',
-          key: process.env.GOOGLE_TRANSLATE_API_KEY,
+          key: apiKey,
         },
         timeout: 10000,
       }

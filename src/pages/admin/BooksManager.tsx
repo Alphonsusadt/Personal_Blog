@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, getRuntimeCache, setRuntimeCache } from '../../lib/api';
+import { api, getRuntimeCache, setRuntimeCache, invalidateRuntimeCache } from '../../lib/api';
 import { Plus, Pencil, Trash2, Clock, Calendar, Eye, EyeOff, Filter } from 'lucide-react';
 import { resolveLocalizedText, getTranslationStatus, type LocalizedTextValue } from '../../lib/localized';
 
@@ -64,7 +64,13 @@ export function BooksManager() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Hapus buku ini?')) return;
-    await api.del(`/api/books/${id}`); load();
+    await api.del(`/api/books/${id}`);
+    invalidateRuntimeCache('admin:books:list');
+    const item = items.find(i => i._id === id);
+    if (item?.id) {
+      invalidateRuntimeCache(`admin:books:item:${item.id}`);
+    }
+    load();
   };
 
   const handleToggleVisibility = async (item: Book) => {
@@ -73,6 +79,10 @@ export function BooksManager() {
       ...item,
       visible: item.visible === false,
     });
+    invalidateRuntimeCache('admin:books:list');
+    if (item.id) {
+      invalidateRuntimeCache(`admin:books:item:${item.id}`);
+    }
     load();
   };
 

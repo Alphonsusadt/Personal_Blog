@@ -7,7 +7,7 @@ import express from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { translationQueue } from '../services/translationQueue.js';
 import { detectLanguageGoogle, translateGoogle } from '../utils/googleTranslate.js';
-import { callOpenRouterLLM, getSystemPrompt } from '../utils/openRouterLLM.js';
+import { callOpenRouterLLM, getSystemPrompt, cleanLLMResponse } from '../utils/openRouterLLM.js';
 import { callOllamaLLM, isOllamaAvailable } from '../utils/ollamaLLM.js';
 import {
   parseAIResponse,
@@ -234,18 +234,6 @@ export default function createTranslationRoutes(db) {
    * Automatically detects EN -> ID scenario, otherwise defaults to ID -> EN
    */
   function determineTranslationDirection(doc, contentType, currentLanguage) {
-    if (currentLanguage === 'en') {
-      return {
-        srcLang: 'en',
-        tgtLang: 'id',
-      };
-    } else if (currentLanguage === 'id') {
-      return {
-        srcLang: 'id',
-        tgtLang: 'en',
-      };
-    }
-
     const safeParse = (val) => {
       if (typeof val === 'string') {
         try {
@@ -271,23 +259,32 @@ export default function createTranslationRoutes(db) {
     const hasEnglish = (titleObj.en && titleObj.en.trim()) || (contentObj.en && contentObj.en.trim());
     const hasIndonesian = (titleObj.id && titleObj.id.trim()) || (contentObj.id && contentObj.id.trim());
 
-    if (hasEnglish && !hasIndonesian) {
-      // English -> Indonesian translation
-      return {
-        srcLang: 'en',
-        tgtLang: 'id',
-        sourceTitle: titleObj.en || '',
-        sourceContent: contentObj.en || '',
-      };
+    let srcLang = 'id';
+    let tgtLang = 'en';
+
+    if (hasIndonesian && !hasEnglish) {
+      srcLang = 'id';
+      tgtLang = 'en';
+    } else if (hasEnglish && !hasIndonesian) {
+      srcLang = 'en';
+      tgtLang = 'id';
     } else {
-      // Indonesian -> English translation (Default)
-      return {
-        srcLang: 'id',
-        tgtLang: 'en',
-        sourceTitle: resolveText(doc.title, 'id'),
-        sourceContent: resolveText(doc.content || doc.review || doc.description, 'id'),
-      };
+      // Both have content or both are empty
+      if (currentLanguage === 'en') {
+        srcLang = 'id';
+        tgtLang = 'en';
+      } else {
+        srcLang = 'en';
+        tgtLang = 'id';
+      }
     }
+
+    return {
+      srcLang,
+      tgtLang,
+      sourceTitle: resolveText(doc.title, srcLang),
+      sourceContent: resolveText(doc.content || doc.review || doc.description, srcLang),
+    };
   }
 
   /**
@@ -582,21 +579,22 @@ export default function createTranslationRoutes(db) {
           const rawSanitized = sanitizeTranslatedMarkdown(rawTranslated);
           let polishedText = rawSanitized;
 
-          if (rawSanitized.trim().length > 0) {
+          if (rawSanitized.trim().length > 0 && field !== 'title') {
             const polishResult = await translationQueue.executeWithFallback(
               `${postId}:hybrid:polish-${field}`,
               'button-hybrid',
               async (modelId) => {
                 const systemPrompt = getSystemPrompt('polish', tgtLang);
+                const promptText = `<text_to_polish>${rawSanitized}</text_to_polish>`;
                 if (modelId.includes('ollama')) {
-                  return await callOllamaLLM(rawSanitized, systemPrompt, modelId);
+                  return await callOllamaLLM(promptText, systemPrompt, modelId);
                 } else {
-                  return await callOpenRouterLLM(rawSanitized, systemPrompt, modelId);
+                  return await callOpenRouterLLM(promptText, systemPrompt, modelId);
                 }
               }
             );
             if (polishResult.success) {
-              polishedText = polishResult.data;
+              polishedText = cleanLLMResponse(polishResult.result);
             }
           }
 
@@ -742,7 +740,11 @@ RULES:
       let translatedFields = {};
       try {
         let cleaned = result.result.trim();
-        if (cleaned.startsWith('```')) {
+        // Resiliently extract only the JSON object if LLM added introductory/concluding text
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          cleaned = jsonMatch[0];
+        } else if (cleaned.startsWith('```')) {
           cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
         }
         translatedFields = JSON.parse(cleaned);

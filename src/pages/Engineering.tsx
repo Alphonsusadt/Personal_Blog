@@ -2,19 +2,30 @@ import { useState, useMemo, useEffect } from 'react';
 import { Search, Code, X } from 'lucide-react';
 import { getLucideIcon } from '../lib/iconMap';
 import { ProjectCard } from '../components/ProjectCard';
-import { api } from '../lib/api';
+import { api, API_BASE } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { resolveLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
 
+function resolveIconSrc(icon: string): string {
+  // Relative path → prefix with CMS server base
+  if (icon.startsWith('/')) return `${API_BASE}${icon}`;
+  // Flaticon/external CDN → proxy through CMS to avoid hotlink blocks
+  if (icon.startsWith('http') && !icon.includes('/uploads/')) {
+    return `${API_BASE}/api/media/icon-proxy?url=${encodeURIComponent(icon)}`;
+  }
+  return icon;
+}
+
 function CategoryIcon({ icon, className, inverted }: { icon: string; className?: string; inverted?: boolean }) {
+  const [imgError, setImgError] = useState(false);
   const isUrl = icon.startsWith('http') || icon.startsWith('/');
   const isEmoji = /\p{Emoji}/u.test(icon) && !icon.startsWith('http') && icon.length <= 4;
 
   const invertClass = inverted ? '[filter:brightness(0)_invert(1)]' : '';
 
-  if (isUrl) return <img src={icon} alt="" className={`object-contain ${invertClass} ${className || ''}`} style={{ width: 16, height: 16 }} />;
+  if (isUrl && !imgError) return <img src={resolveIconSrc(icon)} alt="" className={`object-contain ${invertClass} ${className || ''}`} style={{ width: 16, height: 16 }} onError={() => setImgError(true)} />;
   if (isEmoji) return <span className={className} style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>;
 
   const Comp = getLucideIcon(icon);
@@ -193,12 +204,16 @@ export function Engineering() {
 
         {/* Projects Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredProjects.map((project) => (
-            <ProjectCard 
-              key={project.id} 
-              project={project}
-            />
-          ))}
+          {filteredProjects.map((project) => {
+            const catItem = dynamicCategories.find(c => c.value === project.category);
+            return (
+              <ProjectCard 
+                key={project.id} 
+                project={project}
+                categoryIcon={catItem?.icon}
+              />
+            );
+          })}
         </div>
 
         {/* No Results */}

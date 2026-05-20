@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, getRuntimeCache, setRuntimeCache } from '../../lib/api';
+import { api, getRuntimeCache, setRuntimeCache, invalidateRuntimeCache } from '../../lib/api';
 import { Plus, Pencil, Trash2, Clock, Calendar, Eye, EyeOff, Filter } from 'lucide-react';
 import { resolveLocalizedText, getTranslationStatus, type LocalizedTextValue } from '../../lib/localized';
 
@@ -64,6 +64,11 @@ export function ProjectsManager() {
   const handleDelete = async (id: string) => {
     if (!confirm('Hapus project ini?')) return;
     await api.del(`/api/projects/${id}`);
+    invalidateRuntimeCache('admin:projects:list');
+    const item = items.find(i => i._id === id);
+    if (item?.id) {
+      invalidateRuntimeCache(`admin:projects:item:${item.id}`);
+    }
     load();
   };
 
@@ -73,6 +78,10 @@ export function ProjectsManager() {
       ...item,
       visible: item.visible === false,
     });
+    invalidateRuntimeCache('admin:projects:list');
+    if (item.id) {
+      invalidateRuntimeCache(`admin:projects:item:${item.id}`);
+    }
     load();
   };
 

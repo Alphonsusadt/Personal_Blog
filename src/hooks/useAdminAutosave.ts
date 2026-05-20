@@ -35,8 +35,8 @@ interface UseAdminAutosaveOptions<T> {
   data: T;
   /** Whether autosave is active (e.g. disabled while loading) */
   enabled: boolean;
-  /** Async function that persists data to the server */
-  saveToServer: (data: T) => Promise<void>;
+  /** Async function that persists data to the server, returning updated document */
+  saveToServer: (data: T) => Promise<T | void>;
   /** Optional guard — skip save if data is considered empty */
   hasMeaningfulData?: (data: T) => boolean;
   /** Local draft debounce in ms (default: 800) */
@@ -170,10 +170,10 @@ export function useAdminAutosave<T>({
       // to binding parameters in a prepared SQL statement.
       // ATOMIC WRITE: saveToServer must use $set on the server (not replace),
       // so only the changed fields are written — crash-safe.
-      await saveToServerRef.current(job.payload);
+      const result = await saveToServerRef.current(job.payload);
 
       // Success — update dirty flag baseline
-      lastSavedFingerprintRef.current = fp;
+      lastSavedFingerprintRef.current = result ? fingerprint(result) : fp;
       retryQueueRef.current = null;
       clearDraft(); // Clear local draft since server is synced
       showSaved();

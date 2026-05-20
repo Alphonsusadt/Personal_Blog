@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { api } from '../../lib/api';
+import { api, API_BASE, invalidateRuntimeCache } from '../../lib/api';
 import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Tag, X, Check } from 'lucide-react';
 import { ICON_MAP, AVAILABLE_ICON_NAMES, getLucideIcon } from '../../lib/iconMap';
 
@@ -41,8 +41,8 @@ function resolveFlaticonUrl(input: string): string {
     const match = url.pathname.match(/\/(?:free|premium)-icon\/[^/]+_(\d+)$/);
     if (match && (url.hostname === 'www.flaticon.com' || url.hostname === 'flaticon.com')) {
       const id = match[1];
-      const folder = id.length > 5 ? id.slice(0, 5) : id;
-      return `https://cdn-icons-png.flaticon.com/128/${folder}/${id}.png`;
+      const folder = id.slice(0, id.length - 3);
+      return `https://cdn-icons-png.flaticon.com/512/${folder}/${id}.png`;
     }
   } catch { /* not a valid URL, ignore */ }
   return input;
@@ -50,13 +50,20 @@ function resolveFlaticonUrl(input: string): string {
 
 function CategoryIconPreview({ icon, size = 18 }: { icon: string; size?: number }) {
   const resolved = resolveFlaticonUrl(icon);
-  const isUrl = resolved.startsWith('http') || resolved.startsWith('/');
+  // Resolve relative paths to CMS server URL, and proxy CDN URLs through CMS
+  let src = resolved;
+  if (resolved.startsWith('/')) {
+    src = `${API_BASE}${resolved}`;
+  } else if (resolved.startsWith('http') && !resolved.includes('/uploads/')) {
+    src = `${API_BASE}/api/media/icon-proxy?url=${encodeURIComponent(resolved)}`;
+  }
+  const isUrl = src.startsWith('http') || src.startsWith('/');
   const isEmoji = /\p{Emoji}/u.test(icon) && !icon.startsWith('http') && icon.length <= 4;
 
   if (!icon) return <Tag style={{ width: size, height: size }} className="text-[#94A3B8]" />;
 
   if (isUrl) {
-    return <img src={resolved} alt="" style={{ width: size, height: size }} className="object-contain" />;
+    return <img src={src} alt="" style={{ width: size, height: size }} className="object-contain" />;
   }
 
   if (isEmoji) {
@@ -103,9 +110,13 @@ function CategoryForm({
       try {
         const res = await api.post('/api/media/proxy-icon', { url: finalIcon });
         finalIcon = res.url;
-      } catch {
-        // If proxy fails, keep the original URL
-        console.warn('Failed to proxy icon, using original URL');
+      } catch (err) {
+        // If proxy fails, keep the original URL but warn the user
+        console.warn('Failed to proxy icon, using original URL:', err);
+        alert(
+          'Warning: Could not cache the icon locally. The icon may not display correctly on the public site due to hotlink protection.\n\n' +
+          'Make sure the CMS server is running and try again.'
+        );
       }
     }
 
@@ -260,6 +271,7 @@ export function CategoriesManager() {
   const handleCreate = async (data: { section: string; value: string; label: { en: string; id: string }; icon: string; order: number }) => {
     try {
       await api.post('/api/categories', data);
+      invalidateRuntimeCache();
       setShowForm(false);
       load();
     } catch (err: unknown) {
@@ -271,6 +283,7 @@ export function CategoriesManager() {
     if (!editing) return;
     try {
       await api.put(`/api/categories/${editing._id}`, data);
+      invalidateRuntimeCache();
       setEditing(null);
       load();
     } catch (err: unknown) {
@@ -281,6 +294,7 @@ export function CategoriesManager() {
   const handleToggle = async (item: CategoryItem) => {
     try {
       await api.patch(`/api/categories/${item._id}/toggle`, {});
+      invalidateRuntimeCache();
       load();
     } catch (err: unknown) {
       setError((err as Error).message);
@@ -291,6 +305,7 @@ export function CategoriesManager() {
     if (!confirm(`Hapus kategori "${item.label.en}"?`)) return;
     try {
       await api.del(`/api/categories/${item._id}`);
+      invalidateRuntimeCache();
       load();
     } catch (err: unknown) {
       setError((err as Error).message);
