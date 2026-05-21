@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { MongoClient } from 'mongodb';
 import bcrypt from 'bcryptjs';
 import { createClient } from '@supabase/supabase-js';
+import readline from 'readline';
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
 const DB_NAME = 'alphonsus-portfolio';
@@ -394,7 +395,34 @@ const settings = {
   }
 };
 
+function askConfirmation(query) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  return new Promise((resolve) => {
+    rl.question(query, (ans) => {
+      rl.close();
+      resolve(ans);
+    });
+  });
+}
+
 async function seed() {
+  // Safety confirmation prompt if using cloud Atlas database
+  const isCloudDb = MONGODB_URI.includes('mongodb+srv://') || process.env.NODE_ENV === 'production';
+  const hasForceFlag = process.argv.includes('--force') || process.argv.includes('-y');
+
+  if (isCloudDb && !hasForceFlag) {
+    console.log('\n⚠️  WARNING: You are about to run the seed script on a CLOUD database (MongoDB Atlas).');
+    console.log('This will PERMANENTLY ERASE your custom projects, books, settings, and categories!');
+    const answer = await askConfirmation('Are you absolutely sure you want to proceed? Type "yes" to confirm: ');
+    if (answer.trim().toLowerCase() !== 'yes') {
+      console.log('❌ Seeding aborted. No data was modified.\n');
+      process.exit(0);
+    }
+  }
+
   const client = new MongoClient(MONGODB_URI);
   await client.connect();
   console.log('Connected to MongoDB');
