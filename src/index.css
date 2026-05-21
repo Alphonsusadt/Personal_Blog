@@ -15,12 +15,12 @@
   --color-hairline: #e6e6e6;
   --color-hairline-soft: #f1f1f1;
   --color-surface-soft: #f7f7f5;
-  --color-block-lime: #dceeb1;
-  --color-block-lilac: #c5b0f4;
-  --color-block-cream: #f4ecd6;
-  --color-block-pink: #efd4d4;
-  --color-block-mint: #c8e6cd;
-  --color-block-coral: #f3c9b6;
+  --color-block-lime: #eef7db;
+  --color-block-lilac: #e6dffd;
+  --color-block-cream: #faf5e8;
+  --color-block-pink: #f7e8e8;
+  --color-block-mint: #e2f5e5;
+  --color-block-coral: #fbe6dc;
   --color-block-navy: #1f1d3d;
   --color-accent-magenta: #ff3d8b;
   --color-semantic-success: #1ea64a;
@@ -156,67 +156,14 @@
   /* Invert primary colors for dark mode contrast */
   --color-primary: #ffffff;
   --color-on-primary: #000000;
-}
 
-/* Ensure color block sections remain extremely beautiful, bright, and legible in dark mode */
-.dark .color-block-section {
-  color: #000000 !important;
-  border-color: rgba(0, 0, 0, 0.1) !important;
-}
-
-.dark .color-block-section h1,
-.dark .color-block-section h2,
-.dark .color-block-section h3,
-.dark .color-block-section h4,
-.dark .color-block-section p,
-.dark .color-block-section label,
-.dark .color-block-section span,
-.dark .color-block-section svg,
-.dark .color-block-section .text-ink {
-  color: #000000 !important;
-}
-
-/* Ensure the success circle and other canvas elements inside color blocks stay clean and white */
-.dark .color-block-section .bg-canvas {
-  background-color: #ffffff !important;
-  border-color: rgba(0, 0, 0, 0.15) !important;
-}
-
-/* Allow dynamic text-color helper utilities (like pink, sky, teal) to preserve their colors */
-.dark .color-block-section .text-pink-500 { color: #ec4899 !important; }
-.dark .color-block-section .text-sky-400 { color: #38bdf8 !important; }
-.dark .color-block-section .text-teal-500 { color: #14b8a6 !important; }
-
-.dark .color-block-section a {
-  color: #000000 !important;
-  opacity: 0.85;
-}
-
-.dark .color-block-section a:hover {
-  opacity: 1;
-}
-
-.dark .color-block-section input,
-.dark .color-block-section textarea {
-  background-color: #ffffff !important;
-  color: #000000 !important;
-  border-color: rgba(0, 0, 0, 0.15) !important;
-}
-
-.dark .color-block-section input::placeholder,
-.dark .color-block-section textarea::placeholder {
-  color: rgba(0, 0, 0, 0.45) !important;
-}
-
-.dark .color-block-section button[type="submit"] {
-  background-color: #000000 !important;
-  color: #ffffff !important;
-}
-
-.dark .color-block-section button:not([type="submit"]) {
-  background-color: #ffffff !important;
-  color: #000000 !important;
-  border-color: rgba(0, 0, 0, 0.15) !important;
+  /* Redefine pastel color blocks to be dark, rich, and desaturated in dark mode */
+  --color-block-lime: #222b25;    /* Soft Forest Sage */
+  --color-block-lilac: #262238;   /* Soft Lavender Plum */
+  --color-block-cream: #2c2621;   /* Soft Sepia Amber */
+  --color-block-pink: #2d2226;    /* Soft Dusty Rose */
+  --color-block-mint: #1f2c24;    /* Soft Pine Mint */
+  --color-block-coral: #2e2422;   /* Soft Warm Terracotta */
 }
 
 .dark body {
