@@ -14,6 +14,7 @@ let dictionaryLoadPromise = null;
 function parseDictionary(dicContent) {
   const lines = dicContent.split('\n').slice(1); // Skip count line
   const words = new Set();
+  const groups = new Map();
   
   for (const line of lines) {
     if (!line.trim()) continue;
@@ -21,9 +22,17 @@ function parseDictionary(dicContent) {
     const baseWord = line.split(/[\s/]/)[0].toLowerCase();
     if (baseWord.length > 0) {
       words.add(baseWord);
+      const firstChar = baseWord[0];
+      if (firstChar) {
+        if (!groups.has(firstChar)) {
+          groups.set(firstChar, []);
+        }
+        groups.get(firstChar).push(baseWord);
+      }
     }
   }
   
+  words.groupedByFirstChar = groups;
   return words;
 }
 
@@ -138,7 +147,35 @@ function findFuzzyMatches(word, dict, maxDistance = 2) {
     return [];
   }
   
-  for (const candidate of dict) {
+  const firstChar = lowerWord[0];
+  if (!firstChar) return [];
+
+  // Look up words starting with the same first character
+  // Also include the second character group to support transposition at the beginning (e.g. obneka -> boneka)
+  const searchGroups = new Set();
+  searchGroups.add(firstChar);
+  if (lowerWord.length > 1) {
+    searchGroups.add(lowerWord[1]);
+  }
+
+  const candidatesList = [];
+  const groups = dict.groupedByFirstChar;
+
+  if (groups) {
+    for (const char of searchGroups) {
+      const groupWords = groups.get(char);
+      if (groupWords) {
+        for (const w of groupWords) {
+          candidatesList.push(w);
+        }
+      }
+    }
+  } else {
+    // Fallback if groups are not built
+    candidatesList.push(...dict);
+  }
+  
+  for (const candidate of candidatesList) {
     if (candidate === lowerWord) continue;
     
     // Length must be similar (within 2 characters)
