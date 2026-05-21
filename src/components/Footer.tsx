@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
+import { resolveLocalizedText, LocalizedTextValue } from '../lib/localized';
 
 interface Settings {
-  footerBio?: string;
+  footerBio?: LocalizedTextValue;
   footerName?: string;
   siteTitle?: string;
   socialLinks?: {
@@ -31,7 +32,10 @@ export function Footer() {
   const currentYear = new Date().getFullYear();
   const { language } = useSiteLanguage();
   const [settings, setSettings] = useState<Settings>({
-    footerBio: 'Biomedical Engineering student exploring the intersection of medical signals, faith, and human life. Bridging the precision of engineering with the mystery of spirituality.',
+    footerBio: {
+      en: 'Biomedical Engineering student exploring the intersection of medical signals, faith, and human life. Bridging the precision of engineering with the mystery of spirituality.',
+      id: 'Mahasiswa Teknik Biomedis yang meneliti irisan antara sinyal medis, iman, dan kehidupan manusia. Menjembatani presisi teknik dengan misteri spiritualitas.'
+    },
     footerName: 'Alphonsus Aditya',
   });
 
@@ -90,7 +94,7 @@ export function Footer() {
               {settings.footerName || 'Alphonsus'}
             </h3>
             <p className="body-sm text-inverse-ink opacity-80 mb-4 max-w-md">
-              {settings.footerBio}
+              {resolveLocalizedText(settings.footerBio, language)}
             </p>
             <div className="flex flex-wrap items-center gap-4 mt-2">
               {showLinkedin && (

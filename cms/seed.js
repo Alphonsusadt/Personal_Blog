@@ -374,7 +374,10 @@ const settings = {
   key: 'settings',
   siteTitle: 'Alphonsus - Biomedical Engineering & Faith',
   footerName: 'Alphonsus Aditya',
-  footerBio: 'Biomedical Engineering student exploring the intersection of medical signals, faith, and human life. Bridging the precision of engineering with the mystery of spirituality.',
+  footerBio: {
+    en: 'Biomedical Engineering student exploring the intersection of medical signals, faith, and human life. Bridging the precision of engineering with the mystery of spirituality.',
+    id: 'Mahasiswa Teknik Biomedis yang meneliti irisan antara sinyal medis, iman, dan kehidupan manusia. Menjembatani presisi teknik dengan misteri spiritualitas.'
+  },
   footerTagline: 'Built with heart and biomedical curiosity',
   navItems: [
     { path: '/', label: 'Home' },

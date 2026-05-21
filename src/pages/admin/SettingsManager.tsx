@@ -3,6 +3,7 @@ import { api } from '../../lib/api';
 import { Save, CheckCircle, Key, Clock, AlertCircle } from 'lucide-react';
 import { useAdminAutosave } from '../../hooks/useAdminAutosave';
 import { AutoFixButton } from '../../components/AutoFixButton';
+import { normalizeLocalizedText, LocalizedText } from '../../lib/localized';
 
 interface SectionSetting {
   enabled: boolean;
@@ -12,7 +13,7 @@ interface SectionSetting {
 interface SettingsData {
   siteTitle: string;
   footerName: string;
-  footerBio: string;
+  footerBio: LocalizedText;
   footerTagline: string;
   sections: {
     writings: SectionSetting;
@@ -43,7 +44,7 @@ const hasMeaningfulSettingsData = (value: SettingsData): boolean => {
   return Boolean(
     value.siteTitle.trim() ||
     value.footerName.trim() ||
-    value.footerBio.trim() ||
+    (value.footerBio.en?.trim() || value.footerBio.id?.trim()) ||
     value.footerTagline.trim() ||
     value.sections.writings.status !== 'hidden' ||
     value.sections.projects.status !== 'hidden' ||
@@ -55,7 +56,7 @@ export function SettingsManager() {
   const [data, setData] = useState<SettingsData>({
     siteTitle: '',
     footerName: '',
-    footerBio: '',
+    footerBio: { en: '', id: '' },
     footerTagline: '',
     sections: {
       writings: { enabled: true, status: 'visible' },
@@ -107,6 +108,7 @@ export function SettingsManager() {
       setData((prev) => ({
         ...prev,
         ...d,
+        footerBio: normalizeLocalizedText(d.footerBio),
         sections: {
           writings: {
             enabled: d.sections?.writings?.status ? d.sections.writings.status !== 'hidden' : d.sections?.writings?.enabled !== false,
@@ -196,10 +198,17 @@ export function SettingsManager() {
             <div><label className={labelCls}>Site Title</label><input value={data.siteTitle} onChange={e => setData({ ...data, siteTitle: e.target.value })} className={inputCls} /></div>
             <div><label className={labelCls}>Footer Name</label><input value={data.footerName} onChange={e => setData({ ...data, footerName: e.target.value })} className={inputCls} /></div>
             <div>
-              <label className={labelCls}>Footer Bio</label>
-              <textarea value={data.footerBio} onChange={e => setData({ ...data, footerBio: e.target.value })} rows={3} className={inputCls} />
+              <label className={labelCls}>Footer Bio (English)</label>
+              <textarea value={data.footerBio.en || ''} onChange={e => setData({ ...data, footerBio: { ...data.footerBio, en: e.target.value } })} rows={3} className={inputCls} />
               <div className="mt-2 flex justify-end">
-                <AutoFixButton text={data.footerBio} onApply={(nextText) => setData({ ...data, footerBio: nextText })} />
+                <AutoFixButton text={data.footerBio.en || ''} onApply={(nextText) => setData({ ...data, footerBio: { ...data.footerBio, en: nextText } })} />
+              </div>
+            </div>
+            <div>
+              <label className={labelCls}>Footer Bio (Indonesia)</label>
+              <textarea value={data.footerBio.id || ''} onChange={e => setData({ ...data, footerBio: { ...data.footerBio, id: e.target.value } })} rows={3} className={inputCls} />
+              <div className="mt-2 flex justify-end">
+                <AutoFixButton text={data.footerBio.id || ''} onApply={(nextText) => setData({ ...data, footerBio: { ...data.footerBio, id: nextText } })} />
               </div>
             </div>
             <div><label className={labelCls}>Footer Tagline</label><input value={data.footerTagline} onChange={e => setData({ ...data, footerTagline: e.target.value })} className={inputCls} /></div>
