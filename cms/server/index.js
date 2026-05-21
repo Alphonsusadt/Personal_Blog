@@ -75,12 +75,19 @@ async function start() {
     process.exit(1);
   }
   const users = db.collection('users');
-  const existing = await users.findOne({ username: adminUsername });
-  if (!existing) {
-    const hashed = await bcrypt.hash(adminPassword, 10);
-    await users.insertOne({ username: adminUsername, password: hashed, createdAt: new Date() });
-    console.log(`Default admin user created (username: ${adminUsername})`);
-  }
+  const hashed = await bcrypt.hash(adminPassword, 10);
+  await users.updateOne(
+    { username: adminUsername },
+    {
+      $set: {
+        username: adminUsername,
+        password: hashed,
+        updatedAt: new Date()
+      }
+    },
+    { upsert: true }
+  );
+  console.log(`Default admin user configured/updated (username: ${adminUsername})`);
 
   const sectionDefaults = {
     writings: { enabled: parseSectionFlag(process.env.SHOW_WRITINGS, true) },
