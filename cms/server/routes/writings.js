@@ -54,21 +54,9 @@ export default function writingsRoutes(db) {
     if (!enabled) return res.json([]);
     const now = new Date().toISOString();
 
-    // Try MongoDB first (most up-to-date), Supabase as fallback
     const result = await trySupabase(
       async () => {
-        // Try MongoDB first - it's the primary source
-        const items = await fallbackCol.find({
-          visible: { $ne: false },
-          $or: [{ status: 'published' }, { status: 'scheduled', publishAt: { $lte: new Date() } }],
-        }).sort({ createdAt: -1, date: -1 }).toArray();
-        
-        // Check if we have items with content
-        if (items.length > 0 && items[0].content) {
-          return items.map(parseSupabaseJson);
-        }
-        
-        // If MongoDB is empty, try Supabase
+        // Try Supabase first
         const { data, error } = await supabase
           .from('artikel')
           .select('*')
@@ -76,10 +64,21 @@ export default function writingsRoutes(db) {
           .or(`status.eq.published,and(status.eq.scheduled,publishAt.lte.${now})`)
           .order('createdAt', { ascending: false });
         if (error) throw error;
-        return data.map(parseSupabaseJson);
+        
+        // If Supabase has published articles, return them
+        if (data && data.length > 0) {
+          return data.map(parseSupabaseJson);
+        }
+        
+        // Fallback to MongoDB if Supabase is empty
+        const items = await fallbackCol.find({
+          visible: { $ne: false },
+          $or: [{ status: 'published' }, { status: 'scheduled', publishAt: { $lte: new Date() } }],
+        }).sort({ createdAt: -1, date: -1 }).toArray();
+        return items.map(parseSupabaseJson);
       },
       async () => {
-        // Fallback - use MongoDB
+        // Fallback to MongoDB if Supabase is down/error
         const items = await fallbackCol.find({
           visible: { $ne: false },
           $or: [{ status: 'published' }, { status: 'scheduled', publishAt: { $lte: new Date() } }],
@@ -98,27 +97,27 @@ export default function writingsRoutes(db) {
 
     const result = await trySupabase(
       async () => {
-        // Try MongoDB first
-        const item = await fallbackCol.findOne({
-          id: req.params.id,
-          visible: { $ne: false },
-          $or: [{ status: 'published' }, { status: 'scheduled', publishAt: { $lte: new Date() } }],
-        });
-        
-        if (item && item.content) {
-          return parseSupabaseJson(item);
-        }
-        
-        // If MongoDB doesn't have it, try Supabase
+        // Try Supabase first
         const { data, error } = await supabase
           .from('artikel')
           .select('*')
           .eq('id', req.params.id)
           .neq('visible', false)
           .or(`status.eq.published,and(status.eq.scheduled,publishAt.lte.${now})`)
-          .single();
+          .maybeSingle(); // maybeSingle handles "not found" gracefully (returns null instead of throwing)
         if (error) throw error;
-        return parseSupabaseJson(data);
+        
+        if (data) {
+          return parseSupabaseJson(data);
+        }
+        
+        // Fallback to MongoDB if not found in Supabase
+        const item = await fallbackCol.findOne({
+          id: req.params.id,
+          visible: { $ne: false },
+          $or: [{ status: 'published' }, { status: 'scheduled', publishAt: { $lte: new Date() } }],
+        });
+        return item ? parseSupabaseJson(item) : null;
       },
       async () => {
         const item = await fallbackCol.findOne({

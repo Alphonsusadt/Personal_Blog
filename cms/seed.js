@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { MongoClient } from 'mongodb';
 import bcrypt from 'bcryptjs';
+import { createClient } from '@supabase/supabase-js';
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
 const DB_NAME = 'alphonsus-portfolio';
@@ -439,6 +440,72 @@ async function seed() {
   const publishedWritings = writings.map(w => ({ ...w, status: 'published', visible: true }));
   await db.collection('writings').insertMany(publishedWritings);
   console.log(`Inserted ${writings.length} writings`);
+
+  // Sync seed writings to Supabase if configured
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_ANON_KEY;
+  if (supabaseUrl && supabaseKey) {
+    console.log('Syncing default writings to Supabase...');
+    try {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      for (const w of publishedWritings) {
+        const sbData = {
+          id: w.id,
+          title: typeof w.title === 'object' ? JSON.stringify(w.title) : w.title,
+          content: typeof w.content === 'object' ? JSON.stringify(w.content) : w.content,
+          excerpt: typeof w.excerpt === 'object' ? JSON.stringify(w.excerpt) : w.excerpt,
+          category: w.category,
+          tags: w.tags || [],
+          status: w.status,
+          date: w.date || new Date().toISOString().split('T')[0],
+          readTime: w.readTime || '5 min read',
+          ogImage: w.ogImage || '',
+          metaTitle: typeof w.metaTitle === 'object' ? JSON.stringify(w.metaTitle) : w.metaTitle || '',
+          metaDescription: typeof w.metaDescription === 'object' ? JSON.stringify(w.metaDescription) : w.metaDescription || '',
+          keywords: w.keywords || [],
+          language: w.language || 'id',
+          publishAt: w.publishAt || null,
+          visible: w.visible !== false,
+          createdAt: w.createdAt || new Date(),
+          updatedAt: w.updatedAt || new Date()
+        };
+        
+        // Check if the record already exists in Supabase by matching the 'id' (slug)
+        const { data: existingRecord, error: fetchError } = await supabase
+          .from('artikel')
+          .select('id')
+          .eq('id', w.id)
+          .maybeSingle();
+
+        if (fetchError) {
+          console.error(`  ❌ Failed to check writing ${w.id} in Supabase:`, fetchError.message);
+          continue;
+        }
+
+        let syncRes;
+        if (existingRecord) {
+          syncRes = await supabase
+            .from('artikel')
+            .update(sbData)
+            .eq('id', w.id);
+        } else {
+          syncRes = await supabase
+            .from('artikel')
+            .insert([sbData]);
+        }
+          
+        if (syncRes.error) {
+          console.error(`  ❌ Failed to sync seed writing ${w.id} to Supabase:`, syncRes.error.message);
+        } else {
+          console.log(`  ✅ Successfully synced seed writing ${w.id} to Supabase`);
+        }
+      }
+    } catch (err) {
+      console.error('Error connecting or syncing to Supabase in seed script:', err.message);
+    }
+  } else {
+    console.log('Supabase credentials not configured in env, skipping Supabase writings sync.');
+  }
 
   const publishedBooks = books.map(b => ({ ...b, status: 'published', visible: true }));
   await db.collection('books').insertMany(publishedBooks);

@@ -75,16 +75,55 @@ export async function upsertSupabase(tableName, id, data) {
 
   try {
     const cleaned = stripForSupabase(tableName, data);
+    const targetId = cleaned.id || id;
+    let result = null;
 
-    // Use native Supabase upsert with conflict resolution on 'id' and maybeSingle()
-    // to handle both inserts and updates safely, avoiding the fragile PGRST116 single() error.
-    const { data: result, error } = await supabase
-      .from(tableName)
-      .upsert(cleaned, { onConflict: 'id' })
-      .select()
-      .maybeSingle();
+    if (targetId) {
+      // Query first to check if the writing/record exists
+      const { data: existing, error: checkError } = await supabase
+        .from(tableName)
+        .select('id')
+        .eq('id', targetId)
+        .maybeSingle();
 
-    if (error) throw error;
+      if (checkError) {
+        console.warn(`[Sync] Check failed in Supabase for ${tableName}/${targetId}:`, checkError.message);
+      }
+
+      if (existing) {
+        // Update existing record
+        const { data: updateRes, error: updateError } = await supabase
+          .from(tableName)
+          .update(cleaned)
+          .eq('id', targetId)
+          .select()
+          .maybeSingle();
+        
+        if (updateError) throw updateError;
+        result = updateRes;
+      } else {
+        // Insert new record
+        const { data: insertRes, error: insertError } = await supabase
+          .from(tableName)
+          .insert([cleaned])
+          .select()
+          .maybeSingle();
+        
+        if (insertError) throw insertError;
+        result = insertRes;
+      }
+    } else {
+      // If no id can be resolved, insert
+      const { data: insertRes, error: insertError } = await supabase
+        .from(tableName)
+        .insert([cleaned])
+        .select()
+        .maybeSingle();
+      
+      if (insertError) throw insertError;
+      result = insertRes;
+    }
+
     return { success: true, result };
   } catch (error) {
     console.error(`[Sync] Supabase ${tableName} error:`, error.message);
@@ -178,23 +217,50 @@ export async function syncMongoToSupabase(db, collection, supabaseTable) {
 
     for (const item of items) {
       try {
-        const cleaned = stripForSupabase(item);
-        
-        // Upsert to Supabase
-        const { error } = await supabase
-          .from(supabaseTable)
-          .upsert(cleaned)
-          .select()
-          .maybeSingle();
+        const cleaned = stripForSupabase(supabaseTable, item);
+        const targetId = cleaned.id || item.id;
+        let syncError = null;
 
-        if (error) {
-          console.error(`  ❌ Failed to sync ${item.id}:`, error.message);
+        if (targetId) {
+          // Check if exists
+          const { data: existing, error: checkError } = await supabase
+            .from(supabaseTable)
+            .select('id')
+            .eq('id', targetId)
+            .maybeSingle();
+
+          if (checkError) {
+            syncError = checkError;
+          } else if (existing) {
+            // Update
+            const { error: updateError } = await supabase
+              .from(supabaseTable)
+              .update(cleaned)
+              .eq('id', targetId);
+            syncError = updateError;
+          } else {
+            // Insert
+            const { error: insertError } = await supabase
+              .from(supabaseTable)
+              .insert([cleaned]);
+            syncError = insertError;
+          }
+        } else {
+          // Just insert
+          const { error: insertError } = await supabase
+            .from(supabaseTable)
+            .insert([cleaned]);
+          syncError = insertError;
+        }
+
+        if (syncError) {
+          console.error(`  ❌ Failed to sync ${item.id || item._id}:`, syncError.message);
           errorCount++;
         } else {
           successCount++;
         }
       } catch (error) {
-        console.error(`  ❌ Error syncing ${item.id}:`, error.message);
+        console.error(`  ❌ Error syncing ${item.id || item._id}:`, error.message);
         errorCount++;
       }
     }

@@ -185,6 +185,50 @@ export default function messagesRoutes(db) {
     try {
       const col = db.collection('messages');
       const messages = await col.find().sort({ createdAt: -1 }).toArray();
+
+      if (supabase) {
+        try {
+          const { data: sbMessages, error } = await supabase
+            .from('messages')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (!error && sbMessages) {
+            let changed = false;
+            for (const sbMsg of sbMessages) {
+              const msgId = sbMsg.original_message_id || (sbMsg.id ? sbMsg.id.toString() : null);
+              if (!msgId) continue;
+
+              const exists = messages.some(m => m.id === msgId);
+              if (!exists) {
+                const newDoc = {
+                  id: msgId,
+                  name: sbMsg.name || 'Anonim',
+                  email: sbMsg.email || null,
+                  subject: sbMsg.subject || '',
+                  body: sbMsg.body || '',
+                  status: sbMsg.status || 'unread',
+                  thread_id: sbMsg.thread_id || '',
+                  replies: [],
+                  createdAt: sbMsg.created_at ? new Date(sbMsg.created_at) : new Date(),
+                  updatedAt: sbMsg.created_at ? new Date(sbMsg.created_at) : new Date()
+                };
+                await col.insertOne(newDoc);
+                messages.push(newDoc);
+                changed = true;
+              }
+            }
+            if (changed) {
+              messages.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            }
+          } else if (error) {
+            console.warn('[messages] Supabase fetch error in GET /:', error.message);
+          }
+        } catch (sbErr) {
+          console.warn('[messages] Failed to sync/merge from Supabase in GET /:', sbErr.message);
+        }
+      }
+
       res.json(messages);
     } catch (error) {
       console.error('GET /api/messages error:', error);
