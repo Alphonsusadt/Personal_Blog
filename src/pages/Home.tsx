@@ -349,7 +349,7 @@ export function Home() {
   return (
     <div className="min-h-screen bg-canvas">
       {/* Hero Section */}
-      <section className="relative py-[96px]">
+      <section className="relative py-12 md:py-[96px]">
         <div className="max-w-[1280px] mx-auto px-6 lg:px-12">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             {/* Left Content */}
@@ -750,7 +750,7 @@ export function Home() {
 
       {/* Recent Projects Section */}
       {sectionVisibility.projects.status !== 'hidden' ? (
-      <section className="mb-[96px]">
+      <section className="mb-12 md:mb-[96px]">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-block-lime color-block-section">
             <div className="mb-12">
@@ -822,7 +822,7 @@ export function Home() {
 
       {/* Recent Writings Section */}
       {sectionVisibility.writings.status !== 'hidden' ? (
-      <section className="mb-[96px]">
+      <section className="mb-12 md:mb-[96px]">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-block-lilac color-block-section">
             <div className="mb-12">
@@ -894,7 +894,7 @@ export function Home() {
 
       {/* Featured Books Section */}
       {sectionVisibility.books.status !== 'hidden' ? (
-      <section className="mb-[96px]">
+      <section className="mb-12 md:mb-[96px]">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-block-cream color-block-section">
             <div className="mb-12">

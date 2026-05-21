@@ -143,10 +143,10 @@ export function Engineering() {
   }, [language, searchTerm, selectedCategory, allProjects]);
 
   return (
-    <div className="min-h-screen py-[96px] bg-canvas">
+    <div className="min-h-screen py-12 md:py-[96px] bg-canvas">
       <div className="max-w-[1280px] mx-auto px-6 lg:px-12">
         {/* Header */}
-        <div className="text-center mb-[48px]">
+        <div className="text-center mb-8 md:mb-[48px]">
           <h1 className="display-lg text-ink mb-4">
             {t('engineering.title', language)}
           </h1>

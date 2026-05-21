@@ -325,7 +325,7 @@ export function WritingDetail() {
   }
 
   return (
-    <div className="min-h-screen py-[96px] bg-canvas">
+    <div className="min-h-screen py-12 md:py-[96px] bg-canvas">
       <div className="max-w-[1280px] mx-auto px-6 lg:px-12">
         {/* Back Button */}
         <button

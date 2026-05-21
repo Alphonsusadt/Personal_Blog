@@ -200,7 +200,7 @@ export function BookDetail() {
   }
 
   return (
-    <div className="min-h-screen py-[96px] bg-canvas">
+    <div className="min-h-screen py-12 md:py-[96px] bg-canvas">
       <div className="max-w-[1280px] mx-auto px-6 lg:px-12">
         {/* Back Button */}
         <button
@@ -270,7 +270,7 @@ export function BookDetail() {
         <hr className="border-hairline mb-10" />
 
         {/* Review Section */}
-        <section className="mb-[96px]">
+        <section className="mb-12 md:mb-[96px]">
           <h2 className="display-md text-ink mb-8">
             {t('library.myReview', language)}
           </h2>
@@ -282,7 +282,7 @@ export function BookDetail() {
         </section>
 
         {/* Key Takeaways Section */}
-        <section className="mb-[96px]">
+        <section className="mb-12 md:mb-[96px]">
           <h2 className="display-md text-ink mb-8">
             {t('library.keyTakeaways', language)}
           </h2>

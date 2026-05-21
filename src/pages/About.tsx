@@ -326,7 +326,7 @@ export function About() {
   const hasQuote = hasText(data.quote[language]);
 
   return (
-    <div className="min-h-screen py-[96px] bg-canvas">
+    <div className="min-h-screen py-12 md:py-[96px] bg-canvas">
       <div className="max-w-[1280px] mx-auto px-6 lg:px-12">
         {hasHeader ? (
           <div className="text-center mb-16">
@@ -344,7 +344,7 @@ export function About() {
         ) : null}
 
         {hasHeroCard ? (
-        <div className="mb-[96px]">
+        <div className="mb-12 md:mb-[96px]">
           <div className="bg-block-cream rounded-[24px] p-8 lg:p-12 color-block-section">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
               <div className="flex justify-center">
@@ -399,7 +399,7 @@ export function About() {
         ) : null}
 
         {storyItems.length > 0 ? (
-        <div className="mb-[96px]">
+        <div className="mb-12 md:mb-[96px]">
           <h2 className="display-md text-ink mb-8">
             My Story
           </h2>
@@ -420,7 +420,7 @@ export function About() {
         ) : null}
 
         {hasSkillsSection ? (
-        <div className="mb-[96px]">
+        <div className="mb-12 md:mb-[96px]">
           <h2 className="display-md text-ink mb-8">
             Skills & Interests
           </h2>
@@ -484,7 +484,7 @@ export function About() {
         ) : null}
 
         {educationItems.length > 0 ? (
-        <div className="mb-[96px]">
+        <div className="mb-12 md:mb-[96px]">
           <h2 className="display-md text-ink mb-8">
             Education & Achievements
           </h2>
@@ -513,7 +513,7 @@ export function About() {
         ) : null}
 
         {timelineItems.length > 0 ? (
-        <div className="mb-[96px]">
+        <div className="mb-12 md:mb-[96px]">
           <h2 className="display-md text-ink mb-8">
             Engineering Project Timeline
           </h2>
@@ -560,7 +560,7 @@ export function About() {
         ) : null}
 
         {hasContactSection ? (
-        <div className="mb-[96px] max-w-2xl mx-auto text-left">
+        <div className="mb-12 md:mb-[96px] max-w-2xl mx-auto text-left">
           {hasText(data.contactHeading[language]) ? (
             <h2 className="display-md text-ink mb-8 text-center">
               {data.contactHeading[language]}
@@ -760,7 +760,7 @@ export function About() {
         ) : null}
 
         {hasQuote ? (
-        <div className="mb-[96px]">
+        <div className="mb-12 md:mb-[96px]">
           <div className="bg-canvas rounded-[24px] p-8 lg:p-12 shadow-sm border border-hairline">
             <blockquote className="text-center">
               <p className="display-sm text-ink opacity-80 mb-6 leading-relaxed serif-font">

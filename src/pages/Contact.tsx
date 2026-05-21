@@ -93,7 +93,7 @@ export function Contact() {
   const showEmail = settings?.socialVisibility?.email !== false;
 
   return (
-    <div className="max-w-[1280px] mx-auto px-6 lg:px-12 py-[80px]">
+    <div className="max-w-[1280px] mx-auto px-6 lg:px-12 py-12 md:py-[80px]">
       {/* Page Header */}
       <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
         <h1 className="display-xl text-ink">
