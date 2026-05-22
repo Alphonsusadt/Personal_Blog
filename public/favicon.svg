@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 24" width="120" height="48" fill="none">
+  <!-- Dynamic style that automatically adapts color in dark/light mode for favicons -->
+  <style>
+    text {
+      fill: #0f172a;
+    }
+    @media (prefers-color-scheme: dark) {
+      text {
+        fill: #ffffff;
+      }
+    }
+  </style>
+  <text x="30" y="18" font-family="Inter, SF Pro Display, system-ui, sans-serif" font-size="18" font-weight="800" letter-spacing="-1" text-anchor="middle">ALP</text>
+</svg>
