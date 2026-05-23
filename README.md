@@ -115,10 +115,13 @@ Sistem ini didesain sebagai portofolio premium dengan Content Management System 
 * **Sinkronisasi Pra-Translate**: Secara otomatis memicu penyimpanan draf (autosave) sebelum proses translate berjalan, sehingga mencegah hilangnya teks terbaru yang belum sempat terkirim ke server.
 
 ### 💾 2. Autosave & Pencegahan Konten Ganda (Anti-Duplication)
-* **Debounced Autosave**: Menyimpan perubahan konten secara cerdas setiap kali pengguna berhenti mengetik selama 6,5 detik tanpa membebani server (memakai debounce 800ms di level input editor).
+* **Debounced Autosave**: Menyimpan perubahan konten secara cerdas setiap kali pengguna berhenti mengetik tanpa membebani server (memakai debounce 800ms di level input editor).
 * **Idempotensi Rute Baru**: Saat membuat dokumen baru, editor secara transparan dialihkan ke rute edit spesifik `/edit/:id` setelah penyimpanan pertama sukses dilakukan.
 * **Server-Side Idempotence**: Backend secara aktif memfilter permintaan penyimpanan baru dengan mengecek keberadaan slug ID draf yang sama untuk mencegah terjadinya dokumen ganda.
 * **Pemetaan Filter Upsert MongoDB**: Modifikasi penanganan database agar `upsert` MongoDB secara akurat mencari kecocokan data menggunakan `_id` bertipe `ObjectId`, menjamin penyimpanan data yang aman dan cepat.
+* **Penyelamat Unmount (Unmount Safety)**: Menyediakan bendera pengaman (`skipUnloadSaveRef`) untuk mencegah kondisi balapan (*race condition*) React saat unmount/berpindah halaman tepat setelah melakukan klik Simpan secara manual, sehingga draft usang tidak tersimpan kembali ke browser lokal.
+* **Deteksi Konflik Tab Ganda (Multi-Tab Collision Warning)**: Menggunakan sesi ID unik dan *event listener* `storage` bawaan HTML5 untuk memantau tab editor secara *real-time*. Jika artikel yang sama dibuka di tab lain, sistem secara lokal menampilkan banner peringatan berkedip untuk mencegah tab saling menimpa draf.
+
 
 ### 🏷️ 3. Pengelolaan Kategori Dinamis (Dynamic Category Manager)
 * **Custom Category Creator**: Admin bebas membuat, menyortir, mengaktifkan/menonaktifkan kategori baru untuk Proyek, Artikel, maupun Buku.
