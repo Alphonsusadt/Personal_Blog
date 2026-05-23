@@ -681,6 +681,16 @@ export function BookEditor() {
         </div>
       </header>
 
+      {/* Multi-Tab Collision Warning Banner */}
+      {autosave.hasCollision && (
+        <div className="bg-amber-600/90 text-white px-6 py-2.5 flex items-center gap-2 text-sm font-medium border-b border-amber-700 animate-pulse">
+          <AlertCircle className="w-4.5 h-4.5 flex-shrink-0" />
+          <span>
+            Peringatan: Dokumen ini sedang dibuka di tab lain. Tutup tab ini atau tab lainnya untuk mencegah data tertimpa secara tidak sengaja.
+          </span>
+        </div>
+      )}
+
       {/* Main Content */}
       <main className="flex-1 p-6 overflow-auto">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl">

@@ -91,6 +91,7 @@ export function useAdminAutosave<T>({
   const [errorMessage, setErrorMessage] = useState('');
   const [hasDraft, setHasDraft] = useState(false);
   const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null);
+  const [hasCollision, setHasCollision] = useState(false);
 
   // ── Internal refs (don't trigger re-renders) ──────────────────────────────
   const localDebounceRef    = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -378,6 +379,40 @@ export function useAdminAutosave<T>({
     };
   }, []);
 
+  // ── Effect: Multi-Tab Collision Prevention ───────────────────────────────
+  useEffect(() => {
+    if (!enabled) return;
+
+    const sessionKey = `active_editor_${storageKey}`;
+    // Unique session ID for this tab instance
+    const mySessionId = Math.random().toString(36).substring(2, 10) + '_' + Date.now();
+
+    // Claim the active editing session
+    localStorage.setItem(sessionKey, mySessionId);
+    setHasCollision(false);
+
+    const handleStorageChange = (e: StorageEvent) => {
+      // If session key changes and the new value is not ours, another tab has opened this same article!
+      if (e.key === sessionKey && e.newValue && e.newValue !== mySessionId) {
+        setHasCollision(true);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      // Clean up session if we were the active session owner
+      try {
+        if (localStorage.getItem(sessionKey) === mySessionId) {
+          localStorage.removeItem(sessionKey);
+        }
+      } catch (err) {
+        // Ignore potential cross-origin or incognito restrictions
+      }
+    };
+  }, [enabled, storageKey]);
+
   // ── Public API ────────────────────────────────────────────────────────────
 
   return {
@@ -390,5 +425,6 @@ export function useAdminAutosave<T>({
     clearDraft,
     readDraft,
     persistLocalDraft,
+    hasCollision,
   };
 }
