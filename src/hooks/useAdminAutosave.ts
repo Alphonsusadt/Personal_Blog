@@ -92,6 +92,8 @@ export function useAdminAutosave<T>({
   const [hasDraft, setHasDraft] = useState(false);
   const [draftTimestamp, setDraftTimestamp] = useState<number | null>(null);
   const [hasCollision, setHasCollision] = useState(false);
+  const [hasBackup, setHasBackup] = useState(false);
+  const [backupTimestamp, setBackupTimestamp] = useState<number | null>(null);
 
   // ── Internal refs (don't trigger re-renders) ──────────────────────────────
   const localDebounceRef    = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -138,8 +140,21 @@ export function useAdminAutosave<T>({
 
   // ── Draft management ──────────────────────────────────────────────────────
 
-  const clearDraft = useCallback(() => {
+  const clearDraft = useCallback((options?: { backup?: boolean }) => {
     try {
+      if (options?.backup) {
+        const stored = localStorage.getItem(storageKey);
+        if (stored) {
+          localStorage.setItem(`${storageKey}_backup`, stored);
+          setHasBackup(true);
+          try {
+            const parsed = JSON.parse(stored);
+            setBackupTimestamp(parsed.timestamp ?? null);
+          } catch {
+            setBackupTimestamp(Date.now());
+          }
+        }
+      }
       localStorage.removeItem(storageKey);
       setHasDraft(false);
       setDraftTimestamp(null);
@@ -268,7 +283,28 @@ export function useAdminAutosave<T>({
     }
   }, [storageKey]);
 
-  // ── Effect: read draft metadata on mount ──────────────────────────────────
+  const readBackupDraft = useCallback((): { data: T; timestamp: number } | null => {
+    try {
+      const stored = localStorage.getItem(`${storageKey}_backup`);
+      if (!stored) return null;
+      return JSON.parse(stored);
+    } catch (err) {
+      console.error('[autosave] read backup draft failed:', err);
+      return null;
+    }
+  }, [storageKey]);
+
+  const clearBackupDraft = useCallback(() => {
+    try {
+      localStorage.removeItem(`${storageKey}_backup`);
+      setHasBackup(false);
+      setBackupTimestamp(null);
+    } catch (err) {
+      console.error('[autosave] clear backup draft failed:', err);
+    }
+  }, [storageKey]);
+
+  // ── Effect: read draft & backup metadata on mount ──────────────────────────
 
   useEffect(() => {
     const draft = readDraft();
@@ -276,7 +312,18 @@ export function useAdminAutosave<T>({
       setHasDraft(true);
       setDraftTimestamp(draft.timestamp ?? null);
     }
-  }, [readDraft]);
+
+    try {
+      const storedBackup = localStorage.getItem(`${storageKey}_backup`);
+      if (storedBackup) {
+        setHasBackup(true);
+        const parsed = JSON.parse(storedBackup);
+        setBackupTimestamp(parsed.timestamp ?? null);
+      }
+    } catch (err) {
+      // ignore
+    }
+  }, [readDraft, storageKey]);
 
   // ── Effect: 1 DEBOUNCE + 2 DIRTY FLAG → local draft ─────────────────────
 
@@ -426,5 +473,9 @@ export function useAdminAutosave<T>({
     readDraft,
     persistLocalDraft,
     hasCollision,
+    hasBackup,
+    backupTimestamp,
+    readBackupDraft,
+    clearBackupDraft,
   };
 }

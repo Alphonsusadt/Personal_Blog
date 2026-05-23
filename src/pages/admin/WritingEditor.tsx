@@ -8,7 +8,7 @@ import { LinkInsertDialog } from '../../components/LinkInsertDialog';
 import { FullPagePreview } from '../../components/FullPagePreview';
 import { sanitizeMarkdown } from '../../lib/mediaUploader';
 import { hasBase64Images } from '../../utils/media';
-import { ArrowLeft, Check, Maximize2, AlertCircle, EyeOff, Eye } from 'lucide-react';
+import { ArrowLeft, Check, Maximize2, AlertCircle, EyeOff, Eye, HardDrive } from 'lucide-react';
 import { useRenderedMarkdown } from '../../hooks/useRenderedMarkdown';
 import { formatDraftTime } from '../../hooks/useLocalDraft';
 import { IsolatedContentEditor } from '../../components/IsolatedInput';
@@ -389,8 +389,27 @@ export function WritingEditor() {
 
   // Discard draft
   const discardDraft = () => {
-    autosave.clearDraft();
-    setShowDraftRecovery(false);
+    const confirmMessage = autoFixLanguage === 'id'
+      ? 'Apakah Anda yakin ingin membuang draft lokal ini? Ketikan Anda yang belum disimpan ke server akan terhapus secara permanen.'
+      : 'Are you sure you want to discard this local draft? Your unsaved writing will be permanently deleted.';
+
+    if (window.confirm(confirmMessage)) {
+      autosave.clearDraft({ backup: true });
+      setShowDraftRecovery(false);
+    }
+  };
+
+  const restoreBackupDraft = () => {
+    const backup = autosave.readBackupDraft();
+    if (backup) {
+      setWriting(backup.data);
+      autosave.persistLocalDraft(backup.data);
+    }
+    autosave.clearBackupDraft();
+  };
+
+  const discardBackupDraft = () => {
+    autosave.clearBackupDraft();
   };
 
   // Stable update callback
@@ -716,6 +735,34 @@ export function WritingEditor() {
           <span>
             Peringatan: Dokumen ini sedang dibuka di tab lain. Tutup tab ini atau tab lainnya untuk mencegah data tertimpa secara tidak sengaja.
           </span>
+        </div>
+      )}
+
+      {/* Backup Draft Recovery Banner */}
+      {autosave.hasBackup && !autosave.hasDraft && (
+        <div className="bg-indigo-600/90 text-white px-6 py-2.5 flex items-center justify-between gap-2 text-sm font-medium border-b border-indigo-700">
+          <div className="flex items-center gap-2">
+            <HardDrive className="w-4.5 h-4.5 flex-shrink-0" />
+            <span>
+              {autoFixLanguage === 'id'
+                ? `Terdeteksi draf cadangan dari ${autosave.backupTimestamp ? formatDraftTime(autosave.backupTimestamp) : 'sebelumnya'} yang dibuang secara tidak sengaja.`
+                : `Detected a backup draft from ${autosave.backupTimestamp ? formatDraftTime(autosave.backupTimestamp) : 'previously'} that was discarded accidentally.`}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={restoreBackupDraft}
+              className="bg-white text-indigo-700 hover:bg-indigo-50 px-3 py-1 rounded text-xs font-semibold transition-colors"
+            >
+              {autoFixLanguage === 'id' ? 'Pulihkan' : 'Restore'}
+            </button>
+            <button
+              onClick={discardBackupDraft}
+              className="text-white/80 hover:text-white text-xs font-medium transition-colors"
+            >
+              {autoFixLanguage === 'id' ? 'Abaikan' : 'Dismiss'}
+            </button>
+          </div>
         </div>
       )}
 
