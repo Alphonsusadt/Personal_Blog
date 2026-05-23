@@ -8,6 +8,7 @@ import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
 import { getLucideIcon } from '../lib/iconMap';
 import { API_BASE } from '../lib/api';
+import { getDeterministicCategoryColor } from '../utils/categoryColor';
 
 interface ProjectCardProps {
   project: Project;
@@ -82,7 +83,7 @@ function CategoryIcon({ category, icon }: { category: Project['category']; icon?
           <img
             src={resolveIconSrc(icon)}
             alt=""
-            className="w-8 h-8 object-contain"
+            className="w-8 h-8 object-contain category-icon-inactive"
             onError={() => setImgError(true)}
           />
         </div>
@@ -125,7 +126,7 @@ export function ProjectCard({ project, featured = false, categoryIcon }: Project
       case 'data-analysis':
         return 'bg-block-pink text-ink';
       default:
-        return 'bg-surface-soft text-ink';
+        return `${getDeterministicCategoryColor(category)} text-ink`;
     }
   };
 

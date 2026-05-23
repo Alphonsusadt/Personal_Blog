@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { resolveLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
+import { getDeterministicCategoryColor } from '../utils/categoryColor';
 
 interface BookCardProps {
   book: Book;
@@ -58,7 +59,7 @@ export function BookCard({ book }: BookCardProps) {
       case 'philosophy':
         return 'bg-block-coral text-ink border border-hairline';
       default:
-        return 'bg-surface-soft text-ink border border-hairline';
+        return `${getDeterministicCategoryColor(category)} text-ink border border-hairline`;
     }
   };
 

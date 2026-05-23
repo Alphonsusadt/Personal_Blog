@@ -8,6 +8,7 @@ import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
 import { getLucideIcon } from '../lib/iconMap';
 import { API_BASE } from '../lib/api';
+import { getDeterministicCategoryColor } from '../utils/categoryColor';
 
 interface WritingCardProps {
   writing: Writing;
@@ -36,8 +37,8 @@ export function WritingCard({ writing, categoryIcon }: WritingCardProps) {
           <img
             src={resolveIconSrc(categoryIcon)}
             alt=""
-            className="w-5 h-5 object-contain"
-            onError={() => setImgError(false)}
+            className="w-5 h-5 object-contain category-icon-inactive"
+            onError={() => setImgError(true)}
           />
         );
       }
@@ -77,7 +78,7 @@ export function WritingCard({ writing, categoryIcon }: WritingCardProps) {
       case 'fiction':
         return 'bg-block-coral text-ink border border-hairline';
       default:
-        return 'bg-surface-soft text-ink border border-hairline';
+        return `${getDeterministicCategoryColor(category)} text-ink border border-hairline`;
     }
   };
 
