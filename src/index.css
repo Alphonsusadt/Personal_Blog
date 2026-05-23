@@ -242,3 +242,12 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
+
+.category-icon-active {
+  filter: brightness(0) invert(1);
+}
+
+.dark .category-icon-active {
+  filter: brightness(0);
+}
+
