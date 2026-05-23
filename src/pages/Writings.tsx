@@ -21,7 +21,7 @@ function CategoryIcon({ icon, className, inverted }: { icon: string; className?:
   const isUrl = icon.startsWith('http') || icon.startsWith('/');
   const isEmoji = /\p{Emoji}/u.test(icon) && !icon.startsWith('http') && icon.length <= 4;
 
-  const invertClass = inverted ? 'category-icon-active' : '';
+  const invertClass = inverted ? 'category-icon-active' : 'category-icon-inactive';
 
   if (isUrl && !imgError) return <img src={resolveIconSrc(icon)} alt="" className={`object-contain ${invertClass} ${className || ''}`} style={{ width: 16, height: 16 }} onError={() => setImgError(true)} />;
   if (isEmoji) return <span className={className} style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>;

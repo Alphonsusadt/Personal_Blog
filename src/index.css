@@ -251,3 +251,12 @@
   filter: brightness(0);
 }
 
+.category-icon-inactive {
+  /* Default original style in light mode */
+}
+
+.dark .category-icon-inactive {
+  filter: brightness(0) invert(1);
+}
+
+
