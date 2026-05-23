@@ -109,6 +109,8 @@ export function useAdminAutosave<T>({
   const isSavingRef = useRef(false);
   // Skip-first-render guard
   const initializedRef = useRef(false);
+  // Safety flag to prevent saving a local draft on unmount/unload if we just saved to the server
+  const skipUnloadSaveRef = useRef(false);
 
   // Stable ref to always-current data (avoid stale closure in callbacks)
   const dataRef = useRef(data);
@@ -232,6 +234,7 @@ export function useAdminAutosave<T>({
   // ── Public: mark as saved (used by manual save to sync dirty flag) ────────
   
   const markAsSaved = useCallback((snapshot: T) => {
+    skipUnloadSaveRef.current = true;
     dataRef.current = snapshot; // Synchronously update ref to avoid stale state on immediate unmount
     lastSavedFingerprintRef.current = fingerprint(snapshot);
     clearDraft();
@@ -298,6 +301,9 @@ export function useAdminAutosave<T>({
     const fp = fingerprint(data);
     if (fp === lastSavedFingerprintRef.current) return;
 
+    // Reset safety flag since data has changed (user started typing again)
+    skipUnloadSaveRef.current = false;
+
     // Freeze snapshot NOW (prepared statement binding)
     const snapshot: T = JSON.parse(fp) as T;
     versionRef.current += 1;
@@ -341,6 +347,10 @@ export function useAdminAutosave<T>({
   useEffect(() => {
     if (!enabled) return;
     const handleUnload = () => {
+      if (skipUnloadSaveRef.current) {
+        clearDraft();
+        return;
+      }
       const currentFp = fingerprint(dataRef.current);
       // Only save draft if there are unsaved changes compared to last server save
       if (currentFp !== lastSavedFingerprintRef.current) {
