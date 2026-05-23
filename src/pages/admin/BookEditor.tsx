@@ -300,11 +300,14 @@ export function BookEditor() {
     if (cached) {
       setBook(cached);
       setLoading(false);
+      // Initialize autosave dirty-flag baseline with cached data
+      autosave.markAsSaved(cached);
       api
         .get(`/api/books/admin/${encodeURIComponent(slug)}`)
         .then((data: Book) => {
           setRuntimeCache(cacheKey, data);
           setBook(data);
+          autosave.markAsSaved(data);
         })
         .catch(() => {
           api.get('/api/books').then((books: Book[]) => {
@@ -312,6 +315,7 @@ export function BookEditor() {
             if (found) {
               setRuntimeCache(cacheKey, found);
               setBook(found);
+              autosave.markAsSaved(found);
             }
           }).catch(console.error);
         });
@@ -323,6 +327,7 @@ export function BookEditor() {
       .then((data: Book) => {
         setRuntimeCache(cacheKey, data);
         setBook(data);
+        autosave.markAsSaved(data);
       })
       .catch(() => {
         // Fallback: load all and search client-side
@@ -331,6 +336,7 @@ export function BookEditor() {
           if (found) {
             setRuntimeCache(cacheKey, found);
             setBook(found);
+            autosave.markAsSaved(found);
           }
         }).catch(console.error);
       })

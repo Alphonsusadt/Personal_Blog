@@ -335,11 +335,14 @@ export function WritingEditor() {
     if (cached) {
       setWriting(cached);
       setLoading(false);
+      // Initialize autosave dirty-flag baseline with cached data
+      autosave.markAsSaved(cached);
       api
         .get(`/api/writings/admin/${encodeURIComponent(slug)}`)
         .then((data: Writing) => {
           setRuntimeCache(cacheKey, data);
           setWriting(data);
+          autosave.markAsSaved(data);
         })
         .catch(() => {
           api.get('/api/writings').then((writings: Writing[]) => {
@@ -347,6 +350,7 @@ export function WritingEditor() {
             if (found) {
               setRuntimeCache(cacheKey, found);
               setWriting(found);
+              autosave.markAsSaved(found);
             }
           }).catch(console.error);
         });
@@ -358,6 +362,7 @@ export function WritingEditor() {
       .then((data: Writing) => {
         setRuntimeCache(cacheKey, data);
         setWriting(data);
+        autosave.markAsSaved(data);
       })
       .catch(() => {
         // Fallback: load all and search client-side
@@ -366,6 +371,7 @@ export function WritingEditor() {
           if (found) {
             setRuntimeCache(cacheKey, found);
             setWriting(found);
+            autosave.markAsSaved(found);
           }
         }).catch(console.error);
       })

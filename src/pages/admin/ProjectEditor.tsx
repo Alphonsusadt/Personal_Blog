@@ -307,11 +307,14 @@ export function ProjectEditor() {
     if (cached) {
       setProject(cached);
       setLoading(false);
+      // Initialize autosave dirty-flag baseline with cached data
+      autosave.markAsSaved(cached);
       api
         .get(`/api/projects/admin/${encodeURIComponent(slug)}`)
         .then((data: Project) => {
           setRuntimeCache(cacheKey, data);
           setProject(data);
+          autosave.markAsSaved(data);
         })
         .catch(() => {
           api.get('/api/projects').then((projects: Project[]) => {
@@ -319,6 +322,7 @@ export function ProjectEditor() {
             if (found) {
               setRuntimeCache(cacheKey, found);
               setProject(found);
+              autosave.markAsSaved(found);
             }
           }).catch(console.error);
         });
@@ -330,6 +334,7 @@ export function ProjectEditor() {
       .then((data: Project) => {
         setRuntimeCache(cacheKey, data);
         setProject(data);
+        autosave.markAsSaved(data);
       })
       .catch(() => {
         // Fallback: load all and search client-side
@@ -338,6 +343,7 @@ export function ProjectEditor() {
           if (found) {
             setRuntimeCache(cacheKey, found);
             setProject(found);
+            autosave.markAsSaved(found);
           }
         }).catch(console.error);
       })
