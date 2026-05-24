@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Github, Linkedin, Mail, Heart, GraduationCap, Code, Users, Send, AlertCircle, CheckCircle2, RefreshCw, Instagram, Twitter, Globe } from 'lucide-react';
 import { api } from '../lib/api';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
+import { formatExternalUrl } from '../utils/url';
 
 type LocalizedText = { en: string; id: string };
 type LocalizedStringArray = { en: string[]; id: string[] };
@@ -259,12 +260,12 @@ export function About() {
   const hasHeader = hasText(data.title[language]) || hasText(data.subtitle[language]);
   const hasHeroCard = hasText(data.bio[language]) || hasText(data.profileImage) || hasText(data.gpa) || hasText(data.projectsCount);
 
-  const linkedinUrl = settings?.socialLinks?.linkedin || data.socialLinks?.linkedin || 'https://linkedin.com/in/alphonsusadt';
-  const githubUrl = settings?.socialLinks?.github || data.socialLinks?.github || 'https://github.com/alphonsusadt';
-  const emailUrl = settings?.socialLinks?.email || data.socialLinks?.email || 'alphonsus@example.com';
-  const instagramUrl = settings?.socialLinks?.instagram || 'https://instagram.com/alphonsusadt';
-  const twitterUrl = settings?.socialLinks?.twitter || 'https://twitter.com/alphonsusadt';
-  const researchGateUrl = settings?.socialLinks?.researchgate || 'https://researchgate.net';
+  const linkedinUrl = formatExternalUrl(settings?.socialLinks?.linkedin || data.socialLinks?.linkedin || 'https://linkedin.com/in/alphonsusadt');
+  const githubUrl = formatExternalUrl(settings?.socialLinks?.github || data.socialLinks?.github || 'https://github.com/alphonsusadt');
+  const emailUrl = formatExternalUrl(settings?.socialLinks?.email || data.socialLinks?.email || 'alphonsus@example.com');
+  const instagramUrl = formatExternalUrl(settings?.socialLinks?.instagram || 'https://instagram.com/alphonsusadt');
+  const twitterUrl = formatExternalUrl(settings?.socialLinks?.twitter || 'https://twitter.com/alphonsusadt');
+  const researchGateUrl = formatExternalUrl(settings?.socialLinks?.researchgate || 'https://researchgate.net');
 
   const showLinkedin = settings?.socialVisibility?.linkedin !== false;
   const showGithub = settings?.socialVisibility?.github !== false;
@@ -747,7 +748,7 @@ export function About() {
               )}
               {showEmail && (
                 <a
-                  href={`mailto:${emailUrl}`}
+                  href={emailUrl}
                   className="flex items-center space-x-1.5 text-ink hover:opacity-85 transition-opacity"
                 >
                   <Mail className="w-4 h-4" />

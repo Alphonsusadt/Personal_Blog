@@ -11,6 +11,7 @@ import { t } from '../lib/translations';
 import type { Project } from '../data/projects';
 import type { Writing } from '../data/writings';
 import type { Book } from '../data/library';
+import { formatExternalUrl } from '../utils/url';
 
 type LocalizedText = { en: string; id: string };
 
@@ -332,12 +333,12 @@ export function Home() {
     }).catch(console.error);
   }, []);
 
-  const linkedinUrl = settings?.socialLinks?.linkedin || homeData.socialLinks?.linkedin || 'https://linkedin.com/in/alphonsusadt';
-  const githubUrl = settings?.socialLinks?.github || homeData.socialLinks?.github || 'https://github.com/alphonsusadt';
-  const emailUrl = settings?.socialLinks?.email || homeData.socialLinks?.email || 'alphonsus@example.com';
-  const instagramUrl = settings?.socialLinks?.instagram || 'https://instagram.com/alphonsusadt';
-  const twitterUrl = settings?.socialLinks?.twitter || 'https://twitter.com/alphonsusadt';
-  const researchGateUrl = settings?.socialLinks?.researchgate || 'https://researchgate.net';
+  const linkedinUrl = formatExternalUrl(settings?.socialLinks?.linkedin || homeData.socialLinks?.linkedin || 'https://linkedin.com/in/alphonsusadt');
+  const githubUrl = formatExternalUrl(settings?.socialLinks?.github || homeData.socialLinks?.github || 'https://github.com/alphonsusadt');
+  const emailUrl = formatExternalUrl(settings?.socialLinks?.email || homeData.socialLinks?.email || 'alphonsus@example.com');
+  const instagramUrl = formatExternalUrl(settings?.socialLinks?.instagram || 'https://instagram.com/alphonsusadt');
+  const twitterUrl = formatExternalUrl(settings?.socialLinks?.twitter || 'https://twitter.com/alphonsusadt');
+  const researchGateUrl = formatExternalUrl(settings?.socialLinks?.researchgate || 'https://researchgate.net');
 
   const showLinkedin = settings?.socialVisibility?.linkedin !== false;
   const showGithub = settings?.socialVisibility?.github !== false;
@@ -444,7 +445,7 @@ export function Home() {
                 )}
                 {showEmail && (
                   <a
-                    href={`mailto:${emailUrl}`}
+                    href={emailUrl}
                     className="flex items-center space-x-2 text-ink opacity-60 hover:opacity-100 transition-opacity group"
                   >
                     <Mail className="w-5 h-5" />

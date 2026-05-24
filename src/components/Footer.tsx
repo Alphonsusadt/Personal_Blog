@@ -5,6 +5,8 @@ import { api } from '../lib/api';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
 import { resolveLocalizedText, LocalizedTextValue } from '../lib/localized';
+import { formatExternalUrl } from '../utils/url';
+
 
 interface Settings {
   footerBio?: LocalizedTextValue;
@@ -70,12 +72,12 @@ export function Footer() {
     { to: '/contact', label: t('nav.contact', language) },
   ].filter((l) => l.enabled !== false);
 
-  const linkedinUrl = settings?.socialLinks?.linkedin || 'https://linkedin.com/in/alphonsusadt';
-  const githubUrl = settings?.socialLinks?.github || 'https://github.com/alphonsusadt';
-  const emailUrl = settings?.socialLinks?.email || 'alphonsus@example.com';
-  const instagramUrl = settings?.socialLinks?.instagram || 'https://instagram.com/alphonsusadt';
-  const twitterUrl = settings?.socialLinks?.twitter || 'https://twitter.com/alphonsusadt';
-  const researchGateUrl = settings?.socialLinks?.researchgate || 'https://researchgate.net';
+  const linkedinUrl = formatExternalUrl(settings?.socialLinks?.linkedin || 'https://linkedin.com/in/alphonsusadt');
+  const githubUrl = formatExternalUrl(settings?.socialLinks?.github || 'https://github.com/alphonsusadt');
+  const emailUrl = formatExternalUrl(settings?.socialLinks?.email || 'alphonsus@example.com');
+  const instagramUrl = formatExternalUrl(settings?.socialLinks?.instagram || 'https://instagram.com/alphonsusadt');
+  const twitterUrl = formatExternalUrl(settings?.socialLinks?.twitter || 'https://twitter.com/alphonsusadt');
+  const researchGateUrl = formatExternalUrl(settings?.socialLinks?.researchgate || 'https://researchgate.net');
 
   const showLinkedin = settings?.socialVisibility?.linkedin !== false;
   const showGithub = settings?.socialVisibility?.github !== false;
@@ -154,7 +156,7 @@ export function Footer() {
               )}
               {showEmail && (
                 <a 
-                  href={`mailto:${emailUrl}`} 
+                  href={emailUrl} 
                   className="text-inverse-ink opacity-60 hover:opacity-100 transition-opacity"
                   aria-label="Email"
                 >
@@ -257,7 +259,7 @@ export function Footer() {
               {showEmail && (
                 <li>
                   <a 
-                    href={`mailto:${emailUrl}`} 
+                    href={emailUrl} 
                     className="caption text-inverse-ink hover:opacity-70 transition-opacity flex items-center"
                   >
                     <Mail className="w-4 h-4 mr-2" />

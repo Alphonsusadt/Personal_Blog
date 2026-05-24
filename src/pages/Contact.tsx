@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Mail, Linkedin, Github, Send, AlertCircle, CheckCircle2, RefreshCw, Instagram, Twitter, Globe } from 'lucide-react';
 import { api } from '../lib/api';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
+import { formatExternalUrl } from '../utils/url';
 
 interface SettingsData {
   socialLinks?: {
@@ -78,12 +79,12 @@ export function Contact() {
     }
   };
 
-  const linkedinUrl = settings?.socialLinks?.linkedin || 'https://linkedin.com/in/alphonsusadt';
-  const githubUrl = settings?.socialLinks?.github || 'https://github.com/alphonsusadt';
-  const emailUrl = settings?.socialLinks?.email || 'alphonsus@example.com';
-  const instagramUrl = settings?.socialLinks?.instagram || 'https://instagram.com/alphonsusadt';
-  const twitterUrl = settings?.socialLinks?.twitter || 'https://twitter.com/alphonsusadt';
-  const researchGateUrl = settings?.socialLinks?.researchgate || 'https://researchgate.net';
+  const linkedinUrl = formatExternalUrl(settings?.socialLinks?.linkedin || 'https://linkedin.com/in/alphonsusadt');
+  const githubUrl = formatExternalUrl(settings?.socialLinks?.github || 'https://github.com/alphonsusadt');
+  const emailUrl = formatExternalUrl(settings?.socialLinks?.email || 'alphonsus@example.com');
+  const instagramUrl = formatExternalUrl(settings?.socialLinks?.instagram || 'https://instagram.com/alphonsusadt');
+  const twitterUrl = formatExternalUrl(settings?.socialLinks?.twitter || 'https://twitter.com/alphonsusadt');
+  const researchGateUrl = formatExternalUrl(settings?.socialLinks?.researchgate || 'https://researchgate.net');
 
   const showLinkedin = settings?.socialVisibility?.linkedin !== false;
   const showGithub = settings?.socialVisibility?.github !== false;
@@ -282,7 +283,7 @@ export function Contact() {
             )}
             {showEmail && (
               <a
-                href={`mailto:${emailUrl}`}
+                href={emailUrl}
                 className="flex items-center space-x-2 text-ink hover:opacity-85 transition-opacity"
               >
                 <Mail className="w-4.5 h-4.5" />
