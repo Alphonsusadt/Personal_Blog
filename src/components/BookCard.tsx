@@ -13,15 +13,16 @@ interface BookCardProps {
 export function BookCard({ book }: BookCardProps) {
   const { language } = useSiteLanguage();
   const renderStars = (rating: number) => {
+    const clampedRating = Math.max(0, Math.min(5, rating));
     const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
+    const fullStars = Math.floor(clampedRating);
+    const hasHalfStar = clampedRating % 1 !== 0;
 
     for (let i = 0; i < fullStars; i++) {
       stars.push(
         <Star
           key={`full-${i}`}
-          className="w-4 h-4 fill-yellow-400 text-yellow-400"
+          className="w-4 h-4 fill-yellow-400 text-yellow-400 flex-shrink-0"
         />
       );
     }
@@ -30,17 +31,17 @@ export function BookCard({ book }: BookCardProps) {
       stars.push(
         <StarHalf
           key="half"
-          className="w-4 h-4 fill-yellow-400 text-yellow-400"
+          className="w-4 h-4 fill-yellow-400 text-yellow-400 flex-shrink-0"
         />
       );
     }
 
-    const emptyStars = 5 - Math.ceil(rating);
+    const emptyStars = 5 - Math.ceil(clampedRating);
     for (let i = 0; i < emptyStars; i++) {
       stars.push(
         <Star
           key={`empty-${i}`}
-          className="w-4 h-4 text-gray-300"
+          className="w-4 h-4 text-gray-300 flex-shrink-0"
         />
       );
     }
@@ -91,11 +92,11 @@ export function BookCard({ book }: BookCardProps) {
             />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center space-x-2 mb-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
               <span className={`inline-flex items-center px-2.5 py-1 rounded-[6px] text-xs ${getCategoryColor(book.category)}`}>
                 {getCategoryLabel(book.category)}
               </span>
-              <div className="flex items-center space-x-1">
+              <div className="flex items-center space-x-1 flex-shrink-0">
                 {renderStars(book.rating)}
               </div>
             </div>

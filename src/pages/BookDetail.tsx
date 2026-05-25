@@ -88,30 +88,31 @@ function CategoryBadge({ category, language }: { category: BookType['category'];
 }
 
 function StarRating({ rating }: { rating: number }) {
+  const clampedRating = Math.max(0, Math.min(5, rating));
   const stars = [];
-  const fullStars = Math.floor(rating);
-  const hasHalfStar = rating % 1 !== 0;
+  const fullStars = Math.floor(clampedRating);
+  const hasHalfStar = clampedRating % 1 !== 0;
 
   for (let i = 0; i < fullStars; i++) {
     stars.push(
-      <Star key={`full-${i}`} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+      <Star key={`full-${i}`} className="w-5 h-5 fill-yellow-400 text-yellow-400 flex-shrink-0" />
     );
   }
 
   if (hasHalfStar) {
     stars.push(
-      <StarHalf key="half" className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+      <StarHalf key="half" className="w-5 h-5 fill-yellow-400 text-yellow-400 flex-shrink-0" />
     );
   }
 
-  const emptyStars = 5 - Math.ceil(rating);
+  const emptyStars = 5 - Math.ceil(clampedRating);
   for (let i = 0; i < emptyStars; i++) {
     stars.push(
-      <Star key={`empty-${i}`} className="w-5 h-5 text-hairline" />
+      <Star key={`empty-${i}`} className="w-5 h-5 text-hairline flex-shrink-0" />
     );
   }
 
-  return <div className="flex items-center gap-0.5">{stars}</div>;
+  return <div className="flex items-center gap-0.5 flex-shrink-0">{stars}</div>;
 }
 
 export function BookDetail() {
