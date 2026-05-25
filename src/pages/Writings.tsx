@@ -4,7 +4,7 @@ import { getLucideIcon } from '../lib/iconMap';
 import { WritingCard } from '../components/WritingCard';
 import { api, API_BASE } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
-import { resolveLocalizedText } from '../lib/localized';
+import { resolveLocalizedText, getExactLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
 
@@ -123,10 +123,9 @@ export function Writings() {
         return false;
       }
 
-      // For bilingual content, allow showing even if specific language is missing
-      // (resolveLocalizedText will fallback to other language)
-      const title = resolveLocalizedText(writing.title, language);
-      if (!title) return false; // Only filter if NO title exists at all
+      // Only show content if it has a title in the active language
+      const title = getExactLocalizedText(writing.title, language);
+      if (!title) return false;
 
       const excerpt = resolveLocalizedText(writing.excerpt, language);
       const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase()) ||

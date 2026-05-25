@@ -6,7 +6,7 @@ import { WritingCard } from '../components/WritingCard';
 import { BookCard } from '../components/BookCard';
 import { api } from '../lib/api';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
-import { resolveLocalizedText } from '../lib/localized';
+import { resolveLocalizedText, getExactLocalizedText } from '../lib/localized';
 import { t } from '../lib/translations';
 import type { Project } from '../data/projects';
 import type { Writing } from '../data/writings';
@@ -268,9 +268,8 @@ export function Home() {
   const recentProjects = useMemo(() => {
     return allProjects.filter(p => {
       if (p.contentLanguage && p.contentLanguage !== 'bilingual' && p.contentLanguage !== language) return false;
-      if (p.contentLanguage === 'bilingual' || !p.contentLanguage) {
-        if (!resolveLocalizedText(p.title, language)) return false;
-      }
+      const exactTitle = getExactLocalizedText(p.title, language);
+      if (!exactTitle) return false;
       return true;
     }).slice(0, 3);
   }, [allProjects, language]);
@@ -278,9 +277,8 @@ export function Home() {
   const recentWritings = useMemo(() => {
     return allWritings.filter(w => {
       if (w.contentLanguage && w.contentLanguage !== 'bilingual' && w.contentLanguage !== language) return false;
-      if (w.contentLanguage === 'bilingual' || !w.contentLanguage) {
-        if (!resolveLocalizedText(w.title, language)) return false;
-      }
+      const exactTitle = getExactLocalizedText(w.title, language);
+      if (!exactTitle) return false;
       return true;
     }).slice(0, 3);
   }, [allWritings, language]);
@@ -288,9 +286,8 @@ export function Home() {
   const featuredBooks = useMemo(() => {
     return allBooks.filter(b => {
       if (b.contentLanguage && b.contentLanguage !== 'bilingual' && b.contentLanguage !== language) return false;
-      if (b.contentLanguage === 'bilingual' || !b.contentLanguage) {
-        if (!resolveLocalizedText(b.title, language)) return false;
-      }
+      const exactTitle = getExactLocalizedText(b.title, language);
+      if (!exactTitle) return false;
       return true;
     }).slice(0, 3);
   }, [allBooks, language]);
