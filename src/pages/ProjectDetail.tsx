@@ -3,6 +3,7 @@ import { ArrowLeft, Calendar, Tag, ExternalLink, Clock } from 'lucide-react';
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { embedYouTube } from '../lib/youtubeEmbed';
+import { embedInstagram, embedX } from '../lib/socialEmbed';
 import { CodeBlock } from '../components/CodeBlock';
 import { resolveLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
@@ -134,6 +135,10 @@ async function renderMarkdown(content: string): Promise<string> {
   // Embed YouTube videos from links and bare URLs
   html = embedYouTube(html);
 
+  // Embed Instagram and X/Twitter posts
+  html = embedInstagram(html);
+  html = embedX(html);
+
   return html;
 }
 
@@ -214,6 +219,41 @@ function MermaidDiagram({ code, id }: { code: string; id: string }) {
   );
 }
 
+function loadTwitterScript(callback: () => void) {
+  if ((window as any).twttr && (window as any).twttr.widgets) {
+    callback();
+    return;
+  }
+
+  const existingScript = document.querySelector('script[src="https://platform.twitter.com/widgets.js"]');
+  if (existingScript) {
+    existingScript.addEventListener('load', () => {
+      if ((window as any).twttr && (window as any).twttr.widgets) {
+        callback();
+      }
+    });
+    const interval = setInterval(() => {
+      if ((window as any).twttr && (window as any).twttr.widgets) {
+        clearInterval(interval);
+        callback();
+      }
+    }, 100);
+    setTimeout(() => clearInterval(interval), 5000);
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.src = 'https://platform.twitter.com/widgets.js';
+  script.async = true;
+  script.charset = 'utf-8';
+  script.onload = () => {
+    if ((window as any).twttr && (window as any).twttr.widgets) {
+      callback();
+    }
+  };
+  document.body.appendChild(script);
+}
+
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -284,6 +324,23 @@ export function ProjectDetail() {
     });
     return () => { cancelled = true; };
   }, [rawParts]);
+
+  // Hydrate X/Twitter widgets when content is rendered
+  useEffect(() => {
+    const hasTweets = document.querySelector('.twitter-tweet');
+    if (!hasTweets) return;
+
+    const isDark = document.documentElement.classList.contains('dark');
+    document.querySelectorAll('.twitter-tweet').forEach((bq) => {
+      bq.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    });
+
+    loadTwitterScript(() => {
+      if ((window as any).twttr && (window as any).twttr.widgets) {
+        (window as any).twttr.widgets.load();
+      }
+    });
+  }, [renderedParts]);
 
   if (loading) {
     return (

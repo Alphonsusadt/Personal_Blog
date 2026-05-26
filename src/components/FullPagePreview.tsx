@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { useEffect } from 'react';
 import { useRenderedMarkdown } from '../hooks/useRenderedMarkdown';
 import { Star, CheckCircle, Calendar, Clock, Tag, Github, FileText, Globe } from 'lucide-react';
 
@@ -100,9 +101,61 @@ export function FullPagePreview({ isOpen, onClose, type, data }: FullPagePreview
   );
 }
 
+function loadTwitterScript(callback: () => void) {
+  if ((window as any).twttr && (window as any).twttr.widgets) {
+    callback();
+    return;
+  }
+
+  const existingScript = document.querySelector('script[src="https://platform.twitter.com/widgets.js"]');
+  if (existingScript) {
+    existingScript.addEventListener('load', () => {
+      if ((window as any).twttr && (window as any).twttr.widgets) {
+        callback();
+      }
+    });
+    const interval = setInterval(() => {
+      if ((window as any).twttr && (window as any).twttr.widgets) {
+        clearInterval(interval);
+        callback();
+      }
+    }, 100);
+    setTimeout(() => clearInterval(interval), 5000);
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.src = 'https://platform.twitter.com/widgets.js';
+  script.async = true;
+  script.charset = 'utf-8';
+  script.onload = () => {
+    if ((window as any).twttr && (window as any).twttr.widgets) {
+      callback();
+    }
+  };
+  document.body.appendChild(script);
+}
+
 // Writing Preview Component
 function WritingPreview({ data }: { data: Writing }) {
   const contentHtml = useRenderedMarkdown(data.content || '*Mulai menulis untuk melihat preview...*');
+  
+  useEffect(() => {
+    const hasTweets = document.querySelector('.twitter-tweet');
+    if (!hasTweets) return;
+
+    const isDark = document.documentElement.classList.contains('dark');
+    document.querySelectorAll('.twitter-tweet').forEach((bq) => {
+      bq.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    });
+
+    loadTwitterScript(() => {
+      if ((window as any).twttr && (window as any).twttr.widgets) {
+        (window as any).twttr.widgets.load();
+      }
+    });
+  }, [contentHtml]);
+
   const categoryLabels: Record<string, string> = {
     'reflections': 'Refleksi',
     'technical': 'Teknikal',
@@ -262,6 +315,23 @@ function BookPreview({ data }: { data: Book }) {
 // Project Preview Component
 function ProjectPreview({ data }: { data: Project }) {
   const contentHtml = useRenderedMarkdown(data.content || '*Mulai menulis untuk melihat preview...*');
+
+  useEffect(() => {
+    const hasTweets = document.querySelector('.twitter-tweet');
+    if (!hasTweets) return;
+
+    const isDark = document.documentElement.classList.contains('dark');
+    document.querySelectorAll('.twitter-tweet').forEach((bq) => {
+      bq.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    });
+
+    loadTwitterScript(() => {
+      if ((window as any).twttr && (window as any).twttr.widgets) {
+        (window as any).twttr.widgets.load();
+      }
+    });
+  }, [contentHtml]);
+
   const statusColors: Record<string, string> = {
     'planning': 'bg-blue-100 text-blue-700',
     'ongoing': 'bg-yellow-100 text-yellow-700',

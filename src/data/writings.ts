@@ -46,7 +46,23 @@ This humility serves my faith well. Just as I cannot fully comprehend the Fourie
 
 Biomedical engineering is more than a career—it's a vocation. Every device I help design, every signal I help clarify, has the potential to heal, to comfort, to extend life. This work becomes a form of service, a way to participate in the ongoing work of creation and restoration.
 
-In the quiet moments between heartbeats, both on the screen and in my own chest, I find a rhythm that connects the work of my hands with the longing of my heart.`
+In the quiet moments between heartbeats, both on the screen and in my own chest, I find a rhythm that connects the work of my hands with the longing of my heart.
+
+## Embedded Content Test Section
+
+### Instagram Post
+[instagram](https://www.instagram.com/p/C1hsBnapYG0/?utm_source=ig_web_copy_link&igsh=MzRlODBiNWFlZA==)
+
+### X (Twitter) Posts
+[link](https://x.com/Alphonsusadt/status/2055374451039186995)
+[link](https://x.com/Alphonsusadt/status/2055374451039186995)
+
+### YouTube Video
+https://youtu.be/xj3xEisC7D4?si=v89Ip-gdmTN-n1eN
+
+### Free Link Test
+[Google Search](https://www.google.com)
+`
   },
   {
     id: 'laboratory-silence',

@@ -144,6 +144,36 @@
   border: 0;
 }
 
+/* Instagram and X responsive embeds */
+.instagram-embed-container iframe,
+.x-tweet-container .twitter-tweet,
+.x-tweet-container iframe {
+  max-width: 100% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+.x-tweet-container {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  width: 100% !important;
+  text-align: center !important;
+}
+
+/* Force X/Twitter generated widget element to center */
+.twitter-tweet-rendered,
+twitter-widget {
+  margin: 1.5rem auto !important;
+  display: block !important;
+}
+
+@media (max-width: 640px) {
+  .instagram-embed-container iframe {
+    height: 480px !important; /* Slightly shorter on mobile to fit screen ratio */
+  }
+}
+
 .dark {
   --color-background: var(--color-block-navy);
   --color-primary-text: var(--color-inverse-ink);

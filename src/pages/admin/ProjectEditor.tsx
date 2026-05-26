@@ -116,6 +116,41 @@ function createAutosaveDraftId(title: string, content: string, prefix: string): 
   return slug || `${prefix}-draft-${Date.now()}`;
 }
 
+function loadTwitterScript(callback: () => void) {
+  if ((window as any).twttr && (window as any).twttr.widgets) {
+    callback();
+    return;
+  }
+
+  const existingScript = document.querySelector('script[src="https://platform.twitter.com/widgets.js"]');
+  if (existingScript) {
+    existingScript.addEventListener('load', () => {
+      if ((window as any).twttr && (window as any).twttr.widgets) {
+        callback();
+      }
+    });
+    const interval = setInterval(() => {
+      if ((window as any).twttr && (window as any).twttr.widgets) {
+        clearInterval(interval);
+        callback();
+      }
+    }, 100);
+    setTimeout(() => clearInterval(interval), 5000);
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.src = 'https://platform.twitter.com/widgets.js';
+  script.async = true;
+  script.charset = 'utf-8';
+  script.onload = () => {
+    if ((window as any).twttr && (window as any).twttr.widgets) {
+      callback();
+    }
+  };
+  document.body.appendChild(script);
+}
+
 export function ProjectEditor() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
@@ -144,6 +179,22 @@ export function ProjectEditor() {
   const exactLocalizedTitle = getExactLocalizedText(project.title, autoFixLanguage);
   const exactLocalizedContent = getExactLocalizedText(project.content, autoFixLanguage);
   const previewHtml = useRenderedMarkdown(exactLocalizedContent || '*Start writing to see preview...*');
+
+  useEffect(() => {
+    const hasTweets = document.querySelector('.twitter-tweet');
+    if (!hasTweets) return;
+
+    const isDark = document.documentElement.classList.contains('dark');
+    document.querySelectorAll('.twitter-tweet').forEach((bq) => {
+      bq.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    });
+
+    loadTwitterScript(() => {
+      if ((window as any).twttr && (window as any).twttr.widgets) {
+        (window as any).twttr.widgets.load();
+      }
+    });
+  }, [previewHtml]);
 
   const [caretWord, setCaretWord] = useState<{ word: string; start: number; end: number } | null>(null);
   const [caretSuggestions, setCaretSuggestions] = useState<string[]>([]);

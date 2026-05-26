@@ -43,7 +43,7 @@ function extractYouTubeId(url: string): string | null {
  * Matches: youtube.com/watch?v=, youtu.be/, youtube.com/embed/, youtube.com/shorts/
  */
 const YT_URL_REGEX =
-  /https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?[^"'\s<>]*?v=[a-zA-Z0-9_-]{11}|embed\/[a-zA-Z0-9_-]{11}|shorts\/[a-zA-Z0-9_-]{11})|youtu\.be\/[a-zA-Z0-9_-]{11})/gi;
+  /https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?[^"'\s<>]*?v=[a-zA-Z0-9_-]{11}|embed\/[a-zA-Z0-9_-]{11}|shorts\/[a-zA-Z0-9_-]{11})|youtu\.be\/[a-zA-Z0-9_-]{11})[^\s"<>']*/gi;
 
 /**
  * Regex to find YouTube URLs inside <a> tag href attributes.

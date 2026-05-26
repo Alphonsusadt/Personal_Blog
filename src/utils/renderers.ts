@@ -326,6 +326,10 @@ export async function renderMarkdown(content: string): Promise<string> {
     // Embed YouTube videos from links and bare URLs
     const { embedYouTube } = await import('../lib/youtubeEmbed');
     processed = embedYouTube(processed);
+    // Embed Instagram and X/Twitter posts
+    const { embedInstagram, embedX } = await import('../lib/socialEmbed');
+    processed = embedInstagram(processed);
+    processed = embedX(processed);
     return processed;
   } catch (e) {
     console.error('[renderMarkdown] Error, falling back to basic markdown:', e);
