@@ -163,6 +163,13 @@ Sistem ini didesain sebagai portofolio premium dengan Content Management System 
 * **Cloudinary (Manajemen Aset Media)**: Unggah file media gambar, sampul ulasan buku, dan ikon kustom secara instan dan aman ke Cloudinary CDN, lengkap dengan pengoptimalan ukuran berkas secara dinamis.
 * **Konfigurasi API Keamanan**: Menggunakan variabel lingkungan (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`) di dalam berkas `.env` lokal untuk keamanan autentikasi.
 
+### 📝 9. Visual Rich Text Editor Premium (WYSIWYG Tiptap)
+* **Visual WYSIWYG Editor**: Menggantikan textarea markdown tradisional dengan editor visual premium bergaya Microsoft Word menggunakan **Tiptap**.
+* **Penyematan Media Langsung (Interactive Media Embeds)**: URL YouTube, Instagram, dan X (Twitter) yang disalin langsung dirender sebagai kartu visual interaktif di dalam kanvas edit.
+* **Resizer Gambar & Media Kustom**: Dilengkapi handle drag-to-resize interaktif warna biru di pojok kanan bawah gambar dan media embed untuk mengubah ukuran persentase lebar (dari 15% hingga 100%) secara langsung serta mendukung alignment (float kiri/kanan dengan pembungkusan teks, atau center).
+* **Editor Kode Visual & Penomoran Baris (Line Numbers Gutter)**: Blok kode dilengkapi dengan baris penomoran dinamis (*line numbers gutter*) di sebelah kiri yang sinkron secara real-time dan dropdown pemilih bahasa pemrograman (mendukung input nama bahasa kustom).
+* **Editor Persamaan Matematika LaTeX (KaTeX)**: Dilengkapi tombol Sigma (Σ) khusus untuk menyisipkan rumus matematika blok (`$$...$$`) dan inline (`$...$`). Rumus LaTeX ditulis melalui editor input langsung dan ditampilkan seketika (*live render*) menggunakan KaTeX di dalam editor sebelum disimpan kembali dalam format standard Markdown.
+
 ---
 
 ## 🔑 Ganti Password Admin
