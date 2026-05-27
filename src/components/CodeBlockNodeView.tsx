@@ -45,6 +45,9 @@ export function CodeBlockNodeView({ node, updateAttributes }: NodeViewProps) {
     updateAttributes({ language: 'javascript' });
   };
 
+  // Count lines based on text content to render line numbers in the gutter
+  const linesCount = node.textContent.split('\n').length;
+
   return (
     <NodeViewWrapper className="code-block-node-wrapper my-6 relative group select-text">
       <div className="border border-[#334155] rounded-lg overflow-hidden bg-[#0F172A]">
@@ -95,10 +98,30 @@ export function CodeBlockNodeView({ node, updateAttributes }: NodeViewProps) {
           </div>
         </div>
 
-        {/* Textarea Code Box */}
-        <pre className="p-4 overflow-x-auto text-sm font-mono text-[#E2E8F0] bg-[#0F172A]">
-          <NodeViewContent as={"code" as any} className={currentLang ? `language-${currentLang}` : ''} />
-        </pre>
+        {/* Code Box with Line Numbers Gutter */}
+        <div className="flex font-mono text-xs leading-[1.6] py-4 bg-[#0F172A] text-[#E2E8F0] overflow-hidden">
+          {/* Gutter numbers */}
+          <div className="select-none text-right pr-4 text-[#475569] border-r border-[#334155] flex flex-col items-end min-w-[4.5ch] user-select-none">
+            {Array.from({ length: Math.max(1, linesCount) }).map((_, i) => (
+              <span key={i} style={{ height: '1.6em', lineHeight: '1.6em' }}>{i + 1}</span>
+            ))}
+          </div>
+          
+          {/* Main editable code element */}
+          <pre className="flex-1 overflow-x-auto m-0 pl-4 bg-transparent outline-none">
+            <NodeViewContent 
+              as={"code" as any} 
+              className={currentLang ? `language-${currentLang}` : ''} 
+              style={{ 
+                display: 'block', 
+                minHeight: '1.6em', 
+                lineHeight: '1.6em',
+                outline: 'none',
+                whiteSpace: 'pre',
+              }} 
+            />
+          </pre>
+        </div>
 
       </div>
     </NodeViewWrapper>
