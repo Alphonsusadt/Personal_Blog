@@ -169,6 +169,15 @@ async function start() {
     etag: true,
   }));
 
+  // Public Health Check Endpoints (for UptimeRobot and deployment logs)
+  app.get('/', (_req, res) => {
+    res.json({ status: 'ok', message: 'CMS API Server is running' });
+  });
+
+  app.get('/api/health', (_req, res) => {
+    res.json({ status: 'ok', message: 'Database connected' });
+  });
+
   // Routes
   app.use('/api/auth', authRoutes(db));
   app.use('/api/projects', projectsRoutes(db));
