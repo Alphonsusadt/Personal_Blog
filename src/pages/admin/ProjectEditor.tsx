@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api, getRuntimeCache, setRuntimeCache, invalidateRuntimeCache } from '../../lib/api';
-import { ProjectToolbar } from '../../components/ProjectToolbar';
 import { ProjectSidebar } from '../../components/ProjectSidebar';
 import { ImageUploadDialog } from '../../components/ImageUploadDialog';
 import { LinkInsertDialog } from '../../components/LinkInsertDialog';
@@ -11,7 +10,7 @@ import { hasBase64Images } from '../../utils/media';
 import { ArrowLeft, Check, Clock, Eye, EyeOff, Maximize2, HardDrive, AlertCircle } from 'lucide-react';
 import { useRenderedMarkdown } from '../../hooks/useRenderedMarkdown';
 import { formatDraftTime } from '../../hooks/useLocalDraft';
-import { IsolatedContentEditor } from '../../components/IsolatedInput';
+import { RichTextEditor, type RichTextEditorRef } from '../../components/RichTextEditor';
 import { AutoFixButton } from '../../components/AutoFixButton';
 import { AssetReuserDialog } from '../../components/AssetReuserDialog';
 import { useAutoFixLanguage } from '../../hooks/useAutoFixLanguage';
@@ -154,7 +153,8 @@ function loadTwitterScript(callback: () => void) {
 export function ProjectEditor() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<RichTextEditorRef>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const pendingCreateRef = useRef(false);
   const dbIdRef = useRef<string | undefined>(undefined);
   const justCreatedRef = useRef(false);
@@ -489,121 +489,43 @@ export function ProjectEditor() {
   }, [caretWord, handleAutoFixContent, updateCaretSuggestions]);
 
   const insertMarkdown = (before: string, after: string = '') => {
-    const textarea = textareaRef.current;
-
-    if (!textarea) {
+    if (editorRef.current) {
+      editorRef.current.insertMarkdown(before + after);
+    } else {
       setProject(prev => {
         const current = getExactLocalizedText(prev.content, autoFixLanguage);
         const newText = current + before + after;
-        const nextProject = { ...prev, content: setLocalizedText(prev.content, autoFixLanguage, newText) };
-        return nextProject;
+        return { ...prev, content: setLocalizedText(prev.content, autoFixLanguage, newText) };
       });
-      return;
     }
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value;
-    const selected = text.substring(start, end);
-    const newText = text.substring(0, start) + before + selected + after + text.substring(end);
-
-    textarea.value = newText;
-    textarea.dispatchEvent(new Event('input', { bubbles: true }));
-
-    setProject(prev => {
-      const nextProject = { ...prev, content: setLocalizedText(prev.content, autoFixLanguage, newText) };
-      return nextProject;
-    });
-
-    setTimeout(() => {
-      textarea.focus();
-      textarea.selectionStart = start + before.length;
-      textarea.selectionEnd = start + before.length + selected.length;
-    }, 0);
   };
 
   const insertImageMarkdown = (imageMarkdown: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) {
-      setProject(prev => {
-        const nextProject = {
-          ...prev,
-          content: setLocalizedText(
-            prev.content,
-            autoFixLanguage,
-            `${getExactLocalizedText(prev.content, autoFixLanguage)}\n${imageMarkdown}\n`
-          )
-        };
-        return nextProject;
-      });
-      return;
-    }
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value;
-    const newText = `${text.substring(0, start)}${imageMarkdown}${text.substring(end)}`;
-    
-    // Update textarea directly FIRST for instant feedback
-    textarea.value = newText;
-
-    setProject(prev => {
-      const nextProject = {
+    const match = imageMarkdown.match(/!\[(.*?)\]\((.*?)\)/);
+    if (match && editorRef.current) {
+      editorRef.current.insertImage(match[1], match[2]);
+    } else if (editorRef.current) {
+      editorRef.current.insertMarkdown(imageMarkdown);
+    } else {
+      setProject(prev => ({
         ...prev,
-        content: setLocalizedText(prev.content, autoFixLanguage, newText)
-      };
-      return nextProject;
-    });
-
-    setTimeout(() => {
-      textarea.focus();
-      const cursorPos = start + imageMarkdown.length;
-      textarea.selectionStart = cursorPos;
-      textarea.selectionEnd = cursorPos;
-    }, 0);
+        content: setLocalizedText(prev.content, autoFixLanguage, `${getExactLocalizedText(prev.content, autoFixLanguage)}\n${imageMarkdown}\n`)
+      }));
+    }
   };
 
   const insertLinkMarkdown = (linkMarkdown: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) {
-      setProject(prev => {
-        const nextProject = {
-          ...prev,
-          content: setLocalizedText(
-            prev.content,
-            autoFixLanguage,
-            `${getExactLocalizedText(prev.content, autoFixLanguage)}${
-              getExactLocalizedText(prev.content, autoFixLanguage) ? '\n' : ''
-            }${linkMarkdown}`
-          )
-        };
-        return nextProject;
-      });
-      return;
-    }
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value;
-    const newText = `${text.substring(0, start)}${linkMarkdown}${text.substring(end)}`;
-    
-    // Update textarea directly FIRST for instant feedback
-    textarea.value = newText;
-
-    setProject(prev => {
-      const nextProject = {
+    const match = linkMarkdown.match(/\[(.*?)\]\((.*?)\)/);
+    if (match && editorRef.current) {
+      editorRef.current.insertLink(match[1], match[2]);
+    } else if (editorRef.current) {
+      editorRef.current.insertMarkdown(linkMarkdown);
+    } else {
+      setProject(prev => ({
         ...prev,
-        content: setLocalizedText(prev.content, autoFixLanguage, newText)
-      };
-      return nextProject;
-    });
-
-    setTimeout(() => {
-      textarea.focus();
-      const cursorPos = start + linkMarkdown.length;
-      textarea.selectionStart = cursorPos;
-      textarea.selectionEnd = cursorPos;
-    });
+        content: setLocalizedText(prev.content, autoFixLanguage, `${getExactLocalizedText(prev.content, autoFixLanguage)}${getExactLocalizedText(prev.content, autoFixLanguage) ? '\n' : ''}${linkMarkdown}`)
+      }));
+    }
   };
 
   const handleSave = async () => {
@@ -891,16 +813,8 @@ export function ProjectEditor() {
               />
             </div>
 
-            {/* Toolbar with Preview Toggle */}
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <ProjectToolbar 
-                textareaRef={textareaRef} 
-                onInsert={insertMarkdown}
-                onInsertImage={insertImageMarkdown}
-                onOpenImageDialog={() => setImageDialogOpen(true)}
-                onOpenLinkDialog={() => setLinkDialogOpen(true)}
-                onOpenAssetReuser={() => setAssetReuserOpen(true)}
-              />
+            {/* Toolbar Area (Now handled inside RichTextEditor, we keep the flex layout for align actions) */}
+            <div className="flex items-center justify-end gap-2 flex-wrap">
 
               <div className="flex items-center gap-2">
                 <AutoFixButton
@@ -958,16 +872,16 @@ export function ProjectEditor() {
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {/* Editor */}
                 <div className="flex flex-col h-full">
-                  <label className="text-xs text-[#94A3B8] font-medium mb-2">MARKDOWN</label>
-                  <IsolatedContentEditor
+                  <label className="text-xs text-[#94A3B8] font-medium mb-2">VISUAL EDITOR</label>
+                  <RichTextEditor
+                    ref={editorRef}
                     initialValue={exactLocalizedContent}
                     onCommit={handleContentCommit}
                     id={`${project._id || project.id}-${autoFixLanguage}`}
-                    textareaRef={textareaRef}
-                    spellCheck
-                    lang={autoFixLanguage}
-                    placeholder="Project content... (Markdown, LaTeX $$...$$ supported)"
-                    className="flex-1 min-h-[60vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
+                    onOpenImageDialog={() => setImageDialogOpen(true)}
+                    onOpenLinkDialog={() => setLinkDialogOpen(true)}
+                    onOpenAssetReuser={() => setAssetReuserOpen(true)}
+                    className="flex-1 min-h-[60vh]"
                   />
                 </div>
 
@@ -994,15 +908,15 @@ export function ProjectEditor() {
               </div>
             ) : (
               /* Full Editor (no preview) */
-              <IsolatedContentEditor
+              <RichTextEditor
+                ref={editorRef}
                 initialValue={exactLocalizedContent}
                 onCommit={handleContentCommit}
                 id={`${project._id || project.id}-${autoFixLanguage}`}
-                textareaRef={textareaRef}
-                spellCheck
-                lang={autoFixLanguage}
-                placeholder="Project content... (Markdown, LaTeX $$...$$ supported)"
-                className="w-full min-h-[70vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
+                onOpenImageDialog={() => setImageDialogOpen(true)}
+                onOpenLinkDialog={() => setLinkDialogOpen(true)}
+                onOpenAssetReuser={() => setAssetReuserOpen(true)}
+                className="w-full min-h-[70vh]"
               />
             )}
           </div>

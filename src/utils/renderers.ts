@@ -326,8 +326,9 @@ export async function renderMarkdown(content: string): Promise<string> {
     // Embed YouTube videos from links and bare URLs
     const { embedYouTube } = await import('../lib/youtubeEmbed');
     processed = embedYouTube(processed);
-    // Embed Instagram and X/Twitter posts
-    const { embedInstagram, embedX } = await import('../lib/socialEmbed');
+    // Embed Instagram and X/Twitter posts (custom layouts first, then fallback bare URLs)
+    const { embedInstagram, embedX, renderSocialEmbedTags } = await import('../lib/socialEmbed');
+    processed = renderSocialEmbedTags(processed);
     processed = embedInstagram(processed);
     processed = embedX(processed);
     return processed;

@@ -289,4 +289,98 @@ twitter-widget {
   filter: brightness(0) invert(1);
 }
 
+/* Tiptap Editor Styling */
+.ProseMirror {
+  outline: none;
+  min-height: 50vh;
+}
+.ProseMirror p {
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+.ProseMirror h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  color: #f8fafc;
+}
+.ProseMirror h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 1.75rem;
+  margin-bottom: 0.75rem;
+  color: #f8fafc;
+}
+.ProseMirror h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: #f8fafc;
+}
+.ProseMirror blockquote {
+  border-left: 4px solid #1d4ed8;
+  padding-left: 1rem;
+  color: #94a3b8;
+  font-style: italic;
+  margin: 1.5rem 0;
+}
+.ProseMirror pre {
+  background-color: #0f172a;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #334155;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #e2e8f0;
+  margin: 1.5rem 0;
+  overflow-x: auto;
+}
+.ProseMirror code {
+  background-color: #1e293b;
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  color: #f43f5e;
+}
+.ProseMirror pre code {
+  background-color: transparent;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+.ProseMirror ul {
+  list-style-type: disc;
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+.ProseMirror ol {
+  list-style-type: decimal;
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+.ProseMirror li {
+  margin-bottom: 0.25rem;
+}
+.ProseMirror a {
+  color: #60a5fa;
+  text-decoration: underline;
+}
+.ProseMirror img {
+  border-radius: 0.5rem;
+  max-width: 100%;
+  height: auto;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.ProseMirror img.ProseMirror-selectednode {
+  outline: 3px solid #3b82f6;
+  outline-offset: 2px;
+}
+.ProseMirror .social-embed-wrapper.ProseMirror-selectednode > div {
+  outline: 3px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+
 

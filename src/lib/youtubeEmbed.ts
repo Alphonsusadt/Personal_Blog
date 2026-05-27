@@ -2,7 +2,7 @@
  * Extract YouTube video ID from various URL formats.
  * Handles all common YouTube URL formats.
  */
-function extractYouTubeId(url: string): string | null {
+export function extractYouTubeId(url: string): string | null {
   try {
     const parsed = new URL(url);
     // youtube.com/watch?v=...
@@ -43,7 +43,7 @@ function extractYouTubeId(url: string): string | null {
  * Matches: youtube.com/watch?v=, youtu.be/, youtube.com/embed/, youtube.com/shorts/
  */
 const YT_URL_REGEX =
-  /https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?[^"'\s<>]*?v=[a-zA-Z0-9_-]{11}|embed\/[a-zA-Z0-9_-]{11}|shorts\/[a-zA-Z0-9_-]{11})|youtu\.be\/[a-zA-Z0-9_-]{11})[^\s"<>']*/gi;
+  /(?<!href=")(?<!src=")(?<!href=')(?<!src=')https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?[^"'\s<>]*?v=[a-zA-Z0-9_-]{11}|embed\/[a-zA-Z0-9_-]{11}|shorts\/[a-zA-Z0-9_-]{11})|youtu\.be\/[a-zA-Z0-9_-]{11})[^\s"<>']*/gi;
 
 /**
  * Regex to find YouTube URLs inside <a> tag href attributes.
@@ -72,7 +72,8 @@ export function embedYouTube(html: string): string {
   return html;
 }
 
-function ytIframe(videoId: string): string {
+export function ytIframe(videoId: string): string {
+
   return (
     '<div class="yt-embed-container">' +
       '<div class="yt-embed-wrapper">' +

@@ -1,3 +1,5 @@
+import { extractYouTubeId, ytIframe } from './youtubeEmbed';
+
 /**
  * Extract Instagram Post ID from URL.
  */
@@ -113,3 +115,46 @@ function xBlockquote(url: string, user: string, id: string, fallbackText?: strin
     '</div>'
   );
 }
+
+/**
+ * Parses and replaces custom <div class="social-embed"> tags with the active fully-formed visual widgets (iframes/blockquotes) while preserving user-defined sizes and margins.
+ */
+export function renderSocialEmbedTags(html: string): string {
+  const divRegex = /<div class="social-embed"([^>]*)><\/div>/gi;
+  
+  return html.replace(divRegex, (match, attrsString) => {
+    const getAttr = (name: string): string => {
+      const m = attrsString.match(new RegExp(`data-${name}="([^"]*)"`, 'i'));
+      if (m) return m[1];
+      if (name === 'style') {
+        const sm = attrsString.match(/style="([^"]*)"/i);
+        return sm ? sm[1] : '';
+      }
+      return '';
+    };
+
+    const type = getAttr('type');
+    const url = getAttr('url');
+    const style = getAttr('style');
+
+    if (type === 'youtube') {
+      const videoId = extractYouTubeId(url);
+      if (videoId) {
+        return `<div class="youtube-embed-outer" style="${style}">${ytIframe(videoId)}</div>`;
+      }
+    } else if (type === 'instagram') {
+      const postId = extractInstagramId(url);
+      if (postId) {
+        return `<div class="instagram-embed-outer" style="${style}">${igIframe(postId)}</div>`;
+      }
+    } else if (type === 'twitter') {
+      const details = extractXDetails(url);
+      if (details) {
+        return `<div class="x-tweet-outer" style="${style}">${xBlockquote(url, details.user, details.id)}</div>`;
+      }
+    }
+
+    return match;
+  });
+}
+
