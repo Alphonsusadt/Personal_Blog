@@ -108,7 +108,17 @@ export function CodeBlockNodeView({ node, updateAttributes }: NodeViewProps) {
           </div>
           
           {/* Main editable code element */}
-          <pre className="flex-1 overflow-x-auto m-0 pl-4 bg-transparent outline-none">
+          <pre 
+            className="flex-1 overflow-x-auto"
+            style={{
+              backgroundColor: 'transparent',
+              padding: '0 0 0 1rem',
+              borderRadius: '0',
+              border: 'none',
+              margin: '0',
+              outline: 'none',
+            }}
+          >
             <NodeViewContent 
               as={"code" as any} 
               className={currentLang ? `language-${currentLang}` : ''} 
