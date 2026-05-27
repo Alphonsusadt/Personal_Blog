@@ -52,7 +52,15 @@ export function markdownToEditorHtml(markdown: string): string {
   const latexBlocks: string[] = [];
   html = html.replace(/\$\$([\s\S]*?)\$\$/g, (_, eq) => {
     const placeholder = `<!--LATEX_${latexBlocks.length}-->`;
-    latexBlocks.push(`$$${eq.trim()}$$`);
+    latexBlocks.push(eq.trim());
+    return placeholder;
+  });
+
+  // 2b. Separate inline LaTeX ($...$) to preserve equations
+  const inlineLatexBlocks: string[] = [];
+  html = html.replace(/\$([^$\n]+?)\$/g, (_, eq) => {
+    const placeholder = `<!--INLINE_LATEX_${inlineLatexBlocks.length}-->`;
+    inlineLatexBlocks.push(eq.trim());
     return placeholder;
   });
 
@@ -124,7 +132,12 @@ export function markdownToEditorHtml(markdown: string): string {
 
   // 6. Restore block LaTeX equations
   latexBlocks.forEach((eq, index) => {
-    html = html.replace(`<!--LATEX_${index}-->`, `<p>${eq}</p>`);
+    html = html.replace(`<!--LATEX_${index}-->`, `<div class="math-block" data-equation="${escapeHtml(eq)}"></div>`);
+  });
+
+  // 6b. Restore inline LaTeX equations
+  inlineLatexBlocks.forEach((eq, index) => {
+    html = html.replace(`<!--INLINE_LATEX_${index}-->`, `<span class="math-inline" data-equation="${escapeHtml(eq)}"></span>`);
   });
 
   // 7. Restore code blocks
@@ -253,6 +266,11 @@ function domNodeToMarkdown(node: Node): string {
       return `- ${childrenMarkdown}\n`;
     }
     case 'div': {
+      // Check if this is our math block
+      if (element.classList.contains('math-block') || element.getAttribute('data-equation')) {
+        const equation = element.getAttribute('data-equation') || '';
+        return `$$\n${equation}\n$$\n\n`;
+      }
       // Check if this is our custom social embed placeholder
       if (element.classList.contains('social-embed') || element.getAttribute('data-type')) {
         const type = element.getAttribute('data-type') || '';
@@ -263,6 +281,13 @@ function domNodeToMarkdown(node: Node): string {
         return `<div class="social-embed" data-type="${type}" data-url="${url}" data-width="${width}" data-alignment="${alignment}" style="${style}"></div>\n\n`;
       }
       return `${childrenMarkdown}\n\n`;
+    }
+    case 'span': {
+      if (element.classList.contains('math-inline') || element.getAttribute('data-equation')) {
+        const equation = element.getAttribute('data-equation') || '';
+        return `$${equation}$`;
+      }
+      return childrenMarkdown;
     }
     case 'hr':
       return '---\n\n';

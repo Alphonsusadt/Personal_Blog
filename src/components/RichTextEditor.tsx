@@ -3,12 +3,12 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
-import { CustomImage, SocialEmbed, CustomCodeBlock } from '../lib/tiptap-extensions';
+import { CustomImage, SocialEmbed, CustomCodeBlock, MathBlock, MathInline } from '../lib/tiptap-extensions';
 import { detectSocialEmbed, markdownToEditorHtml, editorHtmlToMarkdown } from '../lib/markdownConverter';
 import { 
   Bold, Italic, Heading1, Heading2, Heading3, Quote, Link as LinkIcon, 
   Image as ImageIcon, List, ListOrdered, Code, Undo, Redo, 
-  AlignLeft, AlignCenter, AlignRight, Trash2, HelpCircle
+  AlignLeft, AlignCenter, AlignRight, Trash2, HelpCircle, Sigma
 } from 'lucide-react';
 
 interface RichTextEditorProps {
@@ -61,6 +61,8 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       }),
       SocialEmbed,
       CustomCodeBlock,
+      MathBlock,
+      MathInline,
     ],
     content: initialHtml,
     onUpdate: ({ editor }) => {
@@ -261,6 +263,35 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
             title="Code Block"
           >
             <Code className="w-4 h-4" />
+          </button>
+
+          {/* LaTeX Math Block & Inline Buttons */}
+          <button
+            type="button"
+            onClick={() => {
+              editor.chain().focus().insertContent({
+                type: 'mathBlock',
+                attrs: { equation: '' }
+              }).run();
+            }}
+            className="p-1.5 text-[#94A3B8] hover:text-[#60A5FA] hover:bg-[#1E293B] rounded transition-colors"
+            title="Insert LaTeX Math Block ($$...$$)"
+          >
+            <Sigma className="w-4 h-4 text-emerald-400" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              editor.chain().focus().insertContent({
+                type: 'mathInline',
+                attrs: { equation: 'x' }
+              }).run();
+            }}
+            className="p-1.5 text-[#94A3B8] hover:text-[#60A5FA] hover:bg-[#1E293B] rounded transition-colors flex items-center gap-0.5"
+            title="Insert Inline Math ($...$)"
+          >
+            <span className="text-[10px] font-bold text-emerald-400 font-mono">$</span>
+            <Sigma className="w-3.5 h-3.5 text-emerald-400" />
           </button>
 
           <span className="w-px h-5 bg-[#334155] mx-1" />

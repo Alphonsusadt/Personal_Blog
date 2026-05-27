@@ -5,6 +5,8 @@ import { SocialEmbedView } from '../components/SocialEmbedView';
 import { ImageNodeView } from '../components/ImageNodeView';
 import CodeBlock from '@tiptap/extension-code-block';
 import { CodeBlockNodeView } from '../components/CodeBlockNodeView';
+import { MathBlockNodeView } from '../components/MathBlockNodeView';
+import { MathInlineNodeView } from '../components/MathInlineNodeView';
 
 /**
  * Custom Image extension that parses and handles image alignment (float: left/right/center)
@@ -137,5 +139,100 @@ export const SocialEmbed = Node.create({
 export const CustomCodeBlock = CodeBlock.extend({
   addNodeView() {
     return ReactNodeViewRenderer(CodeBlockNodeView);
+  },
+});
+
+/**
+ * Custom Tiptap Node for LaTeX Block Equations ($$...$$).
+ */
+export const MathBlock = Node.create({
+  name: 'mathBlock',
+  group: 'block',
+  atom: true,
+
+  addAttributes() {
+    return {
+      equation: {
+        default: '',
+      },
+    };
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: 'div.math-block',
+        getAttrs: (dom) => {
+          const element = dom as HTMLElement;
+          return {
+            equation: element.getAttribute('data-equation') || '',
+          };
+        },
+      },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    const { equation } = HTMLAttributes;
+    return [
+      'div',
+      mergeAttributes(HTMLAttributes, {
+        class: 'math-block',
+        'data-equation': equation,
+      }),
+      `$$${equation}$$`,
+    ];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(MathBlockNodeView);
+  },
+});
+
+/**
+ * Custom Tiptap Node for LaTeX Inline Equations ($...$).
+ */
+export const MathInline = Node.create({
+  name: 'mathInline',
+  group: 'inline',
+  inline: true,
+  atom: true,
+
+  addAttributes() {
+    return {
+      equation: {
+        default: '',
+      },
+    };
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: 'span.math-inline',
+        getAttrs: (dom) => {
+          const element = dom as HTMLElement;
+          return {
+            equation: element.getAttribute('data-equation') || '',
+          };
+        },
+      },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    const { equation } = HTMLAttributes;
+    return [
+      'span',
+      mergeAttributes(HTMLAttributes, {
+        class: 'math-inline',
+        'data-equation': equation,
+      }),
+      `$${equation}$`,
+    ];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(MathInlineNodeView);
   },
 });
