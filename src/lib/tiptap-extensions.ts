@@ -7,6 +7,7 @@ import CodeBlock from '@tiptap/extension-code-block';
 import { CodeBlockNodeView } from '../components/CodeBlockNodeView';
 import { MathBlockNodeView } from '../components/MathBlockNodeView';
 import { MathInlineNodeView } from '../components/MathInlineNodeView';
+import { TikzBlockNodeView } from '../components/TikzBlockNodeView';
 
 /**
  * Custom Image extension that parses and handles image alignment (float: left/right/center)
@@ -234,5 +235,52 @@ export const MathInline = Node.create({
 
   addNodeView() {
     return ReactNodeViewRenderer(MathInlineNodeView);
+  },
+});
+
+/**
+ * Custom Tiptap Node for LaTeX TikZ Diagrams (```tikz ... ```).
+ */
+export const TikzBlock = Node.create({
+  name: 'tikzBlock',
+  group: 'block',
+  atom: true,
+
+  addAttributes() {
+    return {
+      code: {
+        default: '',
+      },
+    };
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: 'div.tikz-block',
+        getAttrs: (dom) => {
+          const element = dom as HTMLElement;
+          return {
+            code: element.getAttribute('data-code') || '',
+          };
+        },
+      },
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    const { code } = HTMLAttributes;
+    return [
+      'div',
+      mergeAttributes(HTMLAttributes, {
+        class: 'tikz-block',
+        'data-code': code,
+      }),
+      `\\begin{tikzpicture}\n${code}\n\\end{tikzpicture}`,
+    ];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(TikzBlockNodeView);
   },
 });

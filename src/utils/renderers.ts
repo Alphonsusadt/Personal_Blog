@@ -192,8 +192,25 @@ export async function renderMermaid(content: string): Promise<string> {
   return content;
 }
 
+export async function renderTikz(content: string): Promise<string> {
+  const tikzRegex = /```(?:tikz|latex-tikz)\r?\n([\s\S]*?)\r?\n```/g;
+  const matches = [...content.matchAll(tikzRegex)];
+
+  for (const match of matches) {
+    let tikzCode = match[1].trim();
+    if (!tikzCode.includes('\\begin{tikzpicture}')) {
+      tikzCode = `\\begin{tikzpicture}\n${tikzCode}\n\\end{tikzpicture}`;
+    }
+    const html = `<div class="tikz-diagram-wrapper my-8 flex justify-center"><script type="text/tikz">${tikzCode}</script></div>`;
+    content = content.replace(match[0], html);
+  }
+
+  return content;
+}
+
 export async function renderContent(content: string): Promise<string> {
   let processedContent = await renderLaTeX(content);
+  processedContent = await renderTikz(processedContent);
   processedContent = await renderMermaid(processedContent);
   processedContent = await renderCodeBlocks(processedContent);
   return processedContent;
@@ -319,6 +336,10 @@ export async function renderMarkdown(content: string): Promise<string> {
   try {
     // First render LaTeX equations
     let processed = await renderLaTeX(content);
+    // Render TikZ diagrams
+    processed = await renderTikz(processed);
+    // Render Mermaid diagrams
+    processed = await renderMermaid(processed);
     // Then render code blocks with Prism.js (before markdownToHtml to avoid conflicts)
     processed = await renderCodeBlocks(processed);
     // Then convert remaining markdown to HTML

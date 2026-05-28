@@ -392,3 +392,31 @@ twitter-widget {
   overflow-x: auto !important;
   box-shadow: none !important;
 }
+
+/* TikZ Diagram Styling */
+.tikz-container,
+.tikz-diagram-wrapper,
+.tikz-render {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  background-color: #ffffff !important;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  border: 1px solid #e2e8f0;
+}
+
+.tikz-container svg,
+.tikz-diagram-wrapper svg,
+.tikz-render svg {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* Ensure SVG text scales properly and is black by default */
+.tikz-container svg text,
+.tikz-diagram-wrapper svg text,
+.tikz-render svg text {
+  font-family: inherit;
+  fill: #000000 !important;
+}

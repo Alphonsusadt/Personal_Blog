@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { embedYouTube } from '../lib/youtubeEmbed';
 import { embedInstagram, embedX } from '../lib/socialEmbed';
 import { CodeBlock } from '../components/CodeBlock';
+import { TikzDiagram } from '../components/TikzDiagram';
 import { resolveLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
@@ -75,7 +76,7 @@ function CategoryBadge({ category, language }: { category: Project['category']; 
 }
 
 interface ContentPart {
-  type: 'html' | 'mermaid' | 'code';
+  type: 'html' | 'mermaid' | 'code' | 'tikz';
   content: string;
   index: number;
   language?: string;
@@ -147,6 +148,7 @@ function splitContent(content: string): ContentPart[] {
   const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
   let lastIndex = 0;
   let mermaidIndex = 0;
+  let tikzIndex = 0;
   let partIndex = 0;
   let match;
 
@@ -162,6 +164,8 @@ function splitContent(content: string): ContentPart[] {
 
     if (lang === 'mermaid') {
       parts.push({ type: 'mermaid', content: match[2].trim(), index: mermaidIndex++ });
+    } else if (lang === 'tikz' || lang === 'latex-tikz') {
+      parts.push({ type: 'tikz', content: match[2].trim(), index: tikzIndex++ });
     } else {
       parts.push({
         type: 'code',
@@ -507,6 +511,14 @@ export function ProjectDetail() {
                   code={part.content}
                   language={part.language || 'plaintext'}
                   title={part.title}
+                />
+              );
+            } else if (part.type === 'tikz') {
+              return (
+                <TikzDiagram
+                  key={`tikz-${idx}`}
+                  code={part.content}
+                  id={`${id}-${part.index}`}
                 />
               );
             } else {

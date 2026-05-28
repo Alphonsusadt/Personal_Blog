@@ -3,12 +3,12 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
-import { CustomImage, SocialEmbed, CustomCodeBlock, MathBlock, MathInline } from '../lib/tiptap-extensions';
+import { CustomImage, SocialEmbed, CustomCodeBlock, MathBlock, MathInline, TikzBlock } from '../lib/tiptap-extensions';
 import { detectSocialEmbed, markdownToEditorHtml, editorHtmlToMarkdown } from '../lib/markdownConverter';
 import { 
   Bold, Italic, Heading1, Heading2, Heading3, Quote, Link as LinkIcon, 
   Image as ImageIcon, List, ListOrdered, Code, Undo, Redo, 
-  AlignLeft, AlignCenter, AlignRight, Trash2, HelpCircle, Sigma
+  AlignLeft, AlignCenter, AlignRight, Trash2, HelpCircle, Sigma, Palette
 } from 'lucide-react';
 
 interface RichTextEditorProps {
@@ -63,6 +63,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       CustomCodeBlock,
       MathBlock,
       MathInline,
+      TikzBlock,
     ],
     content: initialHtml,
     onUpdate: ({ editor }) => {
@@ -292,6 +293,19 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
           >
             <span className="text-[10px] font-bold text-emerald-400 font-mono">$</span>
             <Sigma className="w-3.5 h-3.5 text-emerald-400" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              editor.chain().focus().insertContent({
+                type: 'tikzBlock',
+                attrs: { code: '' }
+              }).run();
+            }}
+            className="p-1.5 text-[#94A3B8] hover:text-[#60A5FA] hover:bg-[#1E293B] rounded transition-colors"
+            title="Insert TikZ Diagram Block"
+          >
+            <Palette className="w-4 h-4 text-violet-400" />
           </button>
 
           <span className="w-px h-5 bg-[#334155] mx-1" />

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { NodeViewProps, NodeViewWrapper } from '@tiptap/react';
 import katex from 'katex';
-import { Sigma } from 'lucide-react';
+import { Sigma, Trash2 } from 'lucide-react';
 
-export function MathBlockNodeView({ node, updateAttributes, selected }: NodeViewProps) {
+export function MathBlockNodeView({ node, updateAttributes, selected, deleteNode }: NodeViewProps) {
   const equation = node.attrs.equation || '';
   const [isEditing, setIsEditing] = useState(selected);
   const [tempEquation, setTempEquation] = useState(equation);
@@ -59,11 +59,26 @@ export function MathBlockNodeView({ node, updateAttributes, selected }: NodeView
             <Sigma className="w-3.5 h-3.5 text-blue-400" />
             <span>LaTeX Math Block</span>
           </div>
-          {isEditing ? (
-            <span className="text-blue-400 animate-pulse font-mono">Editing Mode (Press Enter to apply)</span>
-          ) : (
-            <span className="opacity-0 group-hover:opacity-100 transition-opacity">Click to Edit</span>
-          )}
+          <div className="flex items-center gap-2">
+            {isEditing ? (
+              <span className="text-blue-400 animate-pulse font-mono">Editing Mode (Press Enter to apply)</span>
+            ) : (
+              <span className="opacity-0 group-hover:opacity-100 transition-opacity">Click to Edit</span>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (confirm('Are you sure you want to delete this LaTeX math block?')) {
+                  deleteNode();
+                }
+              }}
+              className="p-1 text-[#64748B] hover:text-rose-400 hover:bg-rose-500/10 rounded transition-colors"
+              title="Delete Math Block"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* Editing Input */}

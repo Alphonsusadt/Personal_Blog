@@ -4,6 +4,7 @@ import { useMemo, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import { embedYouTube } from '../lib/youtubeEmbed';
 import { embedInstagram, embedX } from '../lib/socialEmbed';
+import { TikzDiagram } from '../components/TikzDiagram';
 import { resolveLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
@@ -72,7 +73,7 @@ function CategoryBadge({ category, language }: { category: Writing['category']; 
 }
 
 interface ContentPart {
-  type: 'html' | 'mermaid';
+  type: 'html' | 'mermaid' | 'tikz';
   content: string;
   index: number;
 }
@@ -139,20 +140,26 @@ async function renderMarkdown(content: string): Promise<string> {
 
 function splitContent(content: string): ContentPart[] {
   const parts: ContentPart[] = [];
-  const mermaidRegex = /```mermaid\n([\s\S]*?)```/g;
+  const blockRegex = /```(mermaid|tikz|latex-tikz)\n([\s\S]*?)```/g;
   let lastIndex = 0;
   let match;
   let mermaidIndex = 0;
+  let tikzIndex = 0;
   let partIndex = 0;
 
-  while ((match = mermaidRegex.exec(content)) !== null) {
+  while ((match = blockRegex.exec(content)) !== null) {
     if (match.index > lastIndex) {
       const htmlContent = content.slice(lastIndex, match.index);
       if (htmlContent.trim()) {
         parts.push({ type: 'html', content: htmlContent, index: partIndex++ });
       }
     }
-    parts.push({ type: 'mermaid', content: match[1].trim(), index: mermaidIndex++ });
+    const lang = match[1].toLowerCase();
+    if (lang === 'mermaid') {
+      parts.push({ type: 'mermaid', content: match[2].trim(), index: mermaidIndex++ });
+    } else {
+      parts.push({ type: 'tikz', content: match[2].trim(), index: tikzIndex++ });
+    }
     lastIndex = match.index + match[0].length;
     partIndex++;
   }
@@ -458,6 +465,14 @@ export function WritingDetail() {
                 <div
                   key={`html-${idx}`}
                   dangerouslySetInnerHTML={{ __html: part.content }}
+                />
+              );
+            } else if (part.type === 'tikz') {
+              return (
+                <TikzDiagram
+                  key={`tikz-${idx}`}
+                  code={part.content}
+                  id={`${id}-${part.index}`}
                 />
               );
             } else {

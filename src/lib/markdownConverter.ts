@@ -39,6 +39,14 @@ export function markdownToEditorHtml(markdown: string): string {
 
   let html = markdown;
 
+  // 1a. Separate TikZ blocks to preserve diagrams and turn them into TikzBlock editor nodes
+  const tikzBlocks: string[] = [];
+  html = html.replace(/```(?:tikz|latex-tikz)\r?\n([\s\S]*?)```/g, (_, code) => {
+    const placeholder = `<!--TIKZ_${tikzBlocks.length}-->`;
+    tikzBlocks.push(code.trim());
+    return placeholder;
+  });
+
   // 1. Separate code blocks to prevent formatting regexes from corrupting code contents
   const codeBlocks: string[] = [];
   html = html.replace(/```(\w*)\r?\n([\s\S]*?)```/g, (_, lang, code) => {
@@ -143,6 +151,11 @@ export function markdownToEditorHtml(markdown: string): string {
   // 7. Restore code blocks
   codeBlocks.forEach((code, index) => {
     html = html.replace(`<!--CODEBLOCK_${index}-->`, code);
+  });
+
+  // 8. Restore TikZ blocks
+  tikzBlocks.forEach((code, index) => {
+    html = html.replace(`<!--TIKZ_${index}-->`, `<div class="tikz-block" data-code="${escapeHtml(code)}"></div>`);
   });
 
   return html;
@@ -270,6 +283,11 @@ function domNodeToMarkdown(node: Node): string {
       if (element.classList.contains('math-block') || element.getAttribute('data-equation')) {
         const equation = element.getAttribute('data-equation') || '';
         return `$$\n${equation}\n$$\n\n`;
+      }
+      // Check if this is our TikZ block
+      if (element.classList.contains('tikz-block') || element.getAttribute('data-code')) {
+        const code = element.getAttribute('data-code') || '';
+        return `\`\`\`tikz\n${code}\n\`\`\`\n\n`;
       }
       // Check if this is our custom social embed placeholder
       if (element.classList.contains('social-embed') || element.getAttribute('data-type')) {

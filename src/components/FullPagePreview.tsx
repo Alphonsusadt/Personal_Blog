@@ -142,18 +142,29 @@ function WritingPreview({ data }: { data: Writing }) {
   
   useEffect(() => {
     const hasTweets = document.querySelector('.twitter-tweet');
-    if (!hasTweets) return;
+    if (hasTweets) {
+      const isDark = document.documentElement.classList.contains('dark');
+      document.querySelectorAll('.twitter-tweet').forEach((bq) => {
+        bq.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      });
 
-    const isDark = document.documentElement.classList.contains('dark');
-    document.querySelectorAll('.twitter-tweet').forEach((bq) => {
-      bq.setAttribute('data-theme', isDark ? 'dark' : 'light');
-    });
+      loadTwitterScript(() => {
+        if ((window as any).twttr && (window as any).twttr.widgets) {
+          (window as any).twttr.widgets.load();
+        }
+      });
+    }
 
-    loadTwitterScript(() => {
-      if ((window as any).twttr && (window as any).twttr.widgets) {
-        (window as any).twttr.widgets.load();
-      }
-    });
+    if (typeof window.onload === 'function') {
+      const timer = setTimeout(() => {
+        try {
+          (window.onload as any)();
+        } catch (err) {
+          console.error('Failed to trigger TikZJax compile in preview:', err);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
   }, [contentHtml]);
 
   const categoryLabels: Record<string, string> = {
@@ -318,18 +329,29 @@ function ProjectPreview({ data }: { data: Project }) {
 
   useEffect(() => {
     const hasTweets = document.querySelector('.twitter-tweet');
-    if (!hasTweets) return;
+    if (hasTweets) {
+      const isDark = document.documentElement.classList.contains('dark');
+      document.querySelectorAll('.twitter-tweet').forEach((bq) => {
+        bq.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      });
 
-    const isDark = document.documentElement.classList.contains('dark');
-    document.querySelectorAll('.twitter-tweet').forEach((bq) => {
-      bq.setAttribute('data-theme', isDark ? 'dark' : 'light');
-    });
+      loadTwitterScript(() => {
+        if ((window as any).twttr && (window as any).twttr.widgets) {
+          (window as any).twttr.widgets.load();
+        }
+      });
+    }
 
-    loadTwitterScript(() => {
-      if ((window as any).twttr && (window as any).twttr.widgets) {
-        (window as any).twttr.widgets.load();
-      }
-    });
+    if (typeof window.onload === 'function') {
+      const timer = setTimeout(() => {
+        try {
+          (window.onload as any)();
+        } catch (err) {
+          console.error('Failed to trigger TikZJax compile in preview:', err);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
   }, [contentHtml]);
 
   const statusColors: Record<string, string> = {

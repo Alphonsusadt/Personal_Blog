@@ -163,22 +163,43 @@ export function WritingEditor() {
   const { language: autoFixLanguage, setLanguage: setAutoFixLanguage } = useAutoFixLanguage();
   const exactLocalizedTitle = getExactLocalizedText(writing.title, autoFixLanguage);
   const exactLocalizedContent = getExactLocalizedText(writing.content, autoFixLanguage);
-  const previewHtml = useRenderedMarkdown(exactLocalizedContent || '*Start writing to see preview...*');
+
+  // Debounce the content passed to the preview renderer to avoid heavy re-compilation on every keystroke
+  const [debouncedContentForPreview, setDebouncedContentForPreview] = useState(exactLocalizedContent);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedContentForPreview(exactLocalizedContent);
+    }, 800); // 800ms debounce
+    return () => clearTimeout(timer);
+  }, [exactLocalizedContent]);
+
+  const previewHtml = useRenderedMarkdown(debouncedContentForPreview || '*Start writing to see preview...*');
 
   useEffect(() => {
     const hasTweets = document.querySelector('.twitter-tweet');
-    if (!hasTweets) return;
+    if (hasTweets) {
+      const isDark = document.documentElement.classList.contains('dark');
+      document.querySelectorAll('.twitter-tweet').forEach((bq) => {
+        bq.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      });
 
-    const isDark = document.documentElement.classList.contains('dark');
-    document.querySelectorAll('.twitter-tweet').forEach((bq) => {
-      bq.setAttribute('data-theme', isDark ? 'dark' : 'light');
-    });
+      loadTwitterScript(() => {
+        if ((window as any).twttr && (window as any).twttr.widgets) {
+          (window as any).twttr.widgets.load();
+        }
+      });
+    }
 
-    loadTwitterScript(() => {
-      if ((window as any).twttr && (window as any).twttr.widgets) {
-        (window as any).twttr.widgets.load();
-      }
-    });
+    if (typeof window.onload === 'function') {
+      const timer = setTimeout(() => {
+        try {
+          (window.onload as any)();
+        } catch (err) {
+          console.error('Failed to trigger TikZJax compile in preview:', err);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
   }, [previewHtml]);
 
   const [caretWord, setCaretWord] = useState<{ word: string; start: number; end: number } | null>(null);
