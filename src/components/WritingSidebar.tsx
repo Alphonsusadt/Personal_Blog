@@ -153,9 +153,13 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
     onUpdate({ ...writingRef.current, excerpt: setLocalizedText(writingRef.current.excerpt, language, value) });
   }, [language, onUpdate]);
 
-  const handleReadTimeCommit = useCallback((value: string) => {
-    onUpdate({ ...writingRef.current, readTime: value });
-  }, [onUpdate]);
+  const calculatedReadTime = `${Math.max(1, Math.ceil(wordCount / 200))} min`;
+
+  React.useEffect(() => {
+    if (writing.readTime !== calculatedReadTime) {
+      onUpdate({ ...writingRef.current, readTime: calculatedReadTime });
+    }
+  }, [calculatedReadTime, writing.readTime, onUpdate]);
 
   const handleAddTag = useCallback((tag: string) => {
     onUpdate({ ...writingRef.current, tags: [...writingRef.current.tags, tag] });
@@ -432,13 +436,9 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
           </div>
           <div>
             <label className="block text-xs text-[#94A3B8] mb-1">Read Time</label>
-            <IsolatedInput
-              id={writing.id}
-              initialValue={writing.readTime}
-              onCommit={handleReadTimeCommit}
-              placeholder="e.g., 5 min"
-              className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
-            />
+            <div className="w-full bg-[#0F172A]/50 border border-[#334155] text-[#94A3B8] rounded-lg px-3 py-2 text-sm font-medium select-none">
+              {calculatedReadTime} (Auto)
+            </div>
           </div>
         </div>
       </SidebarCard>

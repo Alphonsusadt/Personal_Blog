@@ -26,10 +26,29 @@ function detectPlainStringLanguage(str) {
   
   const text = str.toLowerCase();
   
-  // English common words
-  const enWords = ['the', 'and', 'of', 'in', 'to', 'for', 'with', 'is', 'it', 'this', 'that', 'my', 'project', 'writing', 'book', 'about', 'biomedical', 'engineering', 'student', 'hello', 'world', 'with'];
-  // Indonesian common words
-  const idWords = ['yang', 'dan', 'di', 'ke', 'untuk', 'pada', 'dengan', 'saya', 'adalah', 'ini', 'itu', 'proyek', 'tulisan', 'buku', 'tentang', 'teknik', 'mahasiswa', 'halo', 'dunia'];
+  // English common words (expanded list including common technical, academic, and personal terms)
+  const enWords = [
+    'the', 'and', 'of', 'in', 'to', 'for', 'with', 'is', 'it', 'this', 'that', 'my', 
+    'project', 'writing', 'book', 'about', 'biomedical', 'engineering', 'student', 
+    'hello', 'world', 'are', 'be', 'at', 'by', 'an', 'have', 'from', 'or', 'but', 
+    'not', 'your', 'first', 'which', 'would', 'there', 'their', 'who', 'more', 
+    'will', 'can', 'one', 'all', 'been', 'has', 'use', 'using', 'system', 'research',
+    'medical', 'science', 'patient', 'life', 'heart', 'signals', 'clinical', 'device',
+    'experience', 'reflection', 'reflections', 'faith', 'prayer', 'silence', 'god',
+    'laboratory', 'lab', 'imaging', 'processing', 'analysis', 'data', 'design', 'development'
+  ];
+  
+  // Indonesian common words (expanded list including common technical, academic, and personal terms)
+  const idWords = [
+    'yang', 'dan', 'di', 'ke', 'dari', 'untuk', 'pada', 'dengan', 'saya', 'adalah', 
+    'ini', 'itu', 'proyek', 'tulisan', 'buku', 'tentang', 'teknik', 'mahasiswa', 
+    'halo', 'dunia', 'kami', 'mereka', 'kita', 'anda', 'tidak', 'bisa', 'ada', 
+    'akan', 'bukan', 'sebagai', 'oleh', 'atau', 'tetapi', 'juga', 'telah', 'sudah', 
+    'dalam', 'sistem', 'menggunakan', 'penelitian', 'medis', 'pasien', 'hidup', 
+    'jantung', 'sinyal', 'alat', 'perangkat', 'pengalaman', 'refleksi', 'iman', 
+    'doa', 'keheningan', 'tuhan', 'laboratorium', 'pencitraan', 'pemrosesan', 
+    'analisis', 'data', 'desain', 'pengembangan'
+  ];
   
   let enCount = 0;
   let idCount = 0;
@@ -234,26 +253,44 @@ export default function createTranslationRoutes(db) {
    * Automatically detects EN -> ID scenario, otherwise defaults to ID -> EN
    */
   async function determineTranslationDirection(doc, contentType, currentLanguage) {
-    const safeParse = (val) => {
+    // 1. Helper to detect the language of a text block (runs Google API detection, falls back to heuristic)
+    async function detectTextLanguage(text) {
+      if (!text || text.trim().length === 0) {
+        return 'en'; // default fallback
+      }
+      try {
+        const res = await detectLanguageGoogle(text);
+        if (res && (res.language === 'en' || res.language === 'id')) {
+          return res.language;
+        }
+      } catch (err) {
+        // Fall back to heuristic
+      }
+      return detectPlainStringLanguage(text);
+    }
+
+    // 2. Safe field parser that performs language detection for plain strings (legacy/untranslated data)
+    const parseField = async (val) => {
       if (typeof val === 'string') {
         try {
           return JSON.parse(val);
         } catch {
-          const detected = detectPlainStringLanguage(val);
+          const detected = await detectTextLanguage(val);
           return { [detected]: val };
         }
       }
       return val || {};
     };
 
-    const titleObj = safeParse(doc.title);
+    // Parse localized fields from database dynamically
+    const titleObj = await parseField(doc.title);
     let contentObj = {};
     if (contentType === 'writing') {
-      contentObj = safeParse(doc.content);
+      contentObj = await parseField(doc.content);
     } else if (contentType === 'project') {
-      contentObj = safeParse(doc.content || doc.description);
+      contentObj = await parseField(doc.content || doc.description);
     } else if (contentType === 'book') {
-      contentObj = safeParse(doc.review);
+      contentObj = await parseField(doc.review);
     }
 
     const titleEn = (titleObj.en || '').trim();
@@ -261,53 +298,37 @@ export default function createTranslationRoutes(db) {
     const contentEn = (contentObj.en || '').trim();
     const contentId = (contentObj.id || '').trim();
 
-    // Check if the content is duplicated (which indicates fallback copying)
+    const hasEn = !!(titleEn || contentEn);
+    const hasId = !!(titleId || contentId);
+
+    // Check if the content is duplicated (indicating legacy/duplicate fallback state)
     const isTitleDuplicate = titleEn && titleId && titleEn === titleId;
     const isContentDuplicate = contentEn && contentId && contentEn === contentId;
     const isDuplicate = (isTitleDuplicate && (!contentEn || !contentId || isContentDuplicate)) ||
                         (isContentDuplicate && (!titleEn || !titleId || isTitleDuplicate));
 
-    let srcLang = 'id';
-    let tgtLang = 'en';
+    // Default fallback based on active editor tab if we can't decide otherwise
+    let tgtLang = currentLanguage === 'en' ? 'en' : 'id';
+    let srcLang = tgtLang === 'en' ? 'id' : 'en';
 
-    if (isDuplicate) {
+    if (hasId && !hasEn) {
+      // Only Indonesian has content -> Translate to English (overrides any lock)
+      srcLang = 'id';
+      tgtLang = 'en';
+    } else if (hasEn && !hasId) {
+      // Only English has content -> Translate to Indonesian (overrides any lock)
+      srcLang = 'en';
+      tgtLang = 'id';
+    } else if (isDuplicate) {
+      // Both tabs are identical -> Detect language of content, translate to the opposite language
       const sampleText = titleEn || contentEn || '';
-      let detected = 'id';
-      if (sampleText) {
-        try {
-          const res = await detectLanguageGoogle(sampleText);
-          if (res && (res.language === 'en' || res.language === 'id')) {
-            detected = res.language;
-          } else {
-            detected = detectPlainStringLanguage(sampleText);
-          }
-        } catch (err) {
-          console.warn('[translation] Google language detection failed, using heuristic:', err.message);
-          detected = detectPlainStringLanguage(sampleText);
-        }
-      }
+      const detected = await detectTextLanguage(sampleText);
       srcLang = detected;
       tgtLang = detected === 'en' ? 'id' : 'en';
-    } else {
-      const hasEnglish = titleEn || contentEn;
-      const hasIndonesian = titleId || contentId;
-
-      if (hasIndonesian && !hasEnglish) {
-        srcLang = 'id';
-        tgtLang = 'en';
-      } else if (hasEnglish && !hasIndonesian) {
-        srcLang = 'en';
-        tgtLang = 'id';
-      } else {
-        // Both have content or both are empty
-        if (currentLanguage === 'en') {
-          srcLang = 'id';
-          tgtLang = 'en';
-        } else {
-          srcLang = 'en';
-          tgtLang = 'id';
-        }
-      }
+    } else if (doc.translationMetadata && doc.translationMetadata.language) {
+      // Both tabs contain content, but we have a lock/record of the target language from a past translation!
+      tgtLang = doc.translationMetadata.language;
+      srcLang = tgtLang === 'en' ? 'id' : 'en';
     }
 
     return {

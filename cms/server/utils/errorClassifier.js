@@ -83,6 +83,7 @@ export function shouldFallbackToNextModel(errorType) {
     ERROR_TYPES.TIMEOUT,
     ERROR_TYPES.MODEL_ERROR,
     ERROR_TYPES.TOKEN_LIMIT,
+    ERROR_TYPES.RATE_LIMITED,
   ];
   return fallbackErrors.includes(errorType);
 }
