@@ -233,7 +233,7 @@ export default function createTranslationRoutes(db) {
    * Helper: Determine Translation Direction and Select Source Texts
    * Automatically detects EN -> ID scenario, otherwise defaults to ID -> EN
    */
-  function determineTranslationDirection(doc, contentType, currentLanguage) {
+  async function determineTranslationDirection(doc, contentType, currentLanguage) {
     const safeParse = (val) => {
       if (typeof val === 'string') {
         try {
@@ -256,26 +256,57 @@ export default function createTranslationRoutes(db) {
       contentObj = safeParse(doc.review);
     }
 
-    const hasEnglish = (titleObj.en && titleObj.en.trim()) || (contentObj.en && contentObj.en.trim());
-    const hasIndonesian = (titleObj.id && titleObj.id.trim()) || (contentObj.id && contentObj.id.trim());
+    const titleEn = (titleObj.en || '').trim();
+    const titleId = (titleObj.id || '').trim();
+    const contentEn = (contentObj.en || '').trim();
+    const contentId = (contentObj.id || '').trim();
+
+    // Check if the content is duplicated (which indicates fallback copying)
+    const isTitleDuplicate = titleEn && titleId && titleEn === titleId;
+    const isContentDuplicate = contentEn && contentId && contentEn === contentId;
+    const isDuplicate = (isTitleDuplicate && (!contentEn || !contentId || isContentDuplicate)) ||
+                        (isContentDuplicate && (!titleEn || !titleId || isTitleDuplicate));
 
     let srcLang = 'id';
     let tgtLang = 'en';
 
-    if (hasIndonesian && !hasEnglish) {
-      srcLang = 'id';
-      tgtLang = 'en';
-    } else if (hasEnglish && !hasIndonesian) {
-      srcLang = 'en';
-      tgtLang = 'id';
+    if (isDuplicate) {
+      const sampleText = titleEn || contentEn || '';
+      let detected = 'id';
+      if (sampleText) {
+        try {
+          const res = await detectLanguageGoogle(sampleText);
+          if (res && (res.language === 'en' || res.language === 'id')) {
+            detected = res.language;
+          } else {
+            detected = detectPlainStringLanguage(sampleText);
+          }
+        } catch (err) {
+          console.warn('[translation] Google language detection failed, using heuristic:', err.message);
+          detected = detectPlainStringLanguage(sampleText);
+        }
+      }
+      srcLang = detected;
+      tgtLang = detected === 'en' ? 'id' : 'en';
     } else {
-      // Both have content or both are empty
-      if (currentLanguage === 'en') {
+      const hasEnglish = titleEn || contentEn;
+      const hasIndonesian = titleId || contentId;
+
+      if (hasIndonesian && !hasEnglish) {
         srcLang = 'id';
         tgtLang = 'en';
-      } else {
+      } else if (hasEnglish && !hasIndonesian) {
         srcLang = 'en';
         tgtLang = 'id';
+      } else {
+        // Both have content or both are empty
+        if (currentLanguage === 'en') {
+          srcLang = 'id';
+          tgtLang = 'en';
+        } else {
+          srcLang = 'en';
+          tgtLang = 'id';
+        }
       }
     }
 
@@ -439,7 +470,7 @@ export default function createTranslationRoutes(db) {
       }
 
       const doc = await getContent(contentType, postId);
-      const { srcLang, tgtLang } = determineTranslationDirection(doc, contentType, currentLanguage);
+      const { srcLang, tgtLang } = await determineTranslationDirection(doc, contentType, currentLanguage);
       const fields = getTranslatableFields(contentType);
 
       const responseData = {
@@ -548,7 +579,7 @@ export default function createTranslationRoutes(db) {
       }
 
       const doc = await getContent(contentType, postId);
-      const { srcLang, tgtLang } = determineTranslationDirection(doc, contentType, currentLanguage);
+      const { srcLang, tgtLang } = await determineTranslationDirection(doc, contentType, currentLanguage);
       const fields = getTranslatableFields(contentType);
 
       const responseData = {
@@ -677,7 +708,7 @@ export default function createTranslationRoutes(db) {
       }
 
       const doc = await getContent(contentType, postId);
-      const { srcLang, tgtLang } = determineTranslationDirection(doc, contentType, currentLanguage);
+      const { srcLang, tgtLang } = await determineTranslationDirection(doc, contentType, currentLanguage);
       const fields = getTranslatableFields(contentType);
 
       // Build JSON to translate and extract placeholders
