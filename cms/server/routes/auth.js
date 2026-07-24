@@ -1,12 +1,23 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
 import { JWT_SECRET, authMiddleware } from '../middleware/auth.js';
+
+// Brute-force protection: this is a single-admin system, so a successful
+// guess is a full takeover. Limit login attempts per IP.
+const loginRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts. Please try again later.' },
+});
 
 export default function authRoutes(db) {
   const router = Router();
 
-  router.post('/login', async (req, res) => {
+  router.post('/login', loginRateLimit, async (req, res) => {
     try {
       const { username, password } = req.body;
       if (!username || !password) {

@@ -8,6 +8,7 @@ for (const key of Object.keys(process.env)) {
 import express from 'express';
 import compression from 'compression';
 import cors from 'cors';
+import helmet from 'helmet';
 import { MongoClient } from 'mongodb';
 import bcrypt from 'bcryptjs';
 import path from 'path';
@@ -124,6 +125,13 @@ async function start() {
   run30DayAutoCleanup(db).catch(err => console.error('[Trash Cleanup] Startup cleanup failed:', err));
 
   const app = express();
+
+  // Security headers (CSP disabled: this is a JSON API + static upload server,
+  // not an HTML app; CORP relaxed so the frontend, on a different origin, can load /uploads images)
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }));
 
   // Enable gzip/deflate compression for responses
   app.use(compression());

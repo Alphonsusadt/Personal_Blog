@@ -156,7 +156,15 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
-    // Only allow images
+    // Only allow raster images. SVG is explicitly excluded: it's an XML/HTML-adjacent
+    // format that can embed <script>, and would be served back as-is from /uploads,
+    // enabling stored XSS if the file is opened directly rather than via <img>.
+    const isSvg = file.mimetype === 'image/svg+xml' ||
+      path.extname(file.originalname).toLowerCase() === '.svg';
+    if (isSvg) {
+      cb(new Error('SVG files are not allowed'));
+      return;
+    }
     if (!file.mimetype.startsWith('image/')) {
       cb(new Error('Only image files are allowed'));
       return;

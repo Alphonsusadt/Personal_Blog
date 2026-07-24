@@ -1,5 +1,6 @@
 import express from 'express';
 import { isValidIndonesianWord, findCorrections } from '../utils/hunspellDictionary.js';
+import { authMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -115,7 +116,7 @@ const commonCorrectWords = new Set([
  * Body: { words: string[] }
  * Response: { results: { word: string, isValid: boolean, suggestions: string[] }[] }
  */
-router.post('/spell-check', async (req, res) => {
+router.post('/spell-check', authMiddleware, async (req, res) => {
   try {
     const { words } = req.body;
     
@@ -144,7 +145,7 @@ router.post('/spell-check', async (req, res) => {
  * Body: { text: string }
  * Response: { original: string, fixed: string, changes: { from: string, to: string, pos: number }[] }
  */
-router.post('/auto-fix-text', async (req, res) => {
+router.post('/auto-fix-text', authMiddleware, async (req, res) => {
   try {
     const { text } = req.body;
     
