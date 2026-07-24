@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api, getRuntimeCache, setRuntimeCache, invalidateRuntimeCache } from '../../lib/api';
+import { api, getRuntimeCache, setRuntimeCache, invalidateRuntimeCache, ADMIN_PATH } from '../../lib/api';
 import { BookToolbar } from '../../components/BookToolbar';
 import { BookSidebar } from '../../components/BookSidebar';
 import { ImageUploadDialog } from '../../components/ImageUploadDialog';
@@ -238,7 +238,7 @@ export function BookEditor() {
           invalidateRuntimeCache('admin:books:list');
           justCreatedRef.current = true;
           setBook(updated);
-          navigate(`/admin/books/edit/${response.id || autoSlug}`, { replace: true });
+          navigate(`${ADMIN_PATH}/books/edit/${response.id || autoSlug}`, { replace: true });
           pendingCreateRef.current = false;
           return updated;
         }
@@ -584,7 +584,7 @@ export function BookEditor() {
       }
       
       alert('Book saved successfully!');
-      navigate('/admin/books');
+      navigate(`${ADMIN_PATH}/books`);
     } catch (err) {
       console.error('Save failed:', err);
       alert('Failed to save book');
@@ -608,7 +608,7 @@ export function BookEditor() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/admin/books')}
+              onClick={() => navigate(`${ADMIN_PATH}/books`)}
               className="p-2 text-[#94A3B8] hover:text-[#60A5FA] transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />

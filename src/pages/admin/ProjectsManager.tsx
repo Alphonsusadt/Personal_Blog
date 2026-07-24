@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, getRuntimeCache, setRuntimeCache, invalidateRuntimeCache } from '../../lib/api';
+import { api, getRuntimeCache, setRuntimeCache, invalidateRuntimeCache, ADMIN_PATH } from '../../lib/api';
 import { Plus, Pencil, Trash2, Clock, Calendar, Eye, EyeOff, Filter } from 'lucide-react';
 import { resolveLocalizedText, getTranslationStatus, type LocalizedTextValue } from '../../lib/localized';
 
@@ -104,7 +104,7 @@ export function ProjectsManager() {
             </select>
           </div>
         </div>
-        <button onClick={() => navigate('/admin/projects/edit/new')} className="flex items-center gap-2 bg-[#1E40AF] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#1E3A8A] transition-colors">
+        <button onClick={() => navigate(`${ADMIN_PATH}/projects/edit/new`)} className="flex items-center gap-2 bg-[#1E40AF] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#1E3A8A] transition-colors">
           <Plus className="w-4 h-4" /> Add Project
         </button>
       </div>
@@ -179,7 +179,7 @@ export function ProjectsManager() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => navigate(`/admin/projects/edit/${item.id || item._id || ''}`)} className="p-2 text-[#94A3B8] hover:text-[#60A5FA] transition-colors"><Pencil className="w-4 h-4" /></button>
+                      <button onClick={() => navigate(`${ADMIN_PATH}/projects/edit/${item.id || item._id || ''}`)} className="p-2 text-[#94A3B8] hover:text-[#60A5FA] transition-colors"><Pencil className="w-4 h-4" /></button>
                       <button onClick={() => handleToggleVisibility(item)} className="p-2 text-[#94A3B8] hover:text-emerald-400 transition-colors" title={item.visible === false ? 'Show on public site' : 'Hide from public site'}>
                         {item.visible === false ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>

@@ -1,6 +1,7 @@
 import { LocalizedTextValue } from './localized';
 
 export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+export const ADMIN_PATH = import.meta.env.VITE_ADMIN_PATH || '/admin';
 
 export interface PublicSettings {
   footerBio?: LocalizedTextValue;
@@ -86,7 +87,7 @@ export const api = {
   // Generic fetch helpers
   async get(path: string, auth = true) {
     const res = await fetch(`${API_BASE}${path}`, { headers: this.headers(auth) });
-    if (res.status === 401 && auth) { this.logout(); window.location.href = '/admin/login'; throw new Error('Unauthorized'); }
+    if (res.status === 401 && auth) { this.logout(); window.location.href = `${ADMIN_PATH}/login`; throw new Error('Unauthorized'); }
     if (!res.ok) throw new Error(`GET ${path} failed`);
     return res.json();
   },
@@ -95,7 +96,7 @@ export const api = {
     const res = await fetch(`${API_BASE}${path}`, {
       method: 'POST', headers: this.headers(), body: JSON.stringify(data),
     });
-    if (res.status === 401) { this.logout(); window.location.href = '/admin/login'; throw new Error('Unauthorized'); }
+    if (res.status === 401) { this.logout(); window.location.href = `${ADMIN_PATH}/login`; throw new Error('Unauthorized'); }
     if (!res.ok) throw new Error(`POST ${path} failed`);
     return res.json();
   },
@@ -104,7 +105,7 @@ export const api = {
     const res = await fetch(`${API_BASE}${path}`, {
       method: 'PUT', headers: this.headers(), body: JSON.stringify(data),
     });
-    if (res.status === 401) { this.logout(); window.location.href = '/admin/login'; throw new Error('Unauthorized'); }
+    if (res.status === 401) { this.logout(); window.location.href = `${ADMIN_PATH}/login`; throw new Error('Unauthorized'); }
     if (!res.ok) {
       let detail = '';
       try { const body = await res.json(); detail = body.error || body.message || ''; } catch { /* ignore */ }
@@ -118,7 +119,7 @@ export const api = {
     const res = await fetch(`${API_BASE}${path}`, {
       method: 'PATCH', headers: this.headers(), body: JSON.stringify(data),
     });
-    if (res.status === 401) { this.logout(); window.location.href = '/admin/login'; throw new Error('Unauthorized'); }
+    if (res.status === 401) { this.logout(); window.location.href = `${ADMIN_PATH}/login`; throw new Error('Unauthorized'); }
     if (!res.ok) throw new Error(`PATCH ${path} failed`);
     return res.json();
   },
@@ -127,7 +128,7 @@ export const api = {
     const res = await fetch(`${API_BASE}${path}`, {
       method: 'DELETE', headers: this.headers(),
     });
-    if (res.status === 401) { this.logout(); window.location.href = '/admin/login'; throw new Error('Unauthorized'); }
+    if (res.status === 401) { this.logout(); window.location.href = `${ADMIN_PATH}/login`; throw new Error('Unauthorized'); }
     if (!res.ok) throw new Error(`DELETE ${path} failed`);
     return res.json();
   },

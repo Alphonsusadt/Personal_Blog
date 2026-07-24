@@ -1,21 +1,21 @@
 import { useState, useEffect } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { api } from '../../lib/api';
+import { api, ADMIN_PATH } from '../../lib/api';
 import {
   LayoutDashboard, FolderKanban, PenLine, BookOpen, UserCircle, Home, Settings, LogOut, Menu, X, ChevronRight, Tags, Mail, Trash2
 } from 'lucide-react';
 
 const sidebarItems = [
-  { path: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { path: '/admin/projects', label: 'Projects', icon: FolderKanban },
-  { path: '/admin/writings', label: 'Writings', icon: PenLine },
-  { path: '/admin/books', label: 'Books', icon: BookOpen },
-  { path: '/admin/categories', label: 'Categories', icon: Tags },
-  { path: '/admin/about', label: 'About Page', icon: UserCircle },
-  { path: '/admin/home', label: 'Home Page', icon: Home },
-  { path: '/admin/messages', label: 'Messages', icon: Mail },
-  { path: '/admin/settings', label: 'Settings', icon: Settings },
-  { path: '/admin/trash', label: 'Trash Bin', icon: Trash2 },
+  { path: ADMIN_PATH, label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  { path: `${ADMIN_PATH}/projects`, label: 'Projects', icon: FolderKanban },
+  { path: `${ADMIN_PATH}/writings`, label: 'Writings', icon: PenLine },
+  { path: `${ADMIN_PATH}/books`, label: 'Books', icon: BookOpen },
+  { path: `${ADMIN_PATH}/categories`, label: 'Categories', icon: Tags },
+  { path: `${ADMIN_PATH}/about`, label: 'About Page', icon: UserCircle },
+  { path: `${ADMIN_PATH}/home`, label: 'Home Page', icon: Home },
+  { path: `${ADMIN_PATH}/messages`, label: 'Messages', icon: Mail },
+  { path: `${ADMIN_PATH}/settings`, label: 'Settings', icon: Settings },
+  { path: `${ADMIN_PATH}/trash`, label: 'Trash Bin', icon: Trash2 },
 ];
 
 export function AdminLayout() {
@@ -25,14 +25,14 @@ export function AdminLayout() {
 
   useEffect(() => {
     if (!api.isLoggedIn()) {
-      navigate('/admin/login', { replace: true });
+      navigate(`${ADMIN_PATH}/login`, { replace: true });
       return;
     }
   }, [navigate]);
 
   const handleLogout = () => {
     api.logout();
-    navigate('/admin/login');
+    navigate(`${ADMIN_PATH}/login`);
   };
 
   const isActive = (path: string, exact?: boolean) => {
@@ -45,7 +45,7 @@ export function AdminLayout() {
       {/* Sidebar - Fixed */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#1E293B] border-r border-[#334155] transform transition-transform lg:translate-x-0 flex flex-col ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between h-16 px-6 border-b border-[#334155] flex-shrink-0">
-          <Link to="/admin" className="text-lg font-bold text-[#F8FAFC]">CMS Admin</Link>
+          <Link to={ADMIN_PATH} className="text-lg font-bold text-[#F8FAFC]">CMS Admin</Link>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-[#94A3B8]">
             <X className="w-5 h-5" />
           </button>

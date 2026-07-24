@@ -15,6 +15,8 @@ const BookDetail = lazy(() => import('./pages/BookDetail').then(m => ({ default:
 const About = lazy(() => import('./pages/About').then(m => ({ default: m.About })));
 const Contact = lazy(() => import('./pages/Contact').then(m => ({ default: m.Contact })));
 
+import { ADMIN_PATH } from './lib/api';
+
 const Login = lazy(() => import('./pages/admin/Login').then(m => ({ default: m.Login })));
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout').then(m => ({ default: m.AdminLayout })));
 const Dashboard = lazy(() => import('./pages/admin/Dashboard').then(m => ({ default: m.Dashboard })));
@@ -72,8 +74,8 @@ export function App() {
       <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Admin Routes */}
-          <Route path="/admin/login" element={<Login />} />
-          <Route path="/admin" element={<AdminLayout />}>
+          <Route path={`${ADMIN_PATH}/login`} element={<Login />} />
+          <Route path={ADMIN_PATH} element={<AdminLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="projects" element={<ProjectsManager />} />
             <Route path="projects/edit/:slug" element={<ProjectEditor />} />

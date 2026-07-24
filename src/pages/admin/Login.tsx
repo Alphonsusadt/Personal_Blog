@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { api } from '../../lib/api';
+import { api, ADMIN_PATH } from '../../lib/api';
 import { Lock, User, AlertCircle } from 'lucide-react';
 
 export function Login() {
@@ -18,7 +18,7 @@ export function Login() {
     setLoading(true);
     try {
       await api.login(username, password);
-      navigate('/admin');
+      navigate(ADMIN_PATH);
     } catch {
       setError('Username atau password salah');
     } finally {

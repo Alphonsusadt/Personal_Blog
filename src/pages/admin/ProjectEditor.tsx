@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api, getRuntimeCache, setRuntimeCache, invalidateRuntimeCache } from '../../lib/api';
+import { api, getRuntimeCache, setRuntimeCache, invalidateRuntimeCache, ADMIN_PATH } from '../../lib/api';
 import { ProjectSidebar } from '../../components/ProjectSidebar';
 import { ImageUploadDialog } from '../../components/ImageUploadDialog';
 import { LinkInsertDialog } from '../../components/LinkInsertDialog';
@@ -317,7 +317,7 @@ export function ProjectEditor() {
           invalidateRuntimeCache('admin:projects:list');
           justCreatedRef.current = true;
           setProject(updated);
-          navigate(`/admin/projects/edit/${response.id || autoSlug}`, { replace: true });
+          navigate(`${ADMIN_PATH}/projects/edit/${response.id || autoSlug}`, { replace: true });
           pendingCreateRef.current = false;
           return updated;
         }
@@ -619,7 +619,7 @@ export function ProjectEditor() {
       }
       
       alert('Project saved successfully!');
-      navigate('/admin/projects');
+      navigate(`${ADMIN_PATH}/projects`);
     } catch (err) {
       console.error('Save failed:', err);
       alert('Failed to save project');
@@ -643,7 +643,7 @@ export function ProjectEditor() {
         <div className="flex items-center justify-between max-w-[90rem] mx-auto">
           <div className="flex items-center gap-3 sm:gap-4">
             <button
-              onClick={() => navigate('/admin/projects')}
+              onClick={() => navigate(`${ADMIN_PATH}/projects`)}
               className="p-2 text-[#94A3B8] hover:text-[#60A5FA] transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />

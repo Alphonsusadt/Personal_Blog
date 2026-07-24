@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api, getRuntimeCache, setRuntimeCache, invalidateRuntimeCache } from '../../lib/api';
+import { api, getRuntimeCache, setRuntimeCache, invalidateRuntimeCache, ADMIN_PATH } from '../../lib/api';
 import { WritingSidebar } from '../../components/WritingSidebar';
 import { ImageUploadDialog } from '../../components/ImageUploadDialog';
 import { LinkInsertDialog } from '../../components/LinkInsertDialog';
@@ -320,7 +320,7 @@ export function WritingEditor() {
           invalidateRuntimeCache('admin:writings:list');
           justCreatedRef.current = true;
           setWriting(updated);
-          navigate(`/admin/writings/edit/${response.id || draftId}`, { replace: true });
+          navigate(`${ADMIN_PATH}/writings/edit/${response.id || draftId}`, { replace: true });
           pendingCreateRef.current = false;
           return updated;
         }
@@ -635,7 +635,7 @@ export function WritingEditor() {
       }
       
       alert('Writing saved successfully!');
-      navigate('/admin/writings');
+      navigate(`${ADMIN_PATH}/writings`);
     } catch (err) {
       console.error('Save failed:', err);
       const message = err instanceof Error ? err.message : String(err);
@@ -660,7 +660,7 @@ export function WritingEditor() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/admin/writings')}
+              onClick={() => navigate(`${ADMIN_PATH}/writings`)}
               className="p-2 text-[#94A3B8] hover:text-[#60A5FA] transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
