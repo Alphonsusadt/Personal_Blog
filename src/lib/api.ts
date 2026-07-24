@@ -1,7 +1,8 @@
 import { LocalizedTextValue } from './localized';
 
 export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
-export const ADMIN_PATH = import.meta.env.VITE_ADMIN_PATH || '/admin';
+const rawAdminPath = import.meta.env.VITE_ADMIN_PATH || '/admin';
+export const ADMIN_PATH = rawAdminPath.trim().replace(/\/+$/, '') || '/admin';
 
 export interface PublicSettings {
   footerBio?: LocalizedTextValue;

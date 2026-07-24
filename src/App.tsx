@@ -74,21 +74,23 @@ export function App() {
       <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Admin Routes */}
-          <Route path={`${ADMIN_PATH}/login`} element={<Login />} />
-          <Route path={ADMIN_PATH} element={<AdminLayout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="projects" element={<ProjectsManager />} />
-            <Route path="projects/edit/:slug" element={<ProjectEditor />} />
-            <Route path="writings" element={<WritingsManager />} />
-            <Route path="writings/edit/:slug" element={<WritingEditor />} />
-            <Route path="books" element={<BooksManager />} />
-            <Route path="books/edit/:slug" element={<BookEditor />} />
-            <Route path="about" element={<AboutManager />} />
-            <Route path="home" element={<HomeManager />} />
-            <Route path="settings" element={<SettingsManager />} />
-            <Route path="categories" element={<CategoriesManager />} />
-            <Route path="messages" element={<MessagesManager />} />
-            <Route path="trash" element={<TrashManager />} />
+          <Route path={ADMIN_PATH}>
+            <Route path="login" element={<Login />} />
+            <Route element={<AdminLayout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="projects" element={<ProjectsManager />} />
+              <Route path="projects/edit/:slug" element={<ProjectEditor />} />
+              <Route path="writings" element={<WritingsManager />} />
+              <Route path="writings/edit/:slug" element={<WritingEditor />} />
+              <Route path="books" element={<BooksManager />} />
+              <Route path="books/edit/:slug" element={<BookEditor />} />
+              <Route path="about" element={<AboutManager />} />
+              <Route path="home" element={<HomeManager />} />
+              <Route path="settings" element={<SettingsManager />} />
+              <Route path="categories" element={<CategoriesManager />} />
+              <Route path="messages" element={<MessagesManager />} />
+              <Route path="trash" element={<TrashManager />} />
+            </Route>
           </Route>
 
           {/* Public Routes */}
