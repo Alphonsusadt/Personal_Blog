@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Navigation } from './components/Navigation';
 import { Footer } from './components/Footer';
 import { PageLoader } from './components/PageLoader';
@@ -73,25 +73,33 @@ export function App() {
     <BrowserRouter>
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          {/* Admin Routes */}
-          <Route path={ADMIN_PATH}>
-            <Route path="login" element={<Login />} />
-            <Route element={<AdminLayout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="projects" element={<ProjectsManager />} />
-              <Route path="projects/edit/:slug" element={<ProjectEditor />} />
-              <Route path="writings" element={<WritingsManager />} />
-              <Route path="writings/edit/:slug" element={<WritingEditor />} />
-              <Route path="books" element={<BooksManager />} />
-              <Route path="books/edit/:slug" element={<BookEditor />} />
-              <Route path="about" element={<AboutManager />} />
-              <Route path="home" element={<HomeManager />} />
-              <Route path="settings" element={<SettingsManager />} />
-              <Route path="categories" element={<CategoriesManager />} />
-              <Route path="messages" element={<MessagesManager />} />
-              <Route path="trash" element={<TrashManager />} />
-            </Route>
+          {/* Admin Login - standalone, no public layout */}
+          <Route path={`${ADMIN_PATH}/login`} element={<Login />} />
+
+          {/* Admin Dashboard & sub-pages */}
+          <Route path={ADMIN_PATH} element={<AdminLayout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="projects" element={<ProjectsManager />} />
+            <Route path="projects/edit/:slug" element={<ProjectEditor />} />
+            <Route path="writings" element={<WritingsManager />} />
+            <Route path="writings/edit/:slug" element={<WritingEditor />} />
+            <Route path="books" element={<BooksManager />} />
+            <Route path="books/edit/:slug" element={<BookEditor />} />
+            <Route path="about" element={<AboutManager />} />
+            <Route path="home" element={<HomeManager />} />
+            <Route path="settings" element={<SettingsManager />} />
+            <Route path="categories" element={<CategoriesManager />} />
+            <Route path="messages" element={<MessagesManager />} />
+            <Route path="trash" element={<TrashManager />} />
           </Route>
+
+          {/* Redirect old /admin paths to masked admin path */}
+          {ADMIN_PATH !== '/admin' && (
+            <>
+              <Route path="/admin/login" element={<Navigate to={`${ADMIN_PATH}/login`} replace />} />
+              <Route path="/admin/*" element={<Navigate to={ADMIN_PATH} replace />} />
+            </>
+          )}
 
           {/* Public Routes */}
           <Route path="/*" element={<PublicLayout />} />
