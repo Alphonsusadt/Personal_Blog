@@ -18,16 +18,6 @@ async function trySupabase(supabaseFn, mongoFn) {
   return mongoFn();
 }
 
-const SUPABASE_STRIP_FIELDS = ['translationOfId', 'contentLanguage'];
-
-function stripForSupabase(data) {
-  const cleaned = { ...data };
-  for (const field of SUPABASE_STRIP_FIELDS) {
-    delete cleaned[field];
-  }
-  return cleaned;
-}
-
 // Helper: Safely parse JSON string back to object
 function parseSupabaseJson(data) {
   if (!data) return data;
@@ -336,16 +326,17 @@ export default function writingsRoutes(db) {
       // 1. Soft-delete in MongoDB, matched (and created if missing) by the slug `id`
       await fallbackCol.updateOne({ id: slug }, { $set: updateData }, { upsert: true });
 
-      // 2. Update Supabase by 'id' field (the client-side slug string)
+      // 2. Propagate the soft-delete to Supabase. The admin list is served FROM
+      // Supabase, so this must land or the "deleted" writing keeps showing in the
+      // list. Update only the soft-delete columns (avoids schema/onConflict
+      // pitfalls from writing back the whole doc), and check the returned error —
+      // the Supabase client returns errors, it does not throw them.
       if (supabase) {
-        try {
-          const cleaned = stripForSupabase(updateData);
-          await supabase
-            .from('artikel')
-            .upsert(cleaned, { onConflict: 'id' });
-        } catch (err) {
-          console.warn('[writings] Supabase soft-delete update failed:', err.message);
-        }
+        const { error: sbErr } = await supabase
+          .from('artikel')
+          .update({ status: 'deleted', visible: false })
+          .eq('id', slug);
+        if (sbErr) console.warn('[writings] Supabase soft-delete update failed:', sbErr.message);
       }
 
       res.json({ message: 'Deleted' });
