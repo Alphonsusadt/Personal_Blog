@@ -296,26 +296,29 @@ export default function writingsRoutes(db) {
       // client may be a real Mongo ObjectId OR a Supabase-generated UUID — never assume.
       const isObjectId = /^[0-9a-fA-F]{24}$/.test(lookupId);
 
-      let existing = await fallbackCol.findOne(isObjectId ? { _id: new ObjectId(lookupId) } : { id: lookupId });
-      let slug = existing?.id;
-      let sourceDoc = existing;
+      const mongoDoc = await fallbackCol.findOne(isObjectId ? { _id: new ObjectId(lookupId) } : { id: lookupId });
 
-      if (!slug && supabase) {
-        // Not in Mongo at all yet (writing only synced to Supabase) — resolve via its own _id column
+      // Not (or not only) in Mongo — resolve the exact Supabase row via its _id column.
+      // Many legacy Supabase rows have an EMPTY slug (id column), so the slug can
+      // never be required for the lookup to succeed.
+      let sbDoc = null;
+      if (!mongoDoc && !isObjectId && supabase) {
         try {
           const { data } = await supabase.from('artikel').select('*').eq('_id', lookupId).maybeSingle();
-          if (data) {
-            slug = data.id;
-            sourceDoc = parseSupabaseJson(data);
-          }
+          if (data) sbDoc = data;
         } catch (err) {
           console.warn('[writings] Supabase lookup by _id failed:', err.message);
         }
       }
 
-      if (!slug) {
+      if (!mongoDoc && !sbDoc) {
         return res.status(404).json({ error: 'Writing not found' });
       }
+
+      const sourceDoc = mongoDoc || parseSupabaseJson(sbDoc);
+      // Stable key for the Mongo tombstone: prefer the real slug; legacy Supabase
+      // rows with an empty slug fall back to the row's UUID so each gets its own doc.
+      const slug = (mongoDoc?.id || sbDoc?.id || '').trim() || lookupId;
 
       const updateData = {
         ...sourceDoc,
@@ -327,23 +330,36 @@ export default function writingsRoutes(db) {
       };
       delete updateData._id;
 
-      // 1. Soft-delete in MongoDB, matched (and created if missing) by the slug `id`
-      await fallbackCol.updateOne({ id: slug }, { $set: updateData }, { upsert: true });
+      // 1. Soft-delete in MongoDB (upsert a tombstone if the doc only lived in
+      // Supabase) so the item shows up in the Trash Bin and can be restored.
+      if (mongoDoc) {
+        await fallbackCol.updateOne({ _id: mongoDoc._id }, { $set: updateData });
+      } else {
+        await fallbackCol.updateOne({ id: slug }, { $set: updateData }, { upsert: true });
+      }
 
       // 2. Propagate the soft-delete to Supabase. The admin list is served FROM
       // Supabase, so this MUST land — otherwise the "deleted" writing keeps showing
-      // and the delete looks like it did nothing. Update only the soft-delete
-      // columns (avoids schema pitfalls from writing back the whole doc). The
-      // Supabase client returns errors rather than throwing, so check it and fail
-      // loudly with a non-2xx instead of returning a false "success".
+      // and the delete looks like it did nothing. Match by the row's own _id when
+      // the client sent one (always precise, even for empty/duplicated slugs);
+      // never match by an empty slug — .eq('id','') would hit every legacy row.
+      // The Supabase client returns errors rather than throwing, so check it and
+      // fail loudly with a non-2xx instead of returning a false "success".
       if (supabase) {
-        const { error: sbErr } = await supabase
-          .from('artikel')
-          .update({ status: 'deleted', visible: false })
-          .eq('id', slug);
-        if (sbErr) {
-          console.error('[writings] Supabase soft-delete failed:', sbErr.message);
-          return res.status(502).json({ error: 'Gagal menyinkronkan penghapusan ke Supabase: ' + sbErr.message });
+        let query = supabase.from('artikel').update({ status: 'deleted', visible: false });
+        if (!isObjectId) {
+          query = query.eq('_id', lookupId);
+        } else if ((mongoDoc?.id || '').trim()) {
+          query = query.eq('id', mongoDoc.id);
+        } else {
+          query = null; // no safe way to address the Supabase row; Mongo is already updated
+        }
+        if (query) {
+          const { error: sbErr } = await query;
+          if (sbErr) {
+            console.error('[writings] Supabase soft-delete failed:', sbErr.message);
+            return res.status(502).json({ error: 'Gagal menyinkronkan penghapusan ke Supabase: ' + sbErr.message });
+          }
         }
       }
 
