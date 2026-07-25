@@ -298,23 +298,43 @@ export default function writingsRoutes(db) {
   router.delete('/:id', authMiddleware, async (req, res) => {
     try {
       const lookupId = req.params.id;
-      const mongoId = new ObjectId(lookupId);
+      // The admin list reads from Supabase first (see GET '/'), so `_id` sent by the
+      // client may be a real Mongo ObjectId OR a Supabase-generated UUID — never assume.
+      const isObjectId = /^[0-9a-fA-F]{24}$/.test(lookupId);
 
-      const existing = await fallbackCol.findOne({ _id: mongoId });
-      if (!existing) {
+      let existing = await fallbackCol.findOne(isObjectId ? { _id: new ObjectId(lookupId) } : { id: lookupId });
+      let slug = existing?.id;
+      let sourceDoc = existing;
+
+      if (!slug && supabase) {
+        // Not in Mongo at all yet (writing only synced to Supabase) — resolve via its own _id column
+        try {
+          const { data } = await supabase.from('artikel').select('*').eq('_id', lookupId).maybeSingle();
+          if (data) {
+            slug = data.id;
+            sourceDoc = parseSupabaseJson(data);
+          }
+        } catch (err) {
+          console.warn('[writings] Supabase lookup by _id failed:', err.message);
+        }
+      }
+
+      if (!slug) {
         return res.status(404).json({ error: 'Writing not found' });
       }
 
       const updateData = {
-        ...existing,
+        ...sourceDoc,
+        id: slug,
         status: 'deleted',
         visible: false,
         deletedAt: new Date(),
         updatedAt: new Date(),
       };
+      delete updateData._id;
 
-      // 1. Update MongoDB by _id
-      await fallbackCol.updateOne({ _id: mongoId }, { $set: updateData });
+      // 1. Soft-delete in MongoDB, matched (and created if missing) by the slug `id`
+      await fallbackCol.updateOne({ id: slug }, { $set: updateData }, { upsert: true });
 
       // 2. Update Supabase by 'id' field (the client-side slug string)
       if (supabase) {
