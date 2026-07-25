@@ -33,6 +33,7 @@ export function ProjectsManager() {
   const [items, setItems] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterLang, setFilterLang] = useState<'all' | 'bilingual' | 'en' | 'id'>('all');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const cacheKey = 'admin:projects:list';
 
   const load = () => {
@@ -72,6 +73,40 @@ export function ProjectsManager() {
     load();
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const allSelected = filteredItems.length > 0 && filteredItems.every(i => i._id && selectedIds.has(i._id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      filteredItems.forEach(i => {
+        if (!i._id) return;
+        if (allSelected) next.delete(i._id); else next.add(i._id);
+      });
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Hapus ${selectedIds.size} project yang dipilih?`)) return;
+    const ids = Array.from(selectedIds);
+    await Promise.all(ids.map(id => api.del(`/api/projects/${id}`)));
+    invalidateRuntimeCache('admin:projects:list');
+    ids.forEach(id => {
+      const item = items.find(i => i._id === id);
+      if (item?.id) invalidateRuntimeCache(`admin:projects:item:${item.id}`);
+    });
+    setSelectedIds(new Set());
+    load();
+  };
+
   const handleToggleVisibility = async (item: Project) => {
     if (!item._id) return;
     await api.put(`/api/projects/${item._id}`, {
@@ -84,6 +119,16 @@ export function ProjectsManager() {
     }
     load();
   };
+
+  const filteredItems = items.filter(item => {
+    if (filterLang === 'all') return true;
+    const status = getTranslationStatus([item.title, item.description], item.translationOfId, item.contentLanguage);
+    if (filterLang === 'bilingual') return status === 'bilingual';
+    if (filterLang === 'id') return status === 'single-id';
+    if (filterLang === 'en') return status === 'single-en';
+    return true;
+  });
+  const allFilteredSelected = filteredItems.length > 0 && filteredItems.every(i => i._id && selectedIds.has(i._id));
 
   return (
     <div>
@@ -109,11 +154,28 @@ export function ProjectsManager() {
         </button>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between mb-4 bg-[#1E293B] border border-[#334155] rounded-lg px-4 py-3">
+          <p className="text-sm text-[#F8FAFC]">{selectedIds.size} item dipilih</p>
+          <button onClick={handleBulkDelete} className="flex items-center gap-2 bg-red-500/10 text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-500/20 transition-colors">
+            <Trash2 className="w-4 h-4" /> Hapus {selectedIds.size} item
+          </button>
+        </div>
+      )}
+
       {loading ? <p className="text-[#94A3B8]">Loading...</p> : (
         <div className="bg-[#1E293B] border border-[#334155] rounded-xl overflow-hidden">
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#334155] text-left">
+                <th className="px-6 py-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={allFilteredSelected}
+                    onChange={toggleSelectAll}
+                    className="accent-[#1E40AF] w-4 h-4 cursor-pointer"
+                  />
+                </th>
                 <th className="px-6 py-3 text-xs font-medium text-[#94A3B8] uppercase">Title</th>
                 <th className="px-6 py-3 text-xs font-medium text-[#94A3B8] uppercase hidden md:table-cell">Category</th>
                 <th className="px-6 py-3 text-xs font-medium text-[#94A3B8] uppercase hidden lg:table-cell">Created / Updated</th>
@@ -122,17 +184,18 @@ export function ProjectsManager() {
               </tr>
             </thead>
             <tbody>
-              {items.filter(item => {
-                if (filterLang === 'all') return true;
-                const status = getTranslationStatus([item.title, item.description], item.translationOfId, item.contentLanguage);
-                if (filterLang === 'bilingual') return status === 'bilingual';
-                if (filterLang === 'id') return status === 'single-id';
-                if (filterLang === 'en') return status === 'single-en';
-                return true;
-              }).map(item => {
+              {filteredItems.map(item => {
                 const status = getTranslationStatus([item.title, item.description], item.translationOfId, item.contentLanguage);
                 return (
                 <tr key={item._id} className="border-b border-[#334155] last:border-0 hover:bg-[#334155]/20 transition-colors">
+                  <td className="px-6 py-4">
+                    <input
+                      type="checkbox"
+                      checked={!!item._id && selectedIds.has(item._id)}
+                      onChange={() => item._id && toggleSelect(item._id)}
+                      className="accent-[#1E40AF] w-4 h-4 cursor-pointer"
+                    />
+                  </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-[#F8FAFC] font-medium text-sm">{resolveLocalizedText(item.title, 'id') || resolveLocalizedText(item.title, 'en') || 'Untitled'}</p>
@@ -189,7 +252,7 @@ export function ProjectsManager() {
                 </tr>
                 );
               })}
-              {items.length === 0 && <tr><td colSpan={5} className="px-6 py-8 text-center text-[#94A3B8]">No projects yet</td></tr>}
+              {items.length === 0 && <tr><td colSpan={6} className="px-6 py-8 text-center text-[#94A3B8]">No projects yet</td></tr>}
             </tbody>
           </table>
         </div>

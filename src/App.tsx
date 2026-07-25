@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Navigation } from './components/Navigation';
 import { Footer } from './components/Footer';
 import { PageLoader } from './components/PageLoader';
@@ -92,14 +92,6 @@ export function App() {
             <Route path="messages" element={<MessagesManager />} />
             <Route path="trash" element={<TrashManager />} />
           </Route>
-
-          {/* Redirect old /admin paths to masked admin path */}
-          {ADMIN_PATH !== '/admin' && (
-            <>
-              <Route path="/admin/login" element={<Navigate to={`${ADMIN_PATH}/login`} replace />} />
-              <Route path="/admin/*" element={<Navigate to={ADMIN_PATH} replace />} />
-            </>
-          )}
 
           {/* Public Routes */}
           <Route path="/*" element={<PublicLayout />} />
