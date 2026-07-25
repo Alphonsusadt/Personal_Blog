@@ -7,7 +7,7 @@ interface TrashedItem {
   _id: string;
   id: string;
   title: any;
-  type: 'project' | 'writing' | 'book';
+  type: 'project' | 'writing' | 'book' | 'message';
   deletedAt: string;
   daysRemaining: number;
 }
@@ -138,7 +138,8 @@ export function TrashManager() {
                 const typeLabels = {
                   project: { label: 'Project', color: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
                   writing: { label: 'Writing', color: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30' },
-                  book: { label: 'Library', color: 'bg-amber-500/15 text-amber-400 border-amber-500/30' }
+                  book: { label: 'Library', color: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
+                  message: { label: 'Message', color: 'bg-pink-500/15 text-pink-400 border-pink-500/30' }
                 };
 
                 const typeConfig = typeLabels[item.type] || { label: item.type, color: 'bg-[#334155] text-[#94A3B8] border-[#334155]' };

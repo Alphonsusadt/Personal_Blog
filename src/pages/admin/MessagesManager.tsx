@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import {
   Mail, Inbox, Search, Clock, CheckCircle2, MessageSquare, Plus,
-  Globe, Calendar, User, Send, AlertCircle, RefreshCw
+  Globe, Calendar, User, Send, AlertCircle, RefreshCw, Trash2
 } from 'lucide-react';
 
 interface Reply {
@@ -45,6 +45,10 @@ export function MessagesManager() {
   const [sendingReply, setSendingReply] = useState(false);
   const [replyStatus, setReplyStatus] = useState<{ type: 'success' | 'error' | ''; message: string }>({ type: '', message: '' });
 
+  // Bulk-select & delete state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   // Fetch messages and outbox settings
   const fetchData = async () => {
     try {
@@ -63,10 +67,15 @@ export function MessagesManager() {
       const activeEmail = typeof settingsData?.activeSenderEmail === 'string' ? settingsData.activeSenderEmail : '';
       setSelectedSenderEmail(activeEmail || emailsList[0] || '');
       
-      // Keep previous selected message reference if exists
+      // Keep previous selected message reference if it still exists; otherwise
+      // (e.g. it was just deleted) fall back to the first message in the list.
       if (selectedMessage) {
         const updatedSelected = messagesData.find((m: Message) => m.id === selectedMessage.id);
-        if (updatedSelected) setSelectedMessage(updatedSelected);
+        if (updatedSelected) {
+          setSelectedMessage(updatedSelected);
+        } else {
+          setSelectedMessage(messagesData.length > 0 ? messagesData[0] : null);
+        }
       } else if (messagesData.length > 0) {
         setSelectedMessage(messagesData[0]);
       }
@@ -150,6 +159,59 @@ export function MessagesManager() {
       setReplyStatus({ type: 'error', message: err?.message || 'Failed to dispatch email reply via Resend.' });
     } finally {
       setSendingReply(false);
+    }
+  };
+
+  // Move a single message to the Trash Bin (soft delete, restorable for 30 days)
+  const handleDeleteOne = async (id: string) => {
+    if (!confirm('Pindahkan pesan ini ke Tong Sampah?')) return;
+    setDeletingId(id);
+    try {
+      await api.del(`/api/messages/${id}`);
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to delete message:', err);
+      alert('Gagal menghapus pesan.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const allSelected = filteredMessages.length > 0 && filteredMessages.every(m => selectedIds.has(m.id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      filteredMessages.forEach(m => {
+        if (allSelected) next.delete(m.id); else next.add(m.id);
+      });
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Pindahkan ${selectedIds.size} pesan ke Tong Sampah?`)) return;
+    const ids = Array.from(selectedIds);
+    try {
+      await Promise.all(ids.map(id => api.del(`/api/messages/${id}`)));
+      setSelectedIds(new Set());
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to bulk delete messages:', err);
+      alert('Gagal menghapus beberapa pesan.');
     }
   };
 
@@ -245,6 +307,27 @@ export function MessagesManager() {
                   </button>
                 ))}
               </div>
+
+              {/* Bulk select / delete bar */}
+              <div className="flex items-center justify-between pt-0.5">
+                <label className="flex items-center gap-1.5 text-[11px] text-[#94A3B8] cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={filteredMessages.length > 0 && filteredMessages.every(m => selectedIds.has(m.id))}
+                    onChange={toggleSelectAll}
+                    className="accent-[#1E40AF] w-3.5 h-3.5 cursor-pointer"
+                  />
+                  Pilih Semua
+                </label>
+                {selectedIds.size > 0 && (
+                  <button
+                    onClick={handleBulkDelete}
+                    className="flex items-center gap-1 text-[11px] text-red-400 hover:text-red-300 font-medium transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Hapus ({selectedIds.size})
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Scrollable Cards List */}
@@ -269,8 +352,27 @@ export function MessagesManager() {
                     }`}
                   >
                     <div className="flex justify-between items-start gap-2 mb-1.5">
-                      <h4 className="font-semibold text-xs text-[#F8FAFC] truncate max-w-[160px]">{msg.name}</h4>
-                      <span className="text-[10px] text-[#64748b] whitespace-nowrap">{formatDate(msg.createdAt).split(',')[0]}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(msg.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => toggleSelect(msg.id)}
+                          className="accent-[#1E40AF] w-3.5 h-3.5 cursor-pointer flex-shrink-0"
+                        />
+                        <h4 className="font-semibold text-xs text-[#F8FAFC] truncate max-w-[120px]">{msg.name}</h4>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[10px] text-[#64748b] whitespace-nowrap">{formatDate(msg.createdAt).split(',')[0]}</span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteOne(msg.id); }}
+                          disabled={deletingId === msg.id}
+                          className="text-[#64748b] hover:text-red-400 transition-colors disabled:opacity-40"
+                          title="Pindahkan ke Tong Sampah"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                     <p className="text-xs font-medium text-[#E2E8F0] truncate mb-2">{msg.subject}</p>
                     <p className="text-xs text-[#94A3B8] line-clamp-2 leading-relaxed mb-3">{msg.body}</p>
@@ -303,6 +405,14 @@ export function MessagesManager() {
                     <div className="flex items-center gap-4 text-xs text-[#94A3B8]">
                       <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {formatDate(selectedMessage.createdAt)}</span>
                       <span className="flex items-center gap-1.5"><Globe className="w-3.5 h-3.5" /> Language: {selectedMessage.language.toUpperCase()}</span>
+                      <button
+                        onClick={() => handleDeleteOne(selectedMessage.id)}
+                        disabled={deletingId === selectedMessage.id}
+                        className="flex items-center gap-1.5 text-red-400 hover:text-red-300 font-medium transition-colors disabled:opacity-40"
+                        title="Pindahkan ke Tong Sampah"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Hapus
+                      </button>
                     </div>
                   </div>
                   <h2 className="text-lg font-bold text-[#F8FAFC] mb-2">{selectedMessage.subject}</h2>

@@ -184,6 +184,8 @@ export default function messagesRoutes(db) {
   router.get('/', authMiddleware, async (_req, res) => {
     try {
       const col = db.collection('messages');
+      // Fetch ALL messages (including soft-deleted ones) so the Supabase merge
+      // below doesn't resurrect a trashed message it thinks is "missing" from Mongo.
       const messages = await col.find().sort({ createdAt: -1 }).toArray();
 
       if (supabase) {
@@ -229,7 +231,7 @@ export default function messagesRoutes(db) {
         }
       }
 
-      res.json(messages);
+      res.json(messages.filter((m) => !m.deleted));
     } catch (error) {
       console.error('GET /api/messages error:', error);
       res.status(500).json({ error: error.message });
@@ -323,6 +325,29 @@ export default function messagesRoutes(db) {
       });
     } catch (error) {
       console.error('POST /api/messages/:id/reply error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 4. ADMIN: Soft-delete a message (moves it to the Trash Bin for 30 days)
+  router.delete('/:id', authMiddleware, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const col = db.collection('messages');
+
+      let query = { id };
+      if (ObjectId.isValid(id)) {
+        query = { $or: [{ _id: new ObjectId(id) }, { id }] };
+      }
+
+      const result = await col.updateOne(query, { $set: { deleted: true, deletedAt: new Date() } });
+      if (result.matchedCount === 0) {
+        return res.status(404).json({ error: 'Message not found.' });
+      }
+
+      res.json({ success: true, message: 'Message moved to trash.' });
+    } catch (error) {
+      console.error('DELETE /api/messages/:id error:', error);
       res.status(500).json({ error: error.message });
     }
   });

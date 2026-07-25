@@ -92,6 +92,28 @@ export async function run30DayAutoCleanup(db) {
         console.log(`[Trash Cleanup] Successfully purged expired ${colName} item: ${item.title?.en || item.title || item.id}`);
       }
     }
+
+    // Messages use a different schema (`deleted` boolean flag, no `status` field, no Cloudinary assets)
+    const messagesCol = db.collection('messages');
+    const expiredMessages = await messagesCol.find({
+      deleted: true,
+      deletedAt: { $lte: thirtyDaysAgo }
+    }).toArray();
+
+    if (expiredMessages.length > 0) {
+      console.log(`[Trash Cleanup] Found ${expiredMessages.length} expired messages. Purging...`);
+      for (const msg of expiredMessages) {
+        await messagesCol.deleteOne({ _id: msg._id });
+        if (supabase) {
+          try {
+            await supabase.from('messages').delete().eq('original_message_id', msg.id);
+          } catch (err) {
+            console.warn(`[Trash Cleanup] Supabase delete failed for message ${msg.id}:`, err.message);
+          }
+        }
+        console.log(`[Trash Cleanup] Successfully purged expired message: ${msg.subject || msg.id}`);
+      }
+    }
   } catch (err) {
     console.error(`[Trash Cleanup] Error in 30-day auto-cleanup:`, err);
   }
@@ -153,6 +175,21 @@ export default function trashRoutes(db) {
         });
       });
 
+      // 5. Retrieve Messages
+      const messages = await db.collection('messages').find({ deleted: true }).toArray();
+      messages.forEach(item => {
+        const deletedAt = item.deletedAt ? new Date(item.deletedAt) : new Date();
+        const daysRemaining = Math.max(0, 30 - Math.ceil((Date.now() - deletedAt.getTime()) / (1000 * 60 * 60 * 24)));
+        items.push({
+          _id: item._id,
+          id: item.id,
+          title: item.subject,
+          type: 'message',
+          deletedAt,
+          daysRemaining
+        });
+      });
+
       // Sort by deletion date desc
       items.sort((a, b) => b.deletedAt.getTime() - a.deletedAt.getTime());
       res.json(items);
@@ -199,6 +236,13 @@ export default function trashRoutes(db) {
           { $set: { status: 'draft', visible: false }, $unset: { deletedAt: "" } }
         );
         if (result.matchedCount === 0) return res.status(404).json({ error: 'Book not found' });
+      } else if (type === 'message') {
+        const col = db.collection('messages');
+        const result = await col.updateOne(
+          { _id: mongoId },
+          { $unset: { deleted: "", deletedAt: "" } }
+        );
+        if (result.matchedCount === 0) return res.status(404).json({ error: 'Message not found' });
       } else {
         return res.status(400).json({ error: 'Invalid content type' });
       }
@@ -260,6 +304,19 @@ export default function trashRoutes(db) {
 
         // Permanent delete from MongoDB
         await col.deleteOne({ _id: mongoId });
+      } else if (type === 'message') {
+        const col = db.collection('messages');
+        item = await col.findOne({ _id: mongoId });
+        if (!item) return res.status(404).json({ error: 'Message not found' });
+
+        await col.deleteOne({ _id: mongoId });
+        if (supabase) {
+          try {
+            await supabase.from('messages').delete().eq('original_message_id', item.id);
+          } catch (err) {
+            console.warn(`[Trash] Supabase permanent delete failed for message ${item.id}:`, err.message);
+          }
+        }
       } else {
         return res.status(400).json({ error: 'Invalid content type' });
       }
@@ -303,6 +360,21 @@ export default function trashRoutes(db) {
           }
           totalPurged++;
         }
+      }
+
+      // Purge deleted messages too (different schema: `deleted` boolean flag, not `status`)
+      const messagesCol = db.collection('messages');
+      const deletedMessages = await messagesCol.find({ deleted: true }).toArray();
+      for (const msg of deletedMessages) {
+        await messagesCol.deleteOne({ _id: msg._id });
+        if (supabase) {
+          try {
+            await supabase.from('messages').delete().eq('original_message_id', msg.id);
+          } catch (err) {
+            console.warn(`[Trash Empty] Supabase delete failed for message ${msg.id}:`, err.message);
+          }
+        }
+        totalPurged++;
       }
 
       res.json({ message: `Trash bin successfully emptied. Purged ${totalPurged} items.` });
