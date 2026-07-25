@@ -124,6 +124,10 @@ export default function writingsRoutes(db) {
   });
 
   router.get('/', authMiddleware, async (_req, res) => {
+    // NOTE: served from Supabase first (Mongo fallback). Mongo and Supabase have
+    // historically diverged for this project (writings exist in Supabase that were
+    // never in Mongo), so Supabase is the authoritative list here. Deletes MUST
+    // therefore reliably mark the Supabase row 'deleted' (see the DELETE handler).
     const result = await trySupabase(
       async () => {
         const { data, error } = await supabase
@@ -327,16 +331,20 @@ export default function writingsRoutes(db) {
       await fallbackCol.updateOne({ id: slug }, { $set: updateData }, { upsert: true });
 
       // 2. Propagate the soft-delete to Supabase. The admin list is served FROM
-      // Supabase, so this must land or the "deleted" writing keeps showing in the
-      // list. Update only the soft-delete columns (avoids schema/onConflict
-      // pitfalls from writing back the whole doc), and check the returned error —
-      // the Supabase client returns errors, it does not throw them.
+      // Supabase, so this MUST land — otherwise the "deleted" writing keeps showing
+      // and the delete looks like it did nothing. Update only the soft-delete
+      // columns (avoids schema pitfalls from writing back the whole doc). The
+      // Supabase client returns errors rather than throwing, so check it and fail
+      // loudly with a non-2xx instead of returning a false "success".
       if (supabase) {
         const { error: sbErr } = await supabase
           .from('artikel')
           .update({ status: 'deleted', visible: false })
           .eq('id', slug);
-        if (sbErr) console.warn('[writings] Supabase soft-delete update failed:', sbErr.message);
+        if (sbErr) {
+          console.error('[writings] Supabase soft-delete failed:', sbErr.message);
+          return res.status(502).json({ error: 'Gagal menyinkronkan penghapusan ke Supabase: ' + sbErr.message });
+        }
       }
 
       res.json({ message: 'Deleted' });

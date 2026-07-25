@@ -103,14 +103,20 @@ export function WritingsManager() {
     if (selectedIds.size === 0) return;
     if (!confirm(`Hapus ${selectedIds.size} writing yang dipilih?`)) return;
     const ids = Array.from(selectedIds);
-    await Promise.all(ids.map(id => api.del(`/api/writings/${id}`)));
-    invalidateRuntimeCache('admin:writings:list');
-    ids.forEach(id => {
-      const item = items.find(i => i._id === id);
-      if (item?.id) invalidateRuntimeCache(`admin:writings:item:${item.id}`);
-    });
-    setSelectedIds(new Set());
-    load();
+    try {
+      // allSettled so one failed delete can't abort the refresh/reset below
+      const results = await Promise.allSettled(ids.map(id => api.del(`/api/writings/${id}`)));
+      const failed = results.filter(r => r.status === 'rejected').length;
+      if (failed > 0) alert(`${failed} dari ${ids.length} writing gagal dihapus.`);
+    } finally {
+      invalidateRuntimeCache('admin:writings:list');
+      ids.forEach(id => {
+        const item = items.find(i => i._id === id);
+        if (item?.id) invalidateRuntimeCache(`admin:writings:item:${item.id}`);
+      });
+      setSelectedIds(new Set());
+      load();
+    }
   };
 
   const handleToggleVisibility = async (item: Writing) => {
