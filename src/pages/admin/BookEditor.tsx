@@ -226,12 +226,15 @@ export function BookEditor() {
       } else if (!pendingCreateRef.current) {
         pendingCreateRef.current = true;
         const autoSlug = snapshot.id || createAutosaveDraftId(
-          resolveLocalizedText(snapshot.title, autoFixLanguage), 
-          resolveLocalizedText(snapshot.review, autoFixLanguage), 
+          resolveLocalizedText(snapshot.title, autoFixLanguage),
+          resolveLocalizedText(snapshot.review, autoFixLanguage),
           'book'
         );
-        const response = await api.post('/api/books', { ...snapshot, id: autoSlug });
-        if (response._id) {
+        try {
+          const response = await api.post('/api/books', { ...snapshot, id: autoSlug });
+          if (!response._id) {
+            throw new Error('Create book failed: server did not return an _id');
+          }
           dbIdRef.current = response._id;
           const updated = { ...snapshot, _id: response._id, id: response.id || autoSlug };
           setRuntimeCache(`admin:books:item:${response.id || autoSlug}`, updated);
@@ -241,6 +244,9 @@ export function BookEditor() {
           navigate(`${ADMIN_PATH}/books/edit/${response.id || autoSlug}`, { replace: true });
           pendingCreateRef.current = false;
           return updated;
+        } catch (err) {
+          pendingCreateRef.current = false;
+          throw err;
         }
       }
     },
