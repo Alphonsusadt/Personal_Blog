@@ -312,8 +312,11 @@ export function WritingEditor() {
       } else if (!pendingCreateRef.current) {
         pendingCreateRef.current = true;
         const draftId = snapshot.id || createAutosaveDraftId(resolveLocalizedText(snapshot.title, autoFixLanguage), resolveLocalizedText(snapshot.content, autoFixLanguage), 'writing');
-        const response = await api.post('/api/writings', { ...snapshot, id: draftId });
-        if (response._id) {
+        try {
+          const response = await api.post('/api/writings', { ...snapshot, id: draftId });
+          if (!response._id) {
+            throw new Error('Create writing failed: server did not return an _id');
+          }
           dbIdRef.current = response._id;
           const updated = { ...snapshot, _id: response._id, id: response.id || draftId };
           setRuntimeCache(`admin:writings:item:${response.id || draftId}`, updated);
@@ -323,9 +326,15 @@ export function WritingEditor() {
           navigate(`${ADMIN_PATH}/writings/edit/${response.id || draftId}`, { replace: true });
           pendingCreateRef.current = false;
           return updated;
+        } catch (err) {
+          // Reset so the next retry actually attempts the POST again instead of
+          // silently no-op'ing (which used to mark the draft as "saved" and wipe it).
+          pendingCreateRef.current = false;
+          throw err;
         }
-        // If _id is still undefined, keep pendingCreateRef=true to prevent duplicate POSTs
       }
+      // If pendingCreateRef.current is already true here, a create is already
+      // in-flight for this snapshot — skip so we don't fire duplicate POSTs.
     },
     localDebounceMs: 800,
     serverDebounceMs: 3000,

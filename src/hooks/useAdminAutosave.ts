@@ -140,6 +140,10 @@ export function useAdminAutosave<T>({
 
   // ── Draft management ──────────────────────────────────────────────────────
 
+  // Stable ref to clearDraft so long-lived closures (executeServerSave) always
+  // clear the CURRENT storageKey, not the one captured when they were first created.
+  const clearDraftRef = useRef<(options?: { backup?: boolean }) => void>(() => {});
+
   const clearDraft = useCallback((options?: { backup?: boolean }) => {
     try {
       if (options?.backup) {
@@ -163,6 +167,8 @@ export function useAdminAutosave<T>({
     }
   }, [storageKey]);
 
+  clearDraftRef.current = clearDraft;
+
   // ── 1 + 4 + 5 + 6: Core server-save with Queue + Retry + Atomic ──────────
 
   const executeServerSave = useCallback(async (job: SaveJob<T>) => {
@@ -182,6 +188,11 @@ export function useAdminAutosave<T>({
     setErrorMessage('');
     setStatus(job.attempt > 0 ? 'retrying' : 'saving');
 
+    // Tracks whether a retry was scheduled so `finally` below knows not to
+    // release isSavingRef early — `finally` runs even after a `return` in the
+    // catch block, so that used to undo "don't reset isSavingRef yet" every time.
+    let retryScheduled = false;
+
     try {
       // PREPARED STMT: the payload snapshot was frozen at dirty-detection time,
       // so this call always uses a consistent, immutable data set — equivalent
@@ -193,7 +204,7 @@ export function useAdminAutosave<T>({
       // Success — update dirty flag baseline
       lastSavedFingerprintRef.current = result ? fingerprint(result) : fp;
       retryQueueRef.current = null;
-      clearDraft(); // Clear local draft since server is synced
+      clearDraftRef.current(); // Clear local draft (current storageKey) since server is synced
       showSaved();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -204,6 +215,7 @@ export function useAdminAutosave<T>({
         retryQueueRef.current = nextJob;
         setStatus('retrying');
         setErrorMessage(`Retry ${nextJob.attempt}/${maxRetries}…`);
+        retryScheduled = true;
 
         clearTimeout(retryTimeoutRef.current);
         retryTimeoutRef.current = setTimeout(() => {
@@ -214,7 +226,6 @@ export function useAdminAutosave<T>({
             executeServerSave(queued);
           }
         }, retryDelay(job.attempt));
-        return; // don't reset isSavingRef yet
       } else {
         // Exhausted retries
         setStatus('error');
@@ -222,13 +233,15 @@ export function useAdminAutosave<T>({
         retryQueueRef.current = null;
       }
     } finally {
-      isSavingRef.current = false;
+      if (!retryScheduled) {
+        isSavingRef.current = false;
 
-      // Drain queue if another save arrived while we were in-flight
-      if (retryQueueRef.current && retryQueueRef.current.attempt === 0) {
-        const queued = retryQueueRef.current;
-        retryQueueRef.current = null;
-        executeServerSave(queued);
+        // Drain queue if another save arrived while we were in-flight
+        if (retryQueueRef.current && retryQueueRef.current.attempt === 0) {
+          const queued = retryQueueRef.current;
+          retryQueueRef.current = null;
+          executeServerSave(queued);
+        }
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
