@@ -76,6 +76,15 @@ function hasMeaningfulWritingDraft(data: Writing): boolean {
 
 
 
+/** Stable fingerprint used to detect whether the user edited since a fetch went out. */
+function fingerprintWriting(data: Writing): string {
+  try {
+    return JSON.stringify(data);
+  } catch {
+    return String(data);
+  }
+}
+
 function createAutosaveDraftId(title: string, content: string, prefix: string): string {
   const source = title.trim() || content
     .replace(/```[\s\S]*?```/g, ' ')
@@ -144,6 +153,13 @@ export function WritingEditor() {
   const justCreatedRef = useRef(false);
 
   const [writing, setWriting] = useState<Writing>(emptyWriting);
+
+  // Always-current mirror of `writing`, so async handlers can tell whether the
+  // user has typed since a request went out (see applyServerData below).
+  const writingRef = useRef(writing);
+  writingRef.current = writing;
+  // Fingerprint of the last snapshot we applied FROM the server/cache.
+  const lastAppliedRef = useRef<string>('');
 
   // Sync dbIdRef with writing._id whenever it changes
   useEffect(() => {
@@ -415,51 +431,53 @@ export function WritingEditor() {
       return;
     }
     const cacheKey = `admin:writings:item:${slug}`;
+
+    // Apply a snapshot that came from the server/cache — but NEVER on top of edits
+    // the user made while the request was in flight. Overwriting here used to wipe
+    // in-progress typing (and markAsSaved would then delete the local draft too,
+    // so the status read "tersimpan" while the text was gone).
+    const applyServerData = (data: Writing) => {
+      const hasLocalEdits =
+        lastAppliedRef.current !== '' &&
+        fingerprintWriting(writingRef.current) !== lastAppliedRef.current;
+      if (hasLocalEdits) {
+        // Keep the fresher copy in cache for the next open, but leave state alone.
+        setRuntimeCache(cacheKey, data);
+        return;
+      }
+      lastAppliedRef.current = fingerprintWriting(data);
+      setRuntimeCache(cacheKey, data);
+      setWriting(data);
+      autosave.markAsSaved(data);
+    };
+
+    const fetchFromServer = () =>
+      api
+        .get(`/api/writings/admin/${encodeURIComponent(slug)}`)
+        .then((data: Writing) => applyServerData(data))
+        .catch(() =>
+          // Fallback: load all and search client-side
+          api
+            .get('/api/writings')
+            .then((writings: Writing[]) => {
+              const found = writings.find(w => w.id === slug || w._id === slug);
+              if (found) applyServerData(found);
+            })
+            .catch(console.error)
+        );
+
     const cached = getRuntimeCache<Writing>(cacheKey);
     if (cached) {
+      lastAppliedRef.current = fingerprintWriting(cached);
       setWriting(cached);
       setLoading(false);
       // Initialize autosave dirty-flag baseline with cached data
       autosave.markAsSaved(cached);
-      api
-        .get(`/api/writings/admin/${encodeURIComponent(slug)}`)
-        .then((data: Writing) => {
-          setRuntimeCache(cacheKey, data);
-          setWriting(data);
-          autosave.markAsSaved(data);
-        })
-        .catch(() => {
-          api.get('/api/writings').then((writings: Writing[]) => {
-            const found = writings.find(w => w.id === slug || w._id === slug);
-            if (found) {
-              setRuntimeCache(cacheKey, found);
-              setWriting(found);
-              autosave.markAsSaved(found);
-            }
-          }).catch(console.error);
-        });
+      void fetchFromServer();
       return;
     }
     setLoading(true);
-    api
-      .get(`/api/writings/admin/${encodeURIComponent(slug)}`)
-      .then((data: Writing) => {
-        setRuntimeCache(cacheKey, data);
-        setWriting(data);
-        autosave.markAsSaved(data);
-      })
-      .catch(() => {
-        // Fallback: load all and search client-side
-        api.get('/api/writings').then((writings: Writing[]) => {
-          const found = writings.find(w => w.id === slug || w._id === slug);
-          if (found) {
-            setRuntimeCache(cacheKey, found);
-            setWriting(found);
-            autosave.markAsSaved(found);
-          }
-        }).catch(console.error);
-      })
-      .finally(() => setLoading(false));
+    void fetchFromServer().finally(() => setLoading(false));
   }, [slug]);
 
 

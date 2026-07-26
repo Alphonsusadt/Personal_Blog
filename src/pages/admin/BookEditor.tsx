@@ -56,6 +56,15 @@ const emptyBook: Book = {
   devStatus: 'planning',
 };
 
+/** Stable fingerprint used to detect whether the user edited since a fetch went out. */
+function fingerprintBook(data: Book): string {
+  try {
+    return JSON.stringify(data);
+  } catch {
+    return String(data);
+  }
+}
+
 function hasMeaningfulBookDraft(data: Book): boolean {
   const hasTitle = resolveLocalizedText(data.title, 'en').trim() || resolveLocalizedText(data.title, 'id').trim();
   const hasAuthor = resolveLocalizedText(data.author, 'en').trim() || resolveLocalizedText(data.author, 'id').trim();
@@ -117,6 +126,13 @@ export function BookEditor() {
   const dbIdRef = useRef<string | undefined>(undefined);
   const justCreatedRef = useRef(false);
   const [book, setBook] = useState<Book>(emptyBook);
+
+  // Always-current mirror of `book`, so async handlers can tell whether the
+  // user has typed since a request went out (see applyServerData below).
+  const bookRef = useRef(book);
+  bookRef.current = book;
+  // Fingerprint of the last snapshot we applied FROM the server/cache.
+  const lastAppliedRef = useRef<string>('');
 
   // Sync dbIdRef with book._id whenever it changes
   useEffect(() => {
@@ -305,51 +321,51 @@ export function BookEditor() {
       return;
     }
     const cacheKey = `admin:books:item:${slug}`;
+
+    // Never apply a server snapshot on top of edits made while the request was in
+    // flight — that used to silently wipe in-progress typing while the status bar
+    // still read "tersimpan".
+    const applyServerData = (data: Book) => {
+      const hasLocalEdits =
+        lastAppliedRef.current !== '' &&
+        fingerprintBook(bookRef.current) !== lastAppliedRef.current;
+      if (hasLocalEdits) {
+        setRuntimeCache(cacheKey, data);
+        return;
+      }
+      lastAppliedRef.current = fingerprintBook(data);
+      setRuntimeCache(cacheKey, data);
+      setBook(data);
+      autosave.markAsSaved(data);
+    };
+
+    const fetchFromServer = () =>
+      api
+        .get(`/api/books/admin/${encodeURIComponent(slug)}`)
+        .then((data: Book) => applyServerData(data))
+        .catch(() =>
+          // Fallback: load all and search client-side
+          api
+            .get('/api/books')
+            .then((books: Book[]) => {
+              const found = books.find(b => b.id === slug || b._id === slug);
+              if (found) applyServerData(found);
+            })
+            .catch(console.error)
+        );
+
     const cached = getRuntimeCache<Book>(cacheKey);
     if (cached) {
+      lastAppliedRef.current = fingerprintBook(cached);
       setBook(cached);
       setLoading(false);
       // Initialize autosave dirty-flag baseline with cached data
       autosave.markAsSaved(cached);
-      api
-        .get(`/api/books/admin/${encodeURIComponent(slug)}`)
-        .then((data: Book) => {
-          setRuntimeCache(cacheKey, data);
-          setBook(data);
-          autosave.markAsSaved(data);
-        })
-        .catch(() => {
-          api.get('/api/books').then((books: Book[]) => {
-            const found = books.find(b => b.id === slug || b._id === slug);
-            if (found) {
-              setRuntimeCache(cacheKey, found);
-              setBook(found);
-              autosave.markAsSaved(found);
-            }
-          }).catch(console.error);
-        });
+      void fetchFromServer();
       return;
     }
     setLoading(true);
-    api
-      .get(`/api/books/admin/${encodeURIComponent(slug)}`)
-      .then((data: Book) => {
-        setRuntimeCache(cacheKey, data);
-        setBook(data);
-        autosave.markAsSaved(data);
-      })
-      .catch(() => {
-        // Fallback: load all and search client-side
-        api.get('/api/books').then((books: Book[]) => {
-          const found = books.find(b => b.id === slug || b._id === slug);
-          if (found) {
-            setRuntimeCache(cacheKey, found);
-            setBook(found);
-            autosave.markAsSaved(found);
-          }
-        }).catch(console.error);
-      })
-      .finally(() => setLoading(false));
+    void fetchFromServer().finally(() => setLoading(false));
   }, [slug]);
 
   const restoreDraft = () => {

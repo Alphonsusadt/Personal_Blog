@@ -60,6 +60,15 @@ const emptyProject: Project = {
   demoUrl: '',
 };
 
+/** Stable fingerprint used to detect whether the user edited since a fetch went out. */
+function fingerprintProject(data: Project): string {
+  try {
+    return JSON.stringify(data);
+  } catch {
+    return String(data);
+  }
+}
+
 function hasMeaningfulProjectDraft(data: Project): boolean {
   const hasTitle = resolveLocalizedText(data.title, 'en').trim() || resolveLocalizedText(data.title, 'id').trim();
   const hasDesc = resolveLocalizedText(data.description, 'en').trim() || resolveLocalizedText(data.description, 'id').trim();
@@ -159,6 +168,13 @@ export function ProjectEditor() {
   const dbIdRef = useRef<string | undefined>(undefined);
   const justCreatedRef = useRef(false);
   const [project, setProject] = useState<Project>(emptyProject);
+
+  // Always-current mirror of `project`, so async handlers can tell whether the
+  // user has typed since a request went out (see applyServerData below).
+  const projectRef = useRef(project);
+  projectRef.current = project;
+  // Fingerprint of the last snapshot we applied FROM the server/cache.
+  const lastAppliedRef = useRef<string>('');
 
   // Sync dbIdRef with project._id whenever it changes
   useEffect(() => {
@@ -384,51 +400,51 @@ export function ProjectEditor() {
       return;
     }
     const cacheKey = `admin:projects:item:${slug}`;
+
+    // Never apply a server snapshot on top of edits made while the request was in
+    // flight — that used to silently wipe in-progress typing while the status bar
+    // still read "tersimpan".
+    const applyServerData = (data: Project) => {
+      const hasLocalEdits =
+        lastAppliedRef.current !== '' &&
+        fingerprintProject(projectRef.current) !== lastAppliedRef.current;
+      if (hasLocalEdits) {
+        setRuntimeCache(cacheKey, data);
+        return;
+      }
+      lastAppliedRef.current = fingerprintProject(data);
+      setRuntimeCache(cacheKey, data);
+      setProject(data);
+      autosave.markAsSaved(data);
+    };
+
+    const fetchFromServer = () =>
+      api
+        .get(`/api/projects/admin/${encodeURIComponent(slug)}`)
+        .then((data: Project) => applyServerData(data))
+        .catch(() =>
+          // Fallback: load all and search client-side
+          api
+            .get('/api/projects')
+            .then((projects: Project[]) => {
+              const found = projects.find(p => p.id === slug || p._id === slug);
+              if (found) applyServerData(found);
+            })
+            .catch(console.error)
+        );
+
     const cached = getRuntimeCache<Project>(cacheKey);
     if (cached) {
+      lastAppliedRef.current = fingerprintProject(cached);
       setProject(cached);
       setLoading(false);
       // Initialize autosave dirty-flag baseline with cached data
       autosave.markAsSaved(cached);
-      api
-        .get(`/api/projects/admin/${encodeURIComponent(slug)}`)
-        .then((data: Project) => {
-          setRuntimeCache(cacheKey, data);
-          setProject(data);
-          autosave.markAsSaved(data);
-        })
-        .catch(() => {
-          api.get('/api/projects').then((projects: Project[]) => {
-            const found = projects.find(p => p.id === slug || p._id === slug);
-            if (found) {
-              setRuntimeCache(cacheKey, found);
-              setProject(found);
-              autosave.markAsSaved(found);
-            }
-          }).catch(console.error);
-        });
+      void fetchFromServer();
       return;
     }
     setLoading(true);
-    api
-      .get(`/api/projects/admin/${encodeURIComponent(slug)}`)
-      .then((data: Project) => {
-        setRuntimeCache(cacheKey, data);
-        setProject(data);
-        autosave.markAsSaved(data);
-      })
-      .catch(() => {
-        // Fallback: load all and search client-side
-        api.get('/api/projects').then((projects: Project[]) => {
-          const found = projects.find(p => p.id === slug || p._id === slug);
-          if (found) {
-            setRuntimeCache(cacheKey, found);
-            setProject(found);
-            autosave.markAsSaved(found);
-          }
-        }).catch(console.error);
-      })
-      .finally(() => setLoading(false));
+    void fetchFromServer().finally(() => setLoading(false));
   }, [slug]);
 
   const restoreDraft = () => {
