@@ -318,7 +318,10 @@ export function WritingEditor() {
             throw new Error('Create writing failed: server did not return an _id');
           }
           dbIdRef.current = response._id;
-          const updated = { ...snapshot, _id: response._id, id: response.id || draftId };
+          // Merge the server response (updatedAt/createdAt etc.) so the status
+          // bar can show a real "saved" state instead of staying stuck as a
+          // local-only draft until the next full reload.
+          const updated = { ...snapshot, ...response, id: response.id || draftId };
           setRuntimeCache(`admin:writings:item:${response.id || draftId}`, updated);
           invalidateRuntimeCache('admin:writings:list');
           justCreatedRef.current = true;

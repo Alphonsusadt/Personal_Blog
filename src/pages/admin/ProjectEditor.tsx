@@ -315,7 +315,10 @@ export function ProjectEditor() {
             throw new Error('Create project failed: server did not return an _id');
           }
           dbIdRef.current = response._id;
-          const updated = { ...snapshot, _id: response._id, id: response.id || autoSlug };
+          // Merge the server response (updatedAt/createdAt etc.) so the status
+          // bar can show a real "saved" state instead of staying stuck as a
+          // local-only draft until the next full reload.
+          const updated = { ...snapshot, ...response, id: response.id || autoSlug };
           setRuntimeCache(`admin:projects:item:${response.id || autoSlug}`, updated);
           invalidateRuntimeCache('admin:projects:list');
           justCreatedRef.current = true;

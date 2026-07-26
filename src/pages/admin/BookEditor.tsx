@@ -236,7 +236,10 @@ export function BookEditor() {
             throw new Error('Create book failed: server did not return an _id');
           }
           dbIdRef.current = response._id;
-          const updated = { ...snapshot, _id: response._id, id: response.id || autoSlug };
+          // Merge the server response (updatedAt/createdAt etc.) so the status
+          // bar can show a real "saved" state instead of staying stuck as a
+          // local-only draft until the next full reload.
+          const updated = { ...snapshot, ...response, id: response.id || autoSlug };
           setRuntimeCache(`admin:books:item:${response.id || autoSlug}`, updated);
           invalidateRuntimeCache('admin:books:list');
           justCreatedRef.current = true;

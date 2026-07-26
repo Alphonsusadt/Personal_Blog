@@ -346,6 +346,11 @@ export function useAdminAutosave<T>({
 
     clearTimeout(localDebounceRef.current);
     localDebounceRef.current = setTimeout(() => {
+      // DIRTY FLAG: skip if this snapshot is already what the server has —
+      // otherwise a state update that merely reflects a just-completed save
+      // (e.g. the server assigning an _id) re-writes a "phantom" local draft
+      // moments after clearDraft() just removed it.
+      if (fingerprint(data) === lastSavedFingerprintRef.current) return;
       persistLocalDraft(data);
     }, localDebounceMs);
 
