@@ -254,7 +254,7 @@ export function BookEditor() {
       }
     },
     localDebounceMs: 800,
-    serverDebounceMs: 3000,
+    serverDebounceMs: 600,
     periodicIntervalMs: 30_000,
     resetStatusMs: 1500,
     maxRetries: 3,

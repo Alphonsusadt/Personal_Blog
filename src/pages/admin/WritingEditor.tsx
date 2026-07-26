@@ -340,7 +340,7 @@ export function WritingEditor() {
       // in-flight for this snapshot — skip so we don't fire duplicate POSTs.
     },
     localDebounceMs: 800,
-    serverDebounceMs: 3000,
+    serverDebounceMs: 600,
     periodicIntervalMs: 30_000,
     resetStatusMs: 1500,
     maxRetries: 3,
