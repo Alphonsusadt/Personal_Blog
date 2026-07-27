@@ -207,10 +207,11 @@ async function start() {
 
   // Stats endpoint (lightweight, used for auth verification)
   app.get('/api/stats', authMiddleware, async (_req, res) => {
+    const activeFilter = { status: { $ne: 'deleted' } };
     const [projects, writings, books] = await Promise.all([
-      db.collection('projects').countDocuments(),
-      db.collection('writings').countDocuments(),
-      db.collection('books').countDocuments(),
+      db.collection('projects').countDocuments(activeFilter),
+      db.collection('writings').countDocuments(activeFilter),
+      db.collection('books').countDocuments(activeFilter),
     ]);
     res.json({ projects, writings, books });
   });
@@ -231,9 +232,11 @@ async function start() {
       projectsCount, writingsCount, booksCount,
       recentWritings, recentBooks, recentProjects,
     ] = await Promise.all([
-      db.collection('projects').countDocuments(),
-      db.collection('writings').countDocuments(),
-      db.collection('books').countDocuments(),
+      // Tombstone (status 'deleted') tidak boleh ikut terhitung — Dashboard pernah
+      // menampilkan angka lebih besar daripada daftar kontennya.
+      db.collection('projects').countDocuments({ status: { $ne: 'deleted' } }),
+      db.collection('writings').countDocuments({ status: { $ne: 'deleted' } }),
+      db.collection('books').countDocuments({ status: { $ne: 'deleted' } }),
       db.collection('writings').find(
         { ...publishedFilter },
         { projection: { ...recentProjection, excerpt: 1 } },

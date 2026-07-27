@@ -18,6 +18,17 @@ async function trySupabase(supabaseFn, mongoFn) {
   return mongoFn();
 }
 
+// Helper: does the Supabase `artikel` table hold ANY row at all?
+// Used to tell "Supabase belum dipakai" (→ boleh fallback ke Mongo) apart from
+// "Supabase dipakai, tapi semua tulisan memang sudah dihapus/unpublished"
+// (→ JANGAN fallback; kalau tidak, tulisan yang sudah dihapus muncul lagi di
+// situs publik karena dokumen Mongo-nya masih berstatus published).
+async function supabaseHasAnyRow() {
+  const { count, error } = await supabase.from('artikel').select('_id', { count: 'exact', head: true });
+  if (error) throw error;
+  return (count || 0) > 0;
+}
+
 // Helper: Safely parse JSON string back to object
 function parseSupabaseJson(data) {
   if (!data) return data;
@@ -54,12 +65,16 @@ export default function writingsRoutes(db) {
           .or(`status.eq.published,and(status.eq.scheduled,publishAt.lte.${now})`)
           .order('createdAt', { ascending: false });
         if (error) throw error;
-        
+
         // If Supabase has published articles, return them
         if (data && data.length > 0) {
           return data.map(parseSupabaseJson);
         }
-        
+
+        // Nol hasil bukan berarti Supabase kosong — bisa jadi semua tulisan sudah
+        // dihapus/di-unpublish. Hanya jatuh ke Mongo kalau tabelnya benar-benar kosong.
+        if (await supabaseHasAnyRow()) return [];
+
         // Fallback to MongoDB if Supabase is empty
         const items = await fallbackCol.find({
           visible: { $ne: false },
@@ -100,7 +115,18 @@ export default function writingsRoutes(db) {
         if (data) {
           return parseSupabaseJson(data);
         }
-        
+
+        // Tidak ketemu sebagai "published" — kalau slug-nya memang ADA di Supabase
+        // (status deleted/draft/scheduled), hormati itu dan jangan menyajikan versi
+        // Mongo yang mungkin masih berstatus published.
+        const { data: known, error: knownErr } = await supabase
+          .from('artikel')
+          .select('_id')
+          .eq('id', req.params.id)
+          .limit(1);
+        if (knownErr) throw knownErr;
+        if (known && known.length > 0) return null;
+
         // Fallback to MongoDB if not found in Supabase
         const item = await fallbackCol.findOne({
           id: req.params.id,
@@ -174,9 +200,10 @@ export default function writingsRoutes(db) {
             if (!syncResult.success) {
               return res.status(500).json({ error: 'Failed to save data' });
             }
-            if (data.id) {
-              queueAutosave('writings', data.id, data);
-            }
+            // NOTE: tidak ada queueAutosave di sini — dualWrite sudah menulis ke
+            // Mongo + Supabase. Antrian autosave menerima documentId dan dulu diberi
+            // SLUG, bukan _id, sehingga worker meleset di Mongo dan malah menyisipkan
+            // baris hantu baru di Supabase (lihat workers/dbWorker.js).
             return res.status(201).json({ ...data, _id: existing._id.toString() });
           } else {
             return res.status(400).json({ error: 'A writing with this slug already exists' });
@@ -191,11 +218,8 @@ export default function writingsRoutes(db) {
         return res.status(500).json({ error: 'Failed to save data' });
       }
 
-      // Queue autosave if needed
-      if (data.id) {
-        queueAutosave('writings', data.id, data);
-      }
-
+      // dualWrite sudah persist ke Mongo + Supabase; tidak perlu (dan tidak boleh)
+      // mengantre autosave dengan slug sebagai documentId.
       res.status(201).json({ ...data, _id: syncResult.data?._id || syncResult.data?.insertedId });
     } catch (error) {
       console.error('POST /writings error:', error);
@@ -225,11 +249,6 @@ export default function writingsRoutes(db) {
       
       if (!syncResult.success) {
         return res.status(500).json({ error: 'Failed to update data' });
-      }
-
-      // Queue autosave if it's a patch update
-      if (data.id) {
-        queueAutosave('writings', data.id, data);
       }
 
       res.json({ message: 'Updated', data });
@@ -329,6 +348,12 @@ export default function writingsRoutes(db) {
         updatedAt: new Date(),
       };
       delete updateData._id;
+
+      // Simpan UUID baris Supabase-nya. Tanpa ini, Trash hanya bisa mengalamatkan
+      // baris lewat slug — dan slug legacy sering kosong, sehingga purge/restore
+      // meleset (atau menyapu semua baris berslug kosong sekaligus).
+      const supabaseId = sbDoc?._id || (mongoDoc?.supabaseId ?? null);
+      if (supabaseId) updateData.supabaseId = supabaseId;
 
       // 1. Soft-delete in MongoDB (upsert a tombstone if the doc only lived in
       // Supabase) so the item shows up in the Trash Bin and can be restored.

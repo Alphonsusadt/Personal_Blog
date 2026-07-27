@@ -6,7 +6,9 @@
 import { ObjectId } from 'mongodb';
 import { supabase } from '../config/supabase.js';
 
-const STRIP_FIELDS = ['translationOfId', 'contentLanguage'];
+// `supabaseId` adalah kolom bantu khusus Mongo (UUID baris Supabase) — jangan
+// pernah ikut dikirim ke Supabase, tabelnya tidak punya kolom itu.
+const STRIP_FIELDS = ['translationOfId', 'contentLanguage', 'supabaseId'];
 
 function stripForSupabase(tableName, data) {
   const cleaned = { ...data };

@@ -35,23 +35,47 @@ parentPort.on('message', async (message) => {
         targetId = documentId;
       }
 
-      // 1. Save to MongoDB (Primary Source of Truth)
-      const result = await col.updateOne({ _id: targetId }, { $set: $setDoc });
+      // 1. Save to MongoDB (Primary Source of Truth).
+      // `status: { $ne: 'deleted' }` wajib: autosave yang tertunda (debounce/retry)
+      // bisa mendarat SETELAH konten dihapus dan dulu menulis balik status
+      // draft/published ke tombstone-nya — konten jadi hilang dari Trash tapi tetap
+      // tampil di Dashboard & situs publik (lewat fallback Mongo).
+      const result = await col.updateOne(
+        { _id: targetId, status: { $ne: 'deleted' } },
+        { $set: $setDoc }
+      );
 
       // 2. Dual-write/sync to Supabase in background if it's writings
-      if (collectionName === 'writings') {
+      if (collectionName === 'writings' && result.matchedCount > 0) {
         try {
           const { supabase } = await import('../config/supabase.js');
           if (supabase) {
-            const { _id, _clientVersion, translationOfId, contentLanguage, ...updateFields } = $setDoc;
-            
-            // Use native upsert with conflict resolution on '_id' to be highly resilient
-            const { error } = await supabase
-              .from('artikel')
-              .upsert({ ...updateFields, _id: documentId }, { onConflict: '_id' });
-            
-            if (error) {
-              console.warn('[dbWorker] Supabase background upsert failed:', error.message);
+            const { _id, _clientVersion, translationOfId, contentLanguage, supabaseId, ...updateFields } = $setDoc;
+
+            // Kolom `_id` di Supabase berisi UUID. Kalau documentId bukan UUID (mis.
+            // ObjectId Mongo), upsert lama TIDAK ketemu baris mana pun lalu menyisipkan
+            // baris baru — sumber utama Mongo & Supabase jadi menyimpang. Karena itu:
+            // selalu UPDATE (tidak pernah insert) dan alamatkan barisnya secara eksplisit.
+            const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(documentId);
+            let query = null;
+
+            if (isUuid) {
+              query = supabase.from('artikel').update(updateFields).eq('_id', documentId);
+            } else {
+              const doc = await col.findOne({ _id: targetId }, { projection: { id: 1 } });
+              const slug = (doc?.id || '').trim();
+              // Jangan pernah .eq('id', '') — baris legacy berslug kosong akan kena semua.
+              if (slug) query = supabase.from('artikel').update(updateFields).eq('id', slug);
+            }
+
+            if (query) {
+              // Baris yang sudah dihapus di Supabase tidak boleh dihidupkan lagi.
+              const { error } = await query.neq('status', 'deleted');
+              if (error) {
+                console.warn('[dbWorker] Supabase background update failed:', error.message);
+              }
+            } else {
+              console.warn(`[dbWorker] Lewati sync Supabase: tidak ada kunci baris yang aman untuk ${documentId}`);
             }
           }
         } catch (supaErr) {

@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { ObjectId } from 'mongodb';
 import { authMiddleware } from '../middleware/auth.js';
-import { dualWrite } from '../utils/dataSync.js';
 import { supabase } from '../config/supabase.js';
 import cloudinary from '../config/cloudinary.js';
 
@@ -37,6 +36,30 @@ async function deleteCloudinaryAssets(publicIds) {
     } catch (err) {
       console.error(`[Trash] Failed to delete Cloudinary asset ${publicId}:`, err.message || err);
     }
+  }
+}
+
+// Alamatkan baris Supabase `artikel` milik sebuah tombstone writing.
+// Banyak baris legacy punya slug KOSONG, jadi `.eq('id', item.id)` bisa meleset
+// total — atau lebih buruk, `.eq('id','')` menyapu SEMUA baris legacy sekaligus.
+// Karena itu: pakai kolom `_id` (UUID) kalau tersimpan, dan slug hanya bila tidak kosong.
+function supabaseWritingKey(item) {
+  if (!supabase) return null;
+  if (item.supabaseId) return { column: '_id', value: item.supabaseId };
+  const slug = (item.id || '').trim();
+  if (slug) return { column: 'id', value: slug };
+  return null;
+}
+
+async function purgeSupabaseWriting(item, context) {
+  const target = supabaseWritingKey(item);
+  if (!target) {
+    console.warn(`[${context}] Lewati hapus Supabase: tidak ada kunci aman untuk writing ${item._id}`);
+    return;
+  }
+  const { error } = await supabase.from('artikel').delete().eq(target.column, target.value);
+  if (error) {
+    console.warn(`[${context}] Supabase delete failed for artikel ${target.value}:`, error.message);
   }
 }
 
@@ -76,16 +99,7 @@ export async function run30DayAutoCleanup(db) {
         // 2. Hard delete from MongoDB and Supabase
         if (colName === 'writings') {
           await col.deleteOne({ _id: item._id });
-          if (supabase) {
-            try {
-              await supabase
-                .from('artikel')
-                .delete()
-                .eq('id', item.id);
-            } catch (err) {
-              console.warn(`[Trash Cleanup] Supabase delete failed for artikel ${item.id}:`, err.message);
-            }
-          }
+          await purgeSupabaseWriting(item, 'Trash Cleanup');
         } else {
           await col.deleteOne({ _id: item._id });
         }
@@ -213,21 +227,28 @@ export default function trashRoutes(db) {
         );
         if (result.matchedCount === 0) return res.status(404).json({ error: 'Project not found' });
       } else if (type === 'writing') {
-        // Writing has dual write logic
         const col = db.collection('writings');
         const existing = await col.findOne({ _id: mongoId });
         if (!existing) return res.status(404).json({ error: 'Writing not found' });
 
-        const restoreData = {
-          ...existing,
-          status: 'draft',
-          visible: false,
-          deletedAt: null
-        };
+        await col.updateOne(
+          { _id: mongoId },
+          { $set: { status: 'draft', visible: false }, $unset: { deletedAt: '' } }
+        );
 
-        const syncResult = await dualWrite(db, 'writings', 'artikel', existing.id, restoreData);
-        if (!syncResult.success) {
-          return res.status(500).json({ error: 'Failed to restore writing' });
+        // Sengaja TIDAK memakai dualWrite di sini: dualWrite mengalamatkan Supabase
+        // lewat slug, dan untuk baris legacy berslug kosong ia akan menyisipkan baris
+        // BARU alih-alih memulihkan yang lama.
+        const target = supabaseWritingKey(existing);
+        if (target) {
+          const { error } = await supabase
+            .from('artikel')
+            .update({ status: 'draft', visible: false })
+            .eq(target.column, target.value);
+          if (error) {
+            console.warn('[Trash] Supabase restore failed:', error.message);
+            return res.status(502).json({ error: 'Gagal menyinkronkan pemulihan ke Supabase: ' + error.message });
+          }
         }
       } else if (type === 'book') {
         const col = db.collection('books');
@@ -283,16 +304,7 @@ export default function trashRoutes(db) {
 
         // Hard delete from MongoDB and Supabase
         await col.deleteOne({ _id: mongoId });
-        if (supabase) {
-          try {
-            await supabase
-              .from('artikel')
-              .delete()
-              .eq('id', item.id);
-          } catch (err) {
-            console.warn(`[Trash] Supabase permanent delete failed for artikel ${item.id}:`, err.message);
-          }
-        }
+        await purgeSupabaseWriting(item, 'Trash');
       } else if (type === 'book') {
         const col = db.collection('books');
         item = await col.findOne({ _id: mongoId });
@@ -342,19 +354,9 @@ export default function trashRoutes(db) {
           const publicIds = extractCloudinaryPublicIds(item);
           await deleteCloudinaryAssets(publicIds);
           
-          const itemId = item._id.toString();
           if (colName === 'writings') {
             await col.deleteOne({ _id: item._id });
-            if (supabase) {
-              try {
-                await supabase
-                  .from('artikel')
-                  .delete()
-                  .eq('id', item.id);
-              } catch (err) {
-                console.warn(`[Trash Empty] Supabase delete failed for artikel ${item.id}:`, err.message);
-              }
-            }
+            await purgeSupabaseWriting(item, 'Trash Empty');
           } else {
             await col.deleteOne({ _id: item._id });
           }
