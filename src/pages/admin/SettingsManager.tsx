@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../lib/api';
-import { Save, CheckCircle, Key, Clock, AlertCircle } from 'lucide-react';
+import { Save, CheckCircle, Key, Clock, AlertCircle, DatabaseBackup, RefreshCw } from 'lucide-react';
 import { useAdminAutosave } from '../../hooks/useAdminAutosave';
 import { AutoFixButton } from '../../components/AutoFixButton';
 import { normalizeLocalizedText, LocalizedText } from '../../lib/localized';
@@ -85,6 +85,8 @@ export function SettingsManager() {
   const [loading, setLoading] = useState(true);
   const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirm: '' });
   const [passwordMsg, setPasswordMsg] = useState('');
+  const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle');
+  const [syncResult, setSyncResult] = useState<{ message: string; inserted: number; updated: number; pruned: number; errors: string[] } | null>(null);
 
   const saveSettingsToServer = useCallback(async (nextData: SettingsData) => {
     await api.put('/api/settings', nextData);
@@ -149,6 +151,19 @@ export function SettingsManager() {
     try {
       await saveNow();
     } catch (err) { console.error(err); }
+  };
+
+  const handleSyncBackup = async () => {
+    setSyncState('syncing');
+    setSyncResult(null);
+    try {
+      const result = await api.syncWritingsBackup();
+      setSyncResult(result);
+      setSyncState(result.success ? 'done' : 'error');
+    } catch (err) {
+      setSyncResult({ message: err instanceof Error ? err.message : 'Sinkronisasi gagal', inserted: 0, updated: 0, pruned: 0, errors: [] });
+      setSyncState('error');
+    }
   };
 
   const handleChangePassword = async () => {
@@ -783,6 +798,40 @@ export function SettingsManager() {
               </p>
             </div>
           </div>
+        </section>
+
+        <section className="bg-[#1E293B] border border-[#334155] rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-2">
+            <DatabaseBackup className="w-5 h-5 text-[#60A5FA]" />
+            <h2 className="text-lg font-semibold text-[#F8FAFC]">Cadangan Supabase (Writings)</h2>
+          </div>
+          <p className="text-xs text-[#94A3B8] mb-4">
+            MongoDB adalah sumber data utama untuk semua konten. Tabel <code className="text-[#CBD5E1]">artikel</code> di Supabase hanya cadangan satu arah — tidak pernah dibaca situs atau CMS. Tombol ini menyelaraskan cadangan tersebut: menambah tulisan yang belum ada, memperbarui yang berubah, dan membuang baris yang sudah tidak ada di MongoDB.
+          </p>
+          <button
+            onClick={handleSyncBackup}
+            disabled={syncState === 'syncing'}
+            className="flex items-center gap-2 bg-[#334155] text-[#F8FAFC] px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#475569] transition-colors disabled:opacity-50"
+          >
+            {syncState === 'syncing' ? <RefreshCw className="w-4 h-4 animate-spin" /> : <DatabaseBackup className="w-4 h-4" />}
+            {syncState === 'syncing' ? 'Menyelaraskan...' : 'Selaraskan Cadangan Sekarang'}
+          </button>
+
+          {syncResult && (
+            <div className={`mt-4 rounded-lg border p-4 text-sm ${syncState === 'error' ? 'border-red-500/30 bg-red-500/10 text-red-300' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'}`}>
+              <p className="font-medium">{syncResult.message}</p>
+              <div className="mt-2 flex gap-4 text-xs text-[#94A3B8]">
+                <span>+{syncResult.inserted} baru</span>
+                <span>~{syncResult.updated} diperbarui</span>
+                <span>-{syncResult.pruned} dibuang</span>
+              </div>
+              {syncResult.errors.length > 0 && (
+                <ul className="mt-3 space-y-1 border-t border-[#334155]/50 pt-2 text-xs text-red-300">
+                  {syncResult.errors.map((e, i) => <li key={i}>• {e}</li>)}
+                </ul>
+              )}
+            </div>
+          )}
         </section>
 
         <section className="bg-[#1E293B] border border-[#334155] rounded-xl p-6">

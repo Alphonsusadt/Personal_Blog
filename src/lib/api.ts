@@ -203,4 +203,23 @@ export const api = {
   async sendMessageReply(messageId: string, payload: { senderEmail: string; messageText: string }) {
     return this.post(`/api/messages/${messageId}/reply`, payload);
   },
+
+  // Manual Supabase backup sync for writings. The endpoint returns a JSON body
+  // with per-row error detail even on a non-2xx (partial failure), so this reads
+  // the body regardless of status instead of throwing like the generic post().
+  async syncWritingsBackup(): Promise<{
+    success: boolean;
+    message: string;
+    inserted: number;
+    updated: number;
+    pruned: number;
+    errors: string[];
+  }> {
+    const res = await fetch(`${API_BASE}/api/writings/admin/sync-to-supabase`, {
+      method: 'POST',
+      headers: this.headers(),
+    });
+    if (res.status === 401) { this.logout(); window.location.href = `${ADMIN_PATH}/login`; throw new Error('Unauthorized'); }
+    return res.json();
+  },
 };
