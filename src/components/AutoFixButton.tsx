@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { detectTextLanguage, type AutoFixLanguageOption, type TextFixResult } from '../utils/textAutoFix';
-import { API_BASE } from '../lib/api';
+import { api, API_BASE } from '../lib/api';
 
 interface AutoFixButtonProps {
   text: string;
@@ -37,9 +37,11 @@ export function AutoFixButton({
     timerRef.current = setTimeout(() => {
       void (async () => {
         try {
+          // authMiddleware wajib di endpoint ini — tanpa header ini tiap panggilan
+          // langsung 401, itulah yang membuat "API unavailable" tampil terus.
           const response = await fetch(`${API_BASE}/api/auto-fix-text`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: api.headers(),
             body: JSON.stringify({ text: textRef.current, language: targetLanguage }),
             signal: controller.signal,
           });
