@@ -201,76 +201,84 @@ export async function dualDelete(db, collection, supabaseTable, id) {
 }
 
 /**
- * Sync all MongoDB data to Supabase (one-way backup)
+ * Cermin satu arah MongoDB → Supabase (cadangan).
+ *
+ * Setelah sinkronisasi selesai, isi tabel Supabase HARUS sama persis dengan
+ * koleksi Mongo-nya: baris yang tertinggal dibuat, yang berbeda diperbarui, dan
+ * yang sudah tidak ada di Mongo dibuang. Cadangan yang menyimpan baris siluman
+ * justru itulah yang selama ini menyesatkan.
+ *
+ * Baris dialamatkan lewat kolom `_id` (UUID) bila diketahui — slug tidak bisa
+ * diandalkan karena baris legacy banyak yang slug-nya kosong. UUID hasil insert
+ * disimpan balik ke dokumen Mongo sebagai `supabaseId` agar pencocokan
+ * berikutnya selalu tepat.
+ *
+ * Kegagalan tidak dilempar, tapi DIKEMBALIKAN apa adanya — supaya pemanggilnya
+ * bisa menampilkan "cadangan tertinggal" alih-alih diam-diam mengaku sukses.
  */
 export async function syncMongoToSupabase(db, collection, supabaseTable) {
   if (!supabase) {
-    console.warn('[Sync] Supabase not configured, skipping sync');
-    return { success: false };
+    return { success: false, error: 'Supabase tidak dikonfigurasi' };
   }
 
+  const errors = [];
+  let inserted = 0, updated = 0, pruned = 0;
+
   try {
-    console.log(`[Sync] Starting sync: ${collection} → ${supabaseTable}...`);
     const col = db.collection(collection);
     const items = await col.find({}).toArray();
 
-    let successCount = 0;
-    let errorCount = 0;
+    const { data: rows, error: readErr } = await supabase.from(supabaseTable).select('_id,id');
+    if (readErr) return { success: false, error: readErr.message };
+
+    const rowById = new Map(rows.map(r => [String(r._id), r]));
+    const rowBySlug = new Map(rows.filter(r => (r.id || '').trim()).map(r => [String(r.id), r]));
+    const keep = new Set();
 
     for (const item of items) {
-      try {
-        const cleaned = stripForSupabase(supabaseTable, item);
-        const targetId = cleaned.id || item.id;
-        let syncError = null;
+      const label = item.id || String(item._id);
+      const cleaned = stripForSupabase(supabaseTable, item);
+      const match = (item.supabaseId && rowById.get(String(item.supabaseId)))
+        || ((item.id || '').trim() && rowBySlug.get(String(item.id)))
+        || null;
 
-        if (targetId) {
-          // Check if exists
-          const { data: existing, error: checkError } = await supabase
-            .from(supabaseTable)
-            .select('id')
-            .eq('id', targetId)
-            .maybeSingle();
-
-          if (checkError) {
-            syncError = checkError;
-          } else if (existing) {
-            // Update
-            const { error: updateError } = await supabase
-              .from(supabaseTable)
-              .update(cleaned)
-              .eq('id', targetId);
-            syncError = updateError;
-          } else {
-            // Insert
-            const { error: insertError } = await supabase
-              .from(supabaseTable)
-              .insert([cleaned]);
-            syncError = insertError;
-          }
+      if (match) {
+        keep.add(String(match._id));
+        const { error } = await supabase.from(supabaseTable).update(cleaned).eq('_id', match._id);
+        if (error) errors.push(`${label}: ${error.message}`);
+        else updated++;
+      } else {
+        const { data: ins, error } = await supabase.from(supabaseTable).insert([cleaned]).select('_id').maybeSingle();
+        if (error) {
+          errors.push(`${label}: ${error.message}`);
         } else {
-          // Just insert
-          const { error: insertError } = await supabase
-            .from(supabaseTable)
-            .insert([cleaned]);
-          syncError = insertError;
+          inserted++;
+          keep.add(String(ins._id));
+          // Ingat UUID-nya supaya pencocokan berikutnya tidak bergantung pada slug.
+          await col.updateOne({ _id: item._id }, { $set: { supabaseId: ins._id } });
         }
-
-        if (syncError) {
-          console.error(`  ❌ Failed to sync ${item.id || item._id}:`, syncError.message);
-          errorCount++;
-        } else {
-          successCount++;
-        }
-      } catch (error) {
-        console.error(`  ❌ Error syncing ${item.id || item._id}:`, error.message);
-        errorCount++;
       }
     }
 
-    console.log(`[Sync] Complete: ✅ ${successCount} synced, ❌ ${errorCount} failed`);
-    return { success: errorCount === 0, successCount, errorCount };
+    // Buang baris yang sudah tidak punya padanan di Mongo. Pengaman: kalau Mongo
+    // kosong, JANGAN memangkas — itu lebih mungkin salah konfigurasi daripada
+    // perintah menghapus segalanya, dan cadangan tidak boleh ikut terhapus.
+    if (items.length === 0) {
+      if (rows.length > 0) errors.push(`Pemangkasan dilewati: Mongo kosong, ${rows.length} baris Supabase dibiarkan`);
+    } else {
+      for (const row of rows) {
+        if (keep.has(String(row._id))) continue;
+        const { error } = await supabase.from(supabaseTable).delete().eq('_id', row._id);
+        if (error) errors.push(`prune ${row._id}: ${error.message}`);
+        else pruned++;
+      }
+    }
+
+    const success = errors.length === 0;
+    console.log(`[Sync] ${collection} → ${supabaseTable}: +${inserted} ~${updated} -${pruned}${success ? '' : ` (${errors.length} gagal)`}`);
+    return { success, inserted, updated, pruned, errors };
   } catch (error) {
-    console.error(`[Sync] Sync error:`, error.message);
-    return { success: false, error };
+    console.error('[Sync] Sync error:', error.message);
+    return { success: false, inserted, updated, pruned, errors: [...errors, error.message] };
   }
 }

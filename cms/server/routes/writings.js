@@ -194,14 +194,14 @@ export default function writingsRoutes(db) {
       console.log('[Sync] Admin triggered sync: MongoDB → Supabase');
       const syncResult = await syncMongoToSupabase(db, 'writings', 'artikel');
       
-      if (!syncResult.success) {
-        return res.status(500).json({ error: 'Sync failed', ...syncResult });
-      }
-
-      res.json({ 
-        message: 'Sync completed successfully',
-        successCount: syncResult.successCount,
-        errorCount: syncResult.errorCount 
+      // Laporkan apa adanya, termasuk daftar kegagalannya — cadangan yang mengaku
+      // sukses padahal tidak, persis itu yang bikin masalah selama ini.
+      const status = syncResult.success ? 200 : 500;
+      res.status(status).json({
+        message: syncResult.success
+          ? `Cadangan Supabase selaras: +${syncResult.inserted} baru, ${syncResult.updated} diperbarui, ${syncResult.pruned} dibuang`
+          : 'Sebagian cadangan gagal disinkronkan',
+        ...syncResult,
       });
     } catch (error) {
       console.error('Sync endpoint error:', error);
