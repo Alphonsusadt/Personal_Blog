@@ -4,8 +4,16 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-let indonesianDictCache = null;
-let dictionaryLoadPromise = null;
+// Satu kamus Hunspell per bahasa. `id` dan `en` sengaja divendor langsung ke
+// repo (cms/hunspell-id, cms/hunspell-en) daripada lewat npm — keduanya
+// berlisensi bebas dipakai ulang (lihat COPYING / README_en_US.txt masing-masing).
+const DICTIONARY_PATHS = {
+  id: path.join(__dirname, '../../hunspell-id/id_ID.dic'),
+  en: path.join(__dirname, '../../hunspell-en/en_US.dic'),
+};
+
+const dictCache = new Map();
+const dictLoadPromises = new Map();
 
 /**
  * Parse hunspell .dic file and extract base words
@@ -15,7 +23,7 @@ function parseDictionary(dicContent) {
   const lines = dicContent.split('\n').slice(1); // Skip count line
   const words = new Set();
   const groups = new Map();
-  
+
   for (const line of lines) {
     if (!line.trim()) continue;
     // Extract base word (before any space/tab)
@@ -31,65 +39,71 @@ function parseDictionary(dicContent) {
       }
     }
   }
-  
+
   words.groupedByFirstChar = groups;
   return words;
 }
 
 /**
- * Load Indonesian hunspell dictionary
- * Returns a Set of valid Indonesian words for spell checking
+ * Load a Hunspell dictionary for the given language ('id' | 'en').
+ * Returns a Set of valid words for spell checking, cached per language.
  */
-export async function loadIndonesianDictionary() {
-  // If already loaded, return cached version
-  if (indonesianDictCache) {
-    return indonesianDictCache;
-  }
+export async function loadDictionary(lang) {
+  const dicPath = DICTIONARY_PATHS[lang];
+  if (!dicPath) throw new Error(`Tidak ada kamus Hunspell untuk bahasa "${lang}"`);
 
-  // If loading is in progress, wait for it
-  if (dictionaryLoadPromise) {
-    return dictionaryLoadPromise;
-  }
+  if (dictCache.has(lang)) return dictCache.get(lang);
+  if (dictLoadPromises.has(lang)) return dictLoadPromises.get(lang);
 
-  dictionaryLoadPromise = (async () => {
+  const loadPromise = (async () => {
     try {
-      const dicPath = path.join(__dirname, '../../hunspell-id/id_ID.dic');
-      
       if (!fs.existsSync(dicPath)) {
         console.warn(`Hunspell dictionary not found at ${dicPath}`);
         return new Set();
       }
 
       const dicContent = fs.readFileSync(dicPath, 'utf8');
-      indonesianDictCache = parseDictionary(dicContent);
-      
-      console.log(`✅ Loaded Indonesian dictionary: ${indonesianDictCache.size} words`);
-      return indonesianDictCache;
+      const dict = parseDictionary(dicContent);
+      dictCache.set(lang, dict);
+
+      console.log(`✅ Loaded ${lang.toUpperCase()} dictionary: ${dict.size} words`);
+      return dict;
     } catch (error) {
-      console.error('Error loading Indonesian dictionary:', error);
+      console.error(`Error loading ${lang} dictionary:`, error);
       return new Set();
     }
   })();
 
-  return dictionaryLoadPromise;
+  dictLoadPromises.set(lang, loadPromise);
+  return loadPromise;
+}
+
+// Dipertahankan demi kompatibilitas mundur — dulu hanya ada kamus Indonesia.
+export async function loadIndonesianDictionary() {
+  return loadDictionary('id');
 }
 
 /**
- * Check if a word exists in the Indonesian dictionary
+ * Check if a word exists in the dictionary for the given language.
  */
-export async function isValidIndonesianWord(word) {
-  const dict = await loadIndonesianDictionary();
+export async function isValidWord(word, lang = 'id') {
+  const dict = await loadDictionary(lang);
   return dict.has(word.toLowerCase());
 }
 
+// Dipertahankan demi kompatibilitas mundur.
+export async function isValidIndonesianWord(word) {
+  return isValidWord(word, 'id');
+}
+
 /**
- * Find potential corrections from dictionary for a misspelled word
- * Uses fuzzy matching with higher tolerance for severely distorted words
+ * Find potential corrections from the dictionary for a misspelled word.
+ * Uses fuzzy matching with higher tolerance for severely distorted words.
  */
-export async function findCorrections(word, maxDistance = 2) {
-  const dict = await loadIndonesianDictionary();
+export async function findCorrections(word, lang = 'id', maxDistance = 2) {
+  const dict = await loadDictionary(lang);
   if (dict.size === 0) return [];
-  
+
   return findFuzzyMatches(word, dict, maxDistance);
 }
 
@@ -146,7 +160,7 @@ function findFuzzyMatches(word, dict, maxDistance = 2) {
     // Don't fuzzy match very short words
     return [];
   }
-  
+
   const firstChar = lowerWord[0];
   if (!firstChar) return [];
 
@@ -174,16 +188,16 @@ function findFuzzyMatches(word, dict, maxDistance = 2) {
     // Fallback if groups are not built
     candidatesList.push(...dict);
   }
-  
+
   for (const candidate of candidatesList) {
     if (candidate === lowerWord) continue;
-    
+
     // Length must be similar (within 2 characters)
     const lenDiff = Math.abs(lowerWord.length - candidate.length);
     if (lenDiff > 2) continue;
-    
+
     const distance = editDistance(lowerWord, candidate);
-    
+
     // Apply different thresholds based on word length
     let threshold = maxDistance;
     if (lowerWord.length > 10) {
@@ -193,7 +207,7 @@ function findFuzzyMatches(word, dict, maxDistance = 2) {
     } else {
       threshold = 1; // Short words must be closer
     }
-    
+
     if (distance <= threshold) {
       const score = distance + lenDiff * 0.3;
       candidates.push({ word: candidate, distance, score });
@@ -202,11 +216,11 @@ function findFuzzyMatches(word, dict, maxDistance = 2) {
 
   // Sort by score and return top candidate only if it's a clear match
   candidates.sort((a, b) => a.score - b.score);
-  
+
   // Only return if the best match is significantly better than average
   if (candidates.length > 0 && candidates[0].score < 1.5) {
     return candidates.slice(0, 1).map(c => c.word);
   }
-  
+
   return [];
 }
