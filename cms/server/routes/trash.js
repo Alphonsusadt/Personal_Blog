@@ -245,10 +245,9 @@ export default function trashRoutes(db) {
             .from('artikel')
             .update({ status: 'draft', visible: false })
             .eq(target.column, target.value);
-          if (error) {
-            console.warn('[Trash] Supabase restore failed:', error.message);
-            return res.status(502).json({ error: 'Gagal menyinkronkan pemulihan ke Supabase: ' + error.message });
-          }
+          // Mongo adalah sumber kebenaran; cadangan yang gagal tidak membatalkan
+          // pemulihan, cukup dicatat.
+          if (error) console.warn('[Trash] Supabase restore failed:', error.message);
         }
       } else if (type === 'book') {
         const col = db.collection('books');

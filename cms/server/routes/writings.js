@@ -6,30 +6,18 @@ import { queueAutosave } from '../utils/autosaveQueue.js';
 import { dualWrite, syncMongoToSupabase } from '../utils/dataSync.js';
 import { isSectionEnabled } from '../utils/settingsCache.js';
 
-// Helper: try supabase, fall back to mongo on any error
-async function trySupabase(supabaseFn, mongoFn) {
-  if (supabase) {
-    try {
-      return await supabaseFn();
-    } catch (err) {
-      console.warn('[writings] Supabase unavailable, falling back to MongoDB:', err?.message || err);
-    }
-  }
-  return mongoFn();
-}
+// SUMBER KEBENARAN: MongoDB — untuk writings, sama seperti projects & books.
+//
+// Dulu endpoint baca di berkas ini mengambil dari Supabase lebih dulu dengan Mongo
+// sebagai cadangan. Dua penyimpanan yang sama-sama berwenang bisa berbeda isi, dan
+// itulah sumber rentetan bug: tulisan terhapus tetap tampil di situs, Trash kosong
+// padahal ada yang dihapus, dan tulisan baru yang gagal masuk Supabase lenyap dari
+// daftar CMS. Sesuai rancangan awal di README, Supabase adalah CADANGAN: ditulis
+// (lihat dualWrite), tidak pernah dibaca aplikasi.
 
-// Helper: does the Supabase `artikel` table hold ANY row at all?
-// Used to tell "Supabase belum dipakai" (→ boleh fallback ke Mongo) apart from
-// "Supabase dipakai, tapi semua tulisan memang sudah dihapus/unpublished"
-// (→ JANGAN fallback; kalau tidak, tulisan yang sudah dihapus muncul lagi di
-// situs publik karena dokumen Mongo-nya masih berstatus published).
-async function supabaseHasAnyRow() {
-  const { count, error } = await supabase.from('artikel').select('_id', { count: 'exact', head: true });
-  if (error) throw error;
-  return (count || 0) > 0;
-}
-
-// Helper: Safely parse JSON string back to object
+// Helper: Safely parse JSON string back to object.
+// Dokumen lama bisa menyimpan title/excerpt/content sebagai STRING JSON, jadi tetap
+// dinormalkan walaupun sumbernya sekarang Mongo.
 function parseSupabaseJson(data) {
   if (!data) return data;
   const parsed = { ...data };
@@ -48,128 +36,41 @@ function parseSupabaseJson(data) {
 
 export default function writingsRoutes(db) {
   const router = Router();
-  const fallbackCol = db.collection('writings');
+  // Nama 'fallbackCol' sudah tidak tepat: Mongo bukan lagi cadangan, tapi sumbernya.
+  const writingsCol = db.collection('writings');
 
   router.get('/public', async (_req, res) => {
     const enabled = await isSectionEnabled(db, 'writings');
     if (!enabled) return res.json([]);
-    const now = new Date().toISOString();
 
-    const result = await trySupabase(
-      async () => {
-        // Try Supabase first
-        const { data, error } = await supabase
-          .from('artikel')
-          .select('*')
-          .neq('visible', false)
-          .or(`status.eq.published,and(status.eq.scheduled,publishAt.lte.${now})`)
-          .order('createdAt', { ascending: false });
-        if (error) throw error;
+    const items = await writingsCol.find({
+      visible: { $ne: false },
+      $or: [{ status: 'published' }, { status: 'scheduled', publishAt: { $lte: new Date() } }],
+    }).sort({ createdAt: -1, date: -1 }).toArray();
 
-        // If Supabase has published articles, return them
-        if (data && data.length > 0) {
-          return data.map(parseSupabaseJson);
-        }
-
-        // Nol hasil bukan berarti Supabase kosong — bisa jadi semua tulisan sudah
-        // dihapus/di-unpublish. Hanya jatuh ke Mongo kalau tabelnya benar-benar kosong.
-        if (await supabaseHasAnyRow()) return [];
-
-        // Fallback to MongoDB if Supabase is empty
-        const items = await fallbackCol.find({
-          visible: { $ne: false },
-          $or: [{ status: 'published' }, { status: 'scheduled', publishAt: { $lte: new Date() } }],
-        }).sort({ createdAt: -1, date: -1 }).toArray();
-        return items.map(parseSupabaseJson);
-      },
-      async () => {
-        // Fallback to MongoDB if Supabase is down/error
-        const items = await fallbackCol.find({
-          visible: { $ne: false },
-          $or: [{ status: 'published' }, { status: 'scheduled', publishAt: { $lte: new Date() } }],
-        }).sort({ createdAt: -1, date: -1 }).toArray();
-        return items.map(parseSupabaseJson);
-      }
-    );
-
-    res.json(result);
+    res.json(items.map(parseSupabaseJson));
   });
 
   router.get('/public/:id', async (req, res) => {
     const enabled = await isSectionEnabled(db, 'writings');
     if (!enabled) return res.status(404).json({ error: 'Not found' });
-    const now = new Date().toISOString();
 
-    const result = await trySupabase(
-      async () => {
-        // Try Supabase first
-        const { data, error } = await supabase
-          .from('artikel')
-          .select('*')
-          .eq('id', req.params.id)
-          .neq('visible', false)
-          .or(`status.eq.published,and(status.eq.scheduled,publishAt.lte.${now})`)
-          .maybeSingle(); // maybeSingle handles "not found" gracefully (returns null instead of throwing)
-        if (error) throw error;
-        
-        if (data) {
-          return parseSupabaseJson(data);
-        }
+    const item = await writingsCol.findOne({
+      id: req.params.id,
+      visible: { $ne: false },
+      $or: [{ status: 'published' }, { status: 'scheduled', publishAt: { $lte: new Date() } }],
+    });
 
-        // Tidak ketemu sebagai "published" — kalau slug-nya memang ADA di Supabase
-        // (status deleted/draft/scheduled), hormati itu dan jangan menyajikan versi
-        // Mongo yang mungkin masih berstatus published.
-        const { data: known, error: knownErr } = await supabase
-          .from('artikel')
-          .select('_id')
-          .eq('id', req.params.id)
-          .limit(1);
-        if (knownErr) throw knownErr;
-        if (known && known.length > 0) return null;
-
-        // Fallback to MongoDB if not found in Supabase
-        const item = await fallbackCol.findOne({
-          id: req.params.id,
-          visible: { $ne: false },
-          $or: [{ status: 'published' }, { status: 'scheduled', publishAt: { $lte: new Date() } }],
-        });
-        return item ? parseSupabaseJson(item) : null;
-      },
-      async () => {
-        const item = await fallbackCol.findOne({
-          id: req.params.id,
-          visible: { $ne: false },
-          $or: [{ status: 'published' }, { status: 'scheduled', publishAt: { $lte: new Date() } }],
-        });
-        return item ? parseSupabaseJson(item) : null;
-      }
-    );
-
-    if (!result) return res.status(404).json({ error: 'Not found' });
-    res.json(result);
+    if (!item) return res.status(404).json({ error: 'Not found' });
+    res.json(parseSupabaseJson(item));
   });
 
   router.get('/', authMiddleware, async (_req, res) => {
-    // NOTE: served from Supabase first (Mongo fallback). Mongo and Supabase have
-    // historically diverged for this project (writings exist in Supabase that were
-    // never in Mongo), so Supabase is the authoritative list here. Deletes MUST
-    // therefore reliably mark the Supabase row 'deleted' (see the DELETE handler).
-    const result = await trySupabase(
-      async () => {
-        const { data, error } = await supabase
-          .from('artikel')
-          .select('*')
-          .neq('status', 'deleted')
-          .order('updatedAt', { ascending: false });
-        if (error) throw error;
-        return data.map(d => parseSupabaseJson({ ...d, _id: d._id }));
-      },
-      async () => {
-        const items = await fallbackCol.find({ status: { $ne: 'deleted' } }).sort({ updatedAt: -1, createdAt: -1, date: -1 }).toArray();
-        // Apply same transformation for consistency
-        return items.map(d => parseSupabaseJson({ ...d, _id: d._id }));
-      }
-    );
+    const items = await writingsCol
+      .find({ status: { $ne: 'deleted' } })
+      .sort({ updatedAt: -1, createdAt: -1, date: -1 })
+      .toArray();
+    const result = items.map(d => parseSupabaseJson({ ...d, _id: d._id }));
 
     res.json(result);
   });
@@ -192,7 +93,7 @@ export default function writingsRoutes(db) {
 
     try {
       if (data.id) {
-        const existing = await fallbackCol.findOne({ id: data.id });
+        const existing = await writingsCol.findOne({ id: data.id });
         if (existing) {
           if (data.id.includes('-draft-') || existing.status === 'draft') {
             // Re-use existing document and update it to maintain idempotency and prevent duplicates
@@ -311,11 +212,11 @@ export default function writingsRoutes(db) {
   router.delete('/:id', authMiddleware, async (req, res) => {
     try {
       const lookupId = req.params.id;
-      // The admin list reads from Supabase first (see GET '/'), so `_id` sent by the
-      // client may be a real Mongo ObjectId OR a Supabase-generated UUID — never assume.
+      // Daftar admin sekarang selalu mengirim ObjectId Mongo. UUID Supabase masih
+      // ditangani demi tulisan lama yang sempat tersimpan hanya di Supabase.
       const isObjectId = /^[0-9a-fA-F]{24}$/.test(lookupId);
 
-      const mongoDoc = await fallbackCol.findOne(isObjectId ? { _id: new ObjectId(lookupId) } : { id: lookupId });
+      const mongoDoc = await writingsCol.findOne(isObjectId ? { _id: new ObjectId(lookupId) } : { id: lookupId });
 
       // Not (or not only) in Mongo — resolve the exact Supabase row via its _id column.
       // Many legacy Supabase rows have an EMPTY slug (id column), so the slug can
@@ -358,18 +259,16 @@ export default function writingsRoutes(db) {
       // 1. Soft-delete in MongoDB (upsert a tombstone if the doc only lived in
       // Supabase) so the item shows up in the Trash Bin and can be restored.
       if (mongoDoc) {
-        await fallbackCol.updateOne({ _id: mongoDoc._id }, { $set: updateData });
+        await writingsCol.updateOne({ _id: mongoDoc._id }, { $set: updateData });
       } else {
-        await fallbackCol.updateOne({ id: slug }, { $set: updateData }, { upsert: true });
+        await writingsCol.updateOne({ id: slug }, { $set: updateData }, { upsert: true });
       }
 
-      // 2. Propagate the soft-delete to Supabase. The admin list is served FROM
-      // Supabase, so this MUST land — otherwise the "deleted" writing keeps showing
-      // and the delete looks like it did nothing. Match by the row's own _id when
-      // the client sent one (always precise, even for empty/duplicated slugs);
-      // never match by an empty slug — .eq('id','') would hit every legacy row.
-      // The Supabase client returns errors rather than throwing, so check it and
-      // fail loudly with a non-2xx instead of returning a false "success".
+      // 2. Teruskan soft-delete ke cadangan Supabase. Sejak Mongo jadi sumber
+      // kebenaran, kegagalan di sini TIDAK lagi menggagalkan penghapusan — bagi
+      // pengguna kontennya memang sudah terhapus. Cukup dicatat agar terlihat kalau
+      // cadangannya tertinggal. Alamatkan baris lewat _id bila ada; jangan pernah
+      // mencocokkan slug kosong — .eq('id','') akan mengenai semua baris legacy.
       if (supabase) {
         let query = supabase.from('artikel').update({ status: 'deleted', visible: false });
         if (!isObjectId) {
@@ -382,8 +281,7 @@ export default function writingsRoutes(db) {
         if (query) {
           const { error: sbErr } = await query;
           if (sbErr) {
-            console.error('[writings] Supabase soft-delete failed:', sbErr.message);
-            return res.status(502).json({ error: 'Gagal menyinkronkan penghapusan ke Supabase: ' + sbErr.message });
+            console.warn('[writings] Cadangan Supabase gagal ditandai deleted:', sbErr.message);
           }
         }
       }
