@@ -6,7 +6,9 @@
     "start": "node server/index.js",
     "dev": "node --env-file=.env server/index.js",
     "dev:cms": "node --env-file=.env server/index.js",
-    "seed": "node --env-file=.env seed.js"
+    "seed": "node --env-file=.env seed.js",
+    "backup": "node scripts/backup.mjs",
+    "restore": "node scripts/restore.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",

@@ -31,3 +31,14 @@ Thumbs.db
 # Uploaded media and icons
 cms/public/uploads/
 
+# Cadangan database — berisi hash password pengguna dan isi pesan masuk.
+# JANGAN pernah di-commit.
+cms/backups/
+
+# Personal dev scratch space and one-off assets (not part of the app)
+/scratch/
+/generate-banner.cjs
+/linkedin-banner.html
+/linkedin_banner_*.png
+/public/logo-designs/
+
