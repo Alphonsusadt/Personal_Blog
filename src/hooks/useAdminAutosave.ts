@@ -143,6 +143,7 @@ export function useAdminAutosave<T>({
   // Stable ref to clearDraft so long-lived closures (executeServerSave) always
   // clear the CURRENT storageKey, not the one captured when they were first created.
   const clearDraftRef = useRef<(options?: { backup?: boolean }) => void>(() => {});
+  const persistDraftRef = useRef<(snapshot: T) => void>(() => {});
 
   const clearDraft = useCallback((options?: { backup?: boolean }) => {
     try {
@@ -203,15 +204,30 @@ export function useAdminAutosave<T>({
 
       // Success — update dirty flag baseline
       lastSavedFingerprintRef.current = result ? fingerprint(result) : fp;
-      retryQueueRef.current = null;
-      clearDraftRef.current(); // Clear local draft (current storageKey) since server is synced
+      // JANGAN kosongkan antrean di sini: bila penulis terus mengetik selama request ini
+      // berjalan, simpanan yang lebih baru sudah mengantre dan dijalankan di `finally`.
+      // (Dulu antrean dibuang → ketikan terakhir tidak pernah sampai ke server.)
+      if (fingerprint(dataRef.current) === lastSavedFingerprintRef.current) {
+        clearDraftRef.current(); // server sudah persis sama dengan layar → draf lokal tak perlu
+      } else {
+        // Ada ketikan sesudah snapshot ini: draf lokal = satu-satunya salinan terbarunya.
+        persistDraftRef.current(dataRef.current);
+      }
       showSaved();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
 
       if (job.attempt < maxRetries) {
-        // QUEUE + RETRY: exponential back-off
-        const nextJob: SaveJob<T> = { ...job, attempt: job.attempt + 1 };
+        // QUEUE + RETRY: exponential back-off. Bila sudah ada simpanan yang lebih baru di
+        // antrean, coba ulang DENGAN data terbaru itu — bukan data lama yang barusan gagal,
+        // yang kalau berhasil akan menimpa ketikan terbaru.
+        const newer = retryQueueRef.current;
+        const useNewer = !!newer && newer.version > job.version;
+        const nextJob: SaveJob<T> = {
+          payload: useNewer ? newer!.payload : job.payload,
+          version: useNewer ? newer!.version : job.version,
+          attempt: job.attempt + 1,
+        };
         retryQueueRef.current = nextJob;
         setStatus('retrying');
         setErrorMessage(`Retry ${nextJob.attempt}/${maxRetries}…`);
@@ -260,6 +276,10 @@ export function useAdminAutosave<T>({
     }
   }, [storageKey]);
 
+  // Ref supaya executeServerSave (dibuat sekali) selalu menulis ke storageKey TERKINI
+  // (kunci berganti dari "*_new" ke slug setelah tulisan baru dibuat).
+  persistDraftRef.current = persistLocalDraft;
+
   // ── Public: mark as saved (used by manual save to sync dirty flag) ────────
   
   const markAsSaved = useCallback((snapshot: T) => {
@@ -283,6 +303,14 @@ export function useAdminAutosave<T>({
     persistLocalDraft(snapshot);
     versionRef.current += 1;
     await executeServerSave({ payload: snapshot, version: versionRef.current, attempt: 0 });
+
+    // Bila ada simpanan lain yang sedang berjalan, executeServerSave hanya mengantrekan
+    // snapshot ini lalu langsung selesai. Pemanggil (mis. tombol Translate) butuh jaminan
+    // server SUDAH punya isi terbaru, jadi tunggu sampai antrean benar-benar kosong.
+    const deadline = Date.now() + 20_000;
+    while ((isSavingRef.current || retryQueueRef.current) && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
   }, [enabled, executeServerSave, hasMeaningfulData, persistLocalDraft]);
 
   const readDraft = useCallback((): { data: T; timestamp: number } | null => {
@@ -429,7 +457,20 @@ export function useAdminAutosave<T>({
     return () => {
       handleUnload(); // also check/save on React unmount (navigation)
       window.removeEventListener('beforeunload', handleUnload);
+      // Pindah halaman di dalam CMS (mis. Back) tepat setelah mengetik: simpanan yang masih
+      // menunggu debounce akan dibatalkan. Kirim sekarang supaya ketikan terakhir langsung ada
+      // di server (bukan hanya draf lokal). Hanya untuk dokumen yang sudah punya _id: membuat
+      // dokumen baru dari sini akan menavigasi balik ke editor yang baru saja ditinggalkan.
+      const snapshot = dataRef.current as unknown as Record<string, unknown> | null;
+      const dirty = fingerprint(dataRef.current) !== lastSavedFingerprintRef.current;
+      const meaningful = !hasMeaningfulData || hasMeaningfulData(dataRef.current);
+      if (!skipUnloadSaveRef.current && dirty && meaningful && snapshot && snapshot._id) {
+        clearTimeout(serverDebounceRef.current);
+        versionRef.current += 1;
+        void executeServerSave({ payload: dataRef.current, version: versionRef.current, attempt: 0 });
+      }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, persistLocalDraft, clearDraft]);
 
   // ── Cleanup all timers on unmount ─────────────────────────────────────────
@@ -496,4 +537,38 @@ export function useAdminAutosave<T>({
     readBackupDraft,
     clearBackupDraft,
   };
+}
+/**
+ * Hapus draf lokal sebuah kunci beserta cadangannya.
+ * Dipakai setelah tulisan BARU berhasil dibuat: draf "*_new" itu milik tulisan yang kini
+ * sudah tersimpan, dan bila dibiarkan akan ditawarkan ("Draft Ditemukan") ke tulisan baru
+ * berikutnya — memulihkannya menyalin isi tulisan lama ke tulisan baru.
+ */
+export function clearLocalDraft(storageKey: string): void {
+  try {
+    localStorage.removeItem(storageKey);
+    localStorage.removeItem(`${storageKey}_backup`);
+  } catch {
+    /* localStorage tidak tersedia: abaikan */
+  }
+}
+
+/**
+ * Buang draf lokal yang sudah usang (default > 3 hari). Dialog pemulihan hanya menawarkan
+ * draf < 24 jam, jadi draf yang lebih tua tidak berguna dan hanya memenuhi kuota
+ * localStorage (~5 MB) — kuota penuh membuat autosave lokal gagal diam-diam.
+ */
+export function pruneStaleDrafts(maxAgeMs = 3 * 86_400_000): void {
+  try {
+    const now = Date.now();
+    for (const key of Object.keys(localStorage)) {
+      if (!/^(writing|project|book)_draft_/.test(key)) continue;
+      const raw = localStorage.getItem(key);
+      let ts = 0;
+      try { ts = JSON.parse(raw || '{}').timestamp || 0; } catch { /* rusak → buang */ }
+      if (!ts || now - ts > maxAgeMs) localStorage.removeItem(key);
+    }
+  } catch {
+    /* abaikan */
+  }
 }

@@ -5,7 +5,7 @@
  * Tab: Home · Insert · Layout · Review · View, plus tab kontekstual "Table" yang muncul
  * saat kursor berada di dalam tabel (seperti Table Layout di Word).
  */
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
 import {
   ClipboardPaste, Scissors, Copy, Paintbrush, Bold, Italic, Underline, Strikethrough,
@@ -14,7 +14,7 @@ import {
   UnfoldVertical, Pilcrow, Quote, Search, Replace, TextSelect, Table, Image, Link, Youtube, Sigma,
   SquareCode, Minus, Omega, CalendarDays, Palette, Recycle, BetweenHorizontalStart, BetweenHorizontalEnd,
   BetweenVerticalStart, BetweenVerticalEnd, TableCellsMerge, TableCellsSplit, Trash2, PanelTop,
-  ZoomIn, ZoomOut, ChevronUp, ChevronDown, Undo2, Redo2, Code, RectangleHorizontal, WholeWord,
+  ZoomIn, ZoomOut, Type, Crop, RotateCw, RotateCcw, FlipVertical, FlipHorizontal, Captions, ChevronUp, ChevronDown, Undo2, Redo2, Code, RectangleHorizontal, WholeWord,
 } from 'lucide-react';
 import {
   RibbonGroup, Stack, Row, Divider, BigButton, SmallButton, SplitButton, MenuButton, MenuItem,
@@ -26,8 +26,12 @@ import {
   clipboardCommand, SYMBOLS, insertDate, type PaintedFormat,
 } from './commands';
 import { TableGridPicker, EmbedForm } from './panels';
+import { WRAP_OPTIONS, WrapIcon, STYLE_OPTIONS, transformImage, cropImage } from './imageLayout';
+import { PictureCropDialog } from './PictureCropDialog';
+import { isFreeWrap } from '../../lib/tiptap-extensions';
+import { NodeSelection } from '@tiptap/pm/state';
 
-export type RibbonTabId = 'home' | 'insert' | 'review' | 'view' | 'table';
+export type RibbonTabId = 'home' | 'insert' | 'review' | 'view' | 'table' | 'picture';
 export type PageWidth = 'narrow' | 'normal' | 'wide';
 
 export interface RibbonViewState {
@@ -52,6 +56,8 @@ export interface RibbonProps {
   wordCount: number;
   characterCount: number;
   language: 'id' | 'en';
+  /** Pesan status (mis. "Memutar gambar…") untuk status bar editor; '' = selesai. */
+  onStatus?: (message: string) => void;
 }
 
 const LINE_SPACINGS = ['1.0', '1.15', '1.5', '2.0', '2.5', '3.0'];
@@ -73,7 +79,7 @@ const DEAD_STATE = {
   highlight: null as string | null, color: null as string | null, font: 'Merriweather', size: 12,
   bullet: false, ordered: false, inList: false, quote: false, codeBlock: false,
   align: 'left' as 'left' | 'center' | 'right' | 'justify', lineHeight: null as string | null, block: 'p',
-  inTable: false, canUndo: false, canRedo: false, hasSelection: false, canMerge: false, canSplit: false,
+  inTable: false, image: null as Record<string, any> | null, canUndo: false, canRedo: false, hasSelection: false, canMerge: false, canSplit: false,
 };
 
 function StyleTile({ tile, active, onApply }: { tile: (typeof STYLE_TILES)[number]; active: boolean; onApply: (id: string) => void }) {
@@ -136,7 +142,8 @@ function StyleGallery({ active, onApply }: { active: string; onApply: (id: strin
   );
 }
 
-export function Ribbon(props: RibbonProps) {
+/** Dibungkus memo: tidak dirender ulang tiap ketikan bila props-nya tidak berubah. */
+export const Ribbon = memo(function Ribbon(props: RibbonProps) {
   const { editor, view, onViewChange } = props;
   const [tab, setTab] = useState<RibbonTabId>('home');
   const [collapsed, setCollapsed] = useState(false);
@@ -189,6 +196,7 @@ export function Ribbon(props: RibbonProps) {
           : e.isActive('blockquote') ? 'quote'
           : e.isActive('codeBlock') ? 'code' : 'p',
         inTable: e.isActive('table'),
+        image: e.isActive('image') ? { ...e.getAttributes('image') } : null,
         canUndo: e.can().undo(),
         canRedo: e.can().redo(),
         hasSelection: !e.state.selection.empty,
@@ -199,7 +207,7 @@ export function Ribbon(props: RibbonProps) {
   });
 
   const chain = () => editor.chain().focus();
-  const activeTab: RibbonTabId = tab === 'table' && !s.inTable ? 'home' : tab;
+  const activeTab: RibbonTabId = (tab === 'table' && !s.inTable) || (tab === 'picture' && !s.image) ? 'home' : tab;
 
   const applyStyle = (id: string) => {
     const c = chain();
@@ -533,6 +541,204 @@ export function Ribbon(props: RibbonProps) {
     </>
   );
 
+  /* ------------------------------------------------------------ Tab: Picture Format (kontekstual) */
+  const img = s.image;
+  // Gambar tetap terpilih setelah diubah (seperti Word), supaya tab ini tidak hilang.
+  // focus() bawaan mengubah seleksi node menjadi kursor teks, jadi seleksinya dipulihkan.
+  const setImage = (patch: Record<string, unknown>) => {
+    const sel = editor.state.selection;
+    const pos = sel instanceof NodeSelection && sel.node.type.name === 'image' ? sel.from : null;
+    // Mode bebas: gambar yang diperlebar tidak boleh keluar dari kolom.
+    const cur = pos !== null ? (sel as NodeSelection).node.attrs : null;
+    if (cur && isFreeWrap(patch.wrap ?? cur.wrap) && patch.width !== undefined) {
+      const w = parseFloat(String(patch.width)) || 0;
+      const x = Number(patch.offsetX ?? cur.offsetX) || 0;
+      if (x + w > 100) patch = { ...patch, offsetX: Math.max(0, 100 - w) };
+    }
+    chain().updateAttributes('image', patch).run();
+    if (pos !== null && editor.state.doc.nodeAt(pos)?.type.name === 'image') editor.commands.setNodeSelection(pos);
+  };
+  // Pengolahan piksel (putar/balik/potong) bersifat async: simpan posisi node sekarang,
+  // lalu ganti src hanya bila node di posisi itu masih gambar yang sama.
+  const runImageJob = async (label: string, job: (src: string) => Promise<string>) => {
+    const sel = editor.state.selection;
+    if (!(sel instanceof NodeSelection) || sel.node.type.name !== 'image') return;
+    const pos = sel.from;
+    const oldSrc = sel.node.attrs.src as string;
+    props.onStatus?.(label);
+    try {
+      const newSrc = await job(oldSrc);
+      const node = editor.state.doc.nodeAt(pos);
+      if (!node || node.type.name !== 'image' || node.attrs.src !== oldSrc) throw new Error('Gambar sudah berubah atau dipindah; coba lagi');
+      editor.view.dispatch(editor.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: newSrc }));
+      editor.commands.setNodeSelection(pos); // tetap terpilih, seperti Word
+      props.onStatus?.('');
+    } catch (err) {
+      props.onStatus?.(`Gagal: ${err instanceof Error ? err.message : 'error'}`);
+    }
+  };
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [cropBusy, setCropBusy] = useState(false);
+  const floating = img?.wrap === 'square' || img?.wrap === 'tight';
+  const WIDTHS = ['10', '20', '25', '30', '33', '40', '50', '60', '75', '100'];
+
+  const picture = img ? (
+    <>
+      <RibbonGroup label="Arrange">
+        <MenuButton
+          big
+          icon={<WrapIcon wrap={img.wrap} size={30} />}
+          label={'Wrap\nText'}
+          title="Wrap Text: atur hubungan gambar dengan teks"
+          menu={(close) => (
+            <>
+              {WRAP_OPTIONS.map(o => (
+                <MenuItem key={o.id} active={img.wrap === o.id} title={o.hint} icon={<WrapIcon wrap={o.id} />} onClick={() => { close(); setImage(o.apply(img)); }}>
+                  {o.label}
+                </MenuItem>
+              ))}
+            </>
+          )}
+        />
+        <MenuButton
+          big
+          icon={img.align === 'right' ? <AlignRight /> : img.align === 'center' ? <AlignCenter /> : <AlignLeft />}
+          label="Position"
+          title={img.wrap === 'inline' ? 'Gambar In Line mengikuti posisi teks' : 'Posisi gambar di kolom'}
+          disabled={img.wrap === 'inline'}
+          menu={(close) => isFreeWrap(img.wrap) ? (
+            // Mode bebas: tempatkan persis di tepi/tengah kolom; posisi vertikal tetap.
+            <>
+              {([['left', 'Tepi kiri', AlignLeft], ['center', 'Tengah kolom', AlignCenter], ['right', 'Tepi kanan', AlignRight]] as const).map(([pos, label, Icon]) => {
+                const w = parseFloat(img.width) || 50;
+                const x = pos === 'left' ? 0 : pos === 'center' ? (100 - w) / 2 : 100 - w;
+                return (
+                  <MenuItem key={pos} active={Math.abs((img.offsetX || 0) - x) < 0.5} icon={<Icon />} onClick={() => { close(); setImage({ offsetX: Math.round(x * 100) / 100 }); }}>
+                    {label}
+                  </MenuItem>
+                );
+              })}
+            </>
+          ) : (
+            <>
+              <MenuItem active={img.align === 'left'} icon={<AlignLeft />} onClick={() => { close(); setImage({ align: 'left' }); }}>
+                {floating ? 'Kiri (teks di kanan)' : 'Kiri'}
+              </MenuItem>
+              {!floating && (
+                <MenuItem active={img.align === 'center'} icon={<AlignCenter />} onClick={() => { close(); setImage({ align: 'center' }); }}>Tengah</MenuItem>
+              )}
+              <MenuItem active={img.align === 'right'} icon={<AlignRight />} onClick={() => { close(); setImage({ align: 'right' }); }}>
+                {floating ? 'Kanan (teks di kiri)' : 'Kanan'}
+              </MenuItem>
+            </>
+          )}
+        />
+      </RibbonGroup>
+
+      <RibbonGroup label="Size">
+        <Stack className="justify-center">
+          <Row>
+            <span className="text-[12px] w-[44px] text-[var(--wc-text-dim)]">Lebar</span>
+            <ComboBox
+              value={String(parseFloat(img.width) || 100)}
+              items={WIDTHS}
+              width={64}
+              title="Lebar gambar (% lebar kolom)"
+              onCommit={(v) => { const n = Math.max(5, Math.min(100, parseFloat(v))); if (Number.isFinite(n)) setImage({ width: `${Math.round(n)}%` }); }}
+            />
+            <span className="text-[12px] text-[var(--wc-text-dim)]">%</span>
+          </Row>
+          <Row>
+            <SmallButton
+              icon={<RectangleHorizontal />}
+              label="Reset Size"
+              title="Kembalikan ke ukuran bawaan"
+              onClick={() => setImage({ width: floating || isFreeWrap(img.wrap) ? '45%' : img.wrap === 'inline' ? '30%' : '100%' })}
+            />
+          </Row>
+        </Stack>
+      </RibbonGroup>
+
+      <RibbonGroup label="Adjust">
+        <BigButton icon={<Crop />} label="Crop" title="Potong gambar" onClick={() => setCropSrc(img.src)} />
+        <MenuButton
+          big
+          icon={<RotateCw />}
+          label="Rotate"
+          title="Putar atau balik gambar"
+          menu={(close) => (
+            <>
+              <MenuItem icon={<RotateCw />} onClick={() => { close(); runImageJob('Memutar gambar…', (src) => transformImage(src, 'rotateRight')); }}>Rotate Right 90°</MenuItem>
+              <MenuItem icon={<RotateCcw />} onClick={() => { close(); runImageJob('Memutar gambar…', (src) => transformImage(src, 'rotateLeft')); }}>Rotate Left 90°</MenuItem>
+              <MenuSeparator />
+              <MenuItem icon={<FlipVertical />} onClick={() => { close(); runImageJob('Membalik gambar…', (src) => transformImage(src, 'flipV')); }}>Flip Vertical</MenuItem>
+              <MenuItem icon={<FlipHorizontal />} onClick={() => { close(); runImageJob('Membalik gambar…', (src) => transformImage(src, 'flipH')); }}>Flip Horizontal</MenuItem>
+            </>
+          )}
+        />
+      </RibbonGroup>
+
+      <RibbonGroup label="Picture Styles">
+        <div className="flex items-center gap-1 h-[60px]">
+          {STYLE_OPTIONS.map(o => (
+            <button
+              key={o.id}
+              type="button"
+              title={o.label}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setImage({ styleVariant: o.id })}
+              className={`w-[46px] h-[46px] rounded-[4px] border flex items-center justify-center ${(img.styleVariant || 'none') === o.id ? 'border-[var(--wc-accent)] bg-[var(--wc-checked)]' : 'border-transparent hover:bg-[var(--wc-hover)]'}`}
+            >
+              <span className={`wc-style-swatch wc-style-swatch-${o.id}`} />
+            </button>
+          ))}
+        </div>
+      </RibbonGroup>
+
+      <RibbonGroup label="Accessibility">
+        <MenuButton
+          big
+          icon={<Type />}
+          label="Alt Text"
+          title="Teks alternatif untuk pembaca layar & mesin pencari"
+          menu={() => (
+            <div className="px-3 py-2 w-[300px]">
+              <div className="text-[12px] mb-1.5 text-[var(--wc-text-dim)]">Deskripsikan isi gambar (untuk pembaca layar & SEO)</div>
+              <textarea
+                autoFocus
+                defaultValue={img.alt || ''}
+                rows={3}
+                onChange={(e) => setImage({ alt: e.target.value })}
+                className="w-full px-2 py-1.5 text-[13px] bg-[var(--wc-input)] text-[var(--wc-text)] border border-[var(--wc-input-border)] rounded-[3px] outline-none focus:border-[var(--wc-accent)] resize-none"
+              />
+            </div>
+          )}
+        />
+        <BigButton
+          icon={<Captions />}
+          label="Caption"
+          title={img.caption === null || img.caption === undefined ? 'Tambahkan keterangan di bawah gambar' : 'Hapus keterangan'}
+          active={img.caption !== null && img.caption !== undefined}
+          onClick={() => setImage({ caption: img.caption === null || img.caption === undefined ? '' : null })}
+        />
+      </RibbonGroup>
+
+      {cropSrc && (
+        <PictureCropDialog
+          src={cropSrc}
+          busy={cropBusy}
+          onCancel={() => setCropSrc(null)}
+          onApply={async (rect) => {
+            setCropBusy(true);
+            await runImageJob('Memotong gambar…', (src) => cropImage(src, rect));
+            setCropBusy(false);
+            setCropSrc(null);
+          }}
+        />
+      )}
+    </>
+  ) : null;
+
   /* ------------------------------------------------------------ Tab: Review */
   // Hanya grup dari halaman (Auto Fix). Jumlah kata sudah ada di status bar.
   const review = <>{props.reviewGroups}</>;
@@ -568,9 +774,10 @@ export function Ribbon(props: RibbonProps) {
     { id: 'review', label: 'Review' },
     { id: 'view', label: 'View' },
     ...(s.inTable ? [{ id: 'table' as const, label: 'Table', contextual: true }] : []),
+    ...(s.image ? [{ id: 'picture' as const, label: 'Picture Format', contextual: true }] : []),
   ];
 
-  const content = { home, insert, review, view: viewTab, table }[activeTab];
+  const content = { home, insert, review, view: viewTab, table, picture }[activeTab];
 
   return (
     <div className="select-none bg-[var(--wc-ribbon)] border-b border-[var(--wc-border)]">
@@ -622,5 +829,5 @@ export function Ribbon(props: RibbonProps) {
       )}
     </div>
   );
-}
+});
 

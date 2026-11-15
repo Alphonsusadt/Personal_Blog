@@ -10,51 +10,125 @@ import { MathInlineNodeView } from '../components/MathInlineNodeView';
 import { TikzBlockNodeView } from '../components/TikzBlockNodeView';
 
 /**
- * Custom Image extension that parses and handles image alignment (float: left/right/center)
- * and custom widths (33%, 50%, 75%, 100%).
+ * Gambar bergaya Word: ditambatkan di dalam paragraf (node inline), dengan mode
+ * "Wrap Text" seperti Word. HTML yang disimpan:
+ *
+ *   <span class="wc-figure wc-wrap-square wc-align-left wc-style-rounded" style="width: 40%">
+ *     <img src alt>
+ *     <span class="wc-caption">Keterangan</span>   (opsional)
+ *   </span>
+ *
+ * Tata letaknya murni lewat class + CSS (.wc-figure di index.css), jadi tampilan editor =
+ * tampilan publik, dan di HP gambar mengambang otomatis jadi lebar penuh.
+ * Gambar lama (<img style="float: …">) dibaca ke model ini saat dibuka di editor.
  */
+export type ImageWrap = 'inline' | 'square' | 'tight' | 'topBottom' | 'front' | 'behind';
+/** Mode bebas (seperti In Front of / Behind Text di Word): posisi persis lewat offsetX/offsetY. */
+export const FREE_WRAPS: ImageWrap[] = ['front', 'behind'];
+export const isFreeWrap = (w: unknown) => w === 'front' || w === 'behind';
+export type ImageAlign = 'left' | 'center' | 'right';
+export type ImageStyleVariant = 'none' | 'rounded' | 'shadow' | 'border' | 'roundedShadow';
+
+export const IMAGE_WRAPS: ImageWrap[] = ['inline', 'square', 'tight', 'topBottom', 'front', 'behind'];
+
+function legacyLayout(img: HTMLElement): { wrap: ImageWrap; align: ImageAlign } {
+  const float = img.style.float;
+  if (float === 'left' || float === 'right') return { wrap: 'square', align: float };
+  return { wrap: 'topBottom', align: 'center' };
+}
+
+function figureAttrs(figure: HTMLElement) {
+  const img = figure.querySelector('img');
+  if (!img) return false;
+  const cls = figure.classList;
+  const wrap = IMAGE_WRAPS.find(w => cls.contains(`wc-wrap-${w}`)) ?? 'topBottom';
+  const align = (['left', 'center', 'right'] as ImageAlign[]).find(a => cls.contains(`wc-align-${a}`)) ?? 'center';
+  const styleVariant = (['rounded', 'shadow', 'border', 'roundedShadow'] as ImageStyleVariant[]).find(s => cls.contains(`wc-style-${s}`)) ?? 'none';
+  const caption = figure.querySelector('.wc-caption');
+  return {
+    src: img.getAttribute('src'),
+    alt: img.getAttribute('alt'),
+    title: img.getAttribute('title'),
+    width: figure.style.width || '100%',
+    // Posisi bebas: % lebar kolom dari kiri, px dari atas paragraf tambatan.
+    offsetX: parseFloat(figure.style.left) || 0,
+    offsetY: parseFloat(figure.style.top) || 0,
+    wrap,
+    align,
+    styleVariant,
+    caption: caption ? caption.textContent ?? '' : null,
+  };
+}
+
 export const CustomImage = Image.extend({
+  draggable: true,
+
   addAttributes() {
     return {
-      ...this.parent?.(),
-      width: {
-        default: '100%',
-        parseHTML: (element) => {
-          return element.style.width || element.getAttribute('width') || '100%';
-        },
-        renderHTML: (attributes) => {
-          return {
-            style: `width: ${attributes.width}; max-width: 100%; height: auto;`,
-          };
-        },
-      },
-      alignment: {
-        default: 'center',
-        parseHTML: (element) => {
-          const float = element.style.float;
-          if (float === 'left') return 'left';
-          if (float === 'right') return 'right';
-          return 'center';
-        },
-        renderHTML: (attributes) => {
-          let style = '';
-          if (attributes.alignment === 'left') {
-            style = 'float: left; margin: 0.5rem 1.5rem 1.5rem 0;';
-          } else if (attributes.alignment === 'right') {
-            style = 'float: right; margin: 0.5rem 0 1.5rem 1.5rem;';
-          } else {
-            style = 'display: block; margin: 1.5rem auto; float: none;';
-          }
-          return {
-            style,
-          };
-        },
-      },
+      src: { default: null },
+      alt: { default: null },
+      title: { default: null },
+      width: { default: '100%' },
+      wrap: { default: 'topBottom' },
+      align: { default: 'center' },
+      styleVariant: { default: 'none' },
+      // null = tanpa keterangan; '' = keterangan aktif tapi masih kosong.
+      caption: { default: null },
+      offsetX: { default: 0 },
+      offsetY: { default: 0 },
     };
   },
 
+  parseHTML() {
+    return [
+      { tag: 'span.wc-figure', priority: 60, getAttrs: (el) => figureAttrs(el as HTMLElement) },
+      {
+        tag: this.options.allowBase64 ? 'img[src]' : 'img[src]:not([src^="data:"])',
+        getAttrs: (el) => {
+          const img = el as HTMLElement;
+          const { wrap, align } = legacyLayout(img);
+          return {
+            src: img.getAttribute('src'),
+            alt: img.getAttribute('alt'),
+            title: img.getAttribute('title'),
+            width: img.style.width || (img.getAttribute('width')?.endsWith('%') ? img.getAttribute('width') : null) || '100%',
+            wrap,
+            align,
+          };
+        },
+      },
+    ];
+  },
+
+  renderHTML({ node }) {
+    const { src, alt, title, width, wrap, align, styleVariant, caption, offsetX, offsetY } = node.attrs;
+    const cls = ['wc-figure', `wc-wrap-${wrap}`];
+    if (wrap !== 'inline') cls.push(`wc-align-${align}`);
+    if (styleVariant && styleVariant !== 'none') cls.push(`wc-style-${styleVariant}`);
+    let style = `width: ${width}`;
+    if (isFreeWrap(wrap)) style += `; left: ${Math.round((offsetX || 0) * 100) / 100}%; top: ${Math.round(offsetY || 0)}px`;
+    // Tight: teks mengikuti bentuk gambar (butuh PNG transparan; selain itu = Square).
+    if (wrap === 'tight' && src) style += `; shape-outside: url("${String(src).replace(/"/g, '%22')}"); shape-image-threshold: 0.3; shape-margin: 0.75rem`;
+    const imgAttrs: Record<string, string> = { src };
+    if (alt) imgAttrs.alt = alt;
+    if (title) imgAttrs.title = title;
+    const children: any[] = [['img', imgAttrs]];
+    if (caption !== null && caption !== undefined) children.push(['span', { class: 'wc-caption' }, caption]);
+    return ['span', { class: cls.join(' '), style }, ...children];
+  },
+
   addNodeView() {
-    return ReactNodeViewRenderer(ImageNodeView);
+    return ReactNodeViewRenderer(ImageNodeView, {
+      // Input keterangan di dalam gambar harus menerima ketikan sendiri, bukan editor.
+      stopEvent: ({ event }) => {
+        const t = event.target as HTMLElement | null;
+        if (!t) return false;
+        // Gambar bebas (In Front of / Behind Text) digeser oleh NodeView sendiri, mengikuti
+        // mouse; drag bawaan ProseMirror (pindah ke posisi teks) tidak boleh ikut berjalan.
+        if (event.type.startsWith('drag') && t.closest?.('.wc-wrap-front, .wc-wrap-behind')) return true;
+        return t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || !!t.closest?.('[data-wc-handle]');
+      },
+    });
   },
 });
 

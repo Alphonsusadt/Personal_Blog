@@ -1,5 +1,6 @@
 import React, { useImperativeHandle, forwardRef, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { useEditor, useEditorState, EditorContent } from '@tiptap/react';
+import { flushSync } from 'react-dom';
 import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
@@ -10,6 +11,8 @@ import Subscript from '@tiptap/extension-subscript';
 import Superscript from '@tiptap/extension-superscript';
 import { TableKit } from '@tiptap/extension-table';
 import { Placeholder } from '@tiptap/extensions';
+import { isFreeWrap } from '../lib/tiptap-extensions';
+import { NodeSelection } from '@tiptap/pm/state';
 import { CustomImage, SocialEmbed, CustomCodeBlock, MathBlock, MathInline, TikzBlock } from '../lib/tiptap-extensions';
 import { SearchReplace } from '../lib/searchReplace';
 import { Indent } from '../lib/indent';
@@ -50,6 +53,8 @@ export interface RichTextEditorRef {
 }
 
 const VIEW_KEY = 'wc-ribbon-view';
+/** Jeda maksimal sebelum isi editor dikirim ke halaman saat mengetik (lihat scheduleCommit). */
+const COMMIT_DELAY_MS = 120;
 const DEFAULT_VIEW: RibbonViewState = { zoom: 100, showMarks: false, pageWidth: 'normal', theme: 'light' };
 const PAGE_WIDTHS = { narrow: 640, normal: 816, wide: 1040 } as const;
 
@@ -90,8 +95,76 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
 
   const initialValueRef = useRef(initialValue);
   initialValueRef.current = initialValue;
+
+  // ---- Drag gambar: zona kiri/tengah/kanan + garis bantu ----
+  type Zone = { align: 'left' | 'center' | 'right'; label: string };
+  const [dragGuide, setDragGuide] = useState<Zone | null>(null);
+  /** Zona jatuh untuk gambar yang sedang di-drag di dalam editor (null bila bukan gambar). */
+  const dropZone = (pmView: { dragging: any; dom: HTMLElement } | null | undefined, ev: DragEvent | MouseEvent): Zone | null => {
+    const dragged = pmView?.dragging?.slice?.content?.firstChild;
+    const isImage = dragged?.type?.name === 'image' || dragged?.firstChild?.type?.name === 'image';
+    if (!pmView || !isImage) return null;
+    const imageNode = dragged.type.name === 'image' ? dragged : dragged.firstChild;
+    const wrap = imageNode.attrs.wrap;
+    if (wrap === 'inline') return null;
+    const rect = pmView.dom.getBoundingClientRect();
+    const ratio = (ev.clientX - rect.left) / Math.max(1, rect.width);
+    if (wrap === 'square' || wrap === 'tight') {
+      return ratio < 0.5 ? { align: 'left', label: 'Kiri — teks di kanan' } : { align: 'right', label: 'Kanan — teks di kiri' };
+    }
+    if (ratio < 1 / 3) return { align: 'left', label: 'Kiri' };
+    if (ratio > 2 / 3) return { align: 'right', label: 'Kanan' };
+    return { align: 'center', label: 'Tengah' };
+  };
+  const applyDropZone = (zone: Zone) => {
+    const ed = editorRef.current;
+    if (!ed || ed.isDestroyed || !ed.isActive('image')) return;
+    if (ed.getAttributes('image').align !== zone.align) ed.chain().updateAttributes('image', { align: zone.align }).run();
+  };
   const onOpenLinkDialogRef = useRef(onOpenLinkDialog);
   onOpenLinkDialogRef.current = onOpenLinkDialog;
+
+  // ---- Pengiriman isi ke halaman (dikumpulkan saat mengetik cepat) ----
+  const commitTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const commitPendingRef = useRef(false);
+  /** Kirim isi editor ke halaman sekarang. sync=true → render halaman seketika (flushSync),
+   *  supaya penyimpan (autosave/Translate/Ctrl+S/tutup tab) membaca isi terbaru. */
+  const flushCommit = (sync = false) => {
+    clearTimeout(commitTimerRef.current);
+    if (!commitPendingRef.current) return;
+    const ed = editorRef.current;
+    if (!ed || ed.isDestroyed) return;
+    commitPendingRef.current = false;
+    const html = ed.getHTML();
+    const value = isEmptyEditorHtml(html) ? '' : wrapRichHtml(html);
+    rememberEmitted(value);
+    if (sync) {
+      try { flushSync(() => onCommitRef.current(value)); } catch { onCommitRef.current(value); }
+    } else {
+      onCommitRef.current(value);
+    }
+  };
+  const scheduleCommit = () => {
+    commitPendingRef.current = true;
+    clearTimeout(commitTimerRef.current);
+    commitTimerRef.current = setTimeout(() => flushCommit(false), COMMIT_DELAY_MS);
+  };
+  // Tab ditutup / disembunyikan: kirim seketika (sebelum autosave menyimpan draf lokal).
+  useEffect(() => {
+    const now = () => flushCommit(true);
+    const onVisibility = () => { if (document.visibilityState === 'hidden') now(); };
+    window.addEventListener('beforeunload', now, { capture: true });
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('beforeunload', now, { capture: true });
+      document.removeEventListener('visibilitychange', onVisibility);
+      // Editor dilepas (mis. Live Preview menukar instance editor, atau pindah halaman):
+      // kirim ketikan yang belum terkirim. Efek ini dideklarasikan sebelum useEditor, jadi
+      // dibersihkan lebih dulu — editor masih hidup saat getHTML() dipanggil.
+      flushCommit(false);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Unggah gambar yang ditempel/di-drag. Disisipkan sebagai URL server (bukan base64,
   // yang membengkakkan dokumen & autosave). Status tampil di status bar.
@@ -107,7 +180,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         const at = Math.min(pos, ed.state.doc.content.size);
         ed.chain().focus().insertContentAt(at, {
           type: 'image',
-          attrs: { src: url, alt: file.name.replace(/\.[^.]+$/, ''), alignment: 'center', width: '100%' },
+          attrs: { src: url, alt: file.name.replace(/\.[^.]+$/, ''), wrap: 'topBottom', align: 'center', width: '100%' },
         }).run();
         pos = Math.min(at + 1, ed.state.doc.content.size);
       } catch (err) {
@@ -134,8 +207,8 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
   // di tengah mengetik, dan membuat ulang editor saat itu akan menghilangkan fokus/kursor.
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ codeBlock: false, link: false, heading: { levels: [1, 2, 3, 4] } }),
-      CustomImage.configure({ allowBase64: true }),
+      StarterKit.configure({ codeBlock: false, link: false, heading: { levels: [1, 2, 3, 4] }, dropcursor: { color: '#3b5bdb', width: 2 } }),
+      CustomImage.configure({ allowBase64: true, inline: true }),
       Link.configure({ openOnClick: false, autolink: true }),
       TextStyle,
       Color,
@@ -157,15 +230,36 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       TikzBlock,
     ],
     content: toEditorHtml(initialValueRef.current),
-    onUpdate: ({ editor }) => {
-      const html = editor.getHTML();
-      const value = isEmptyEditorHtml(html) ? '' : wrapRichHtml(html);
-      rememberEmitted(value);
-      onCommitRef.current(value);
-    },
+    // Mengetik cepat: jangan render ulang seluruh halaman tiap ketikan. Perubahan dikumpulkan
+    // dan dikirim ke halaman paling sering tiap COMMIT_DELAY_MS, dan SEGERA saat editor
+    // kehilangan fokus (Simpan/Translate/Back/ganti bahasa), Ctrl+S, atau tab ditutup.
+    onUpdate: () => scheduleCommit(),
     editorProps: {
       attributes: { class: 'focus:outline-none', spellcheck: 'true' },
-      handleKeyDown(_view, event) {
+      handleDOMEvents: {
+        blur: () => { flushCommit(true); return false; },
+      },
+      handleKeyDown(view, event) {
+        // Ctrl+S: kirim isi terbaru ke halaman SEBELUM status bar menyimpan.
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') flushCommit(true);
+        // Gambar bebas (In Front of / Behind Text) terpilih: panah menggeser 1px, Shift = 10px.
+        const sel = view.state.selection as NodeSelection;
+        const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+        if (arrows[event.key] && sel.node?.type.name === 'image' && isFreeWrap(sel.node.attrs.wrap) && !event.ctrlKey && !event.metaKey) {
+          event.preventDefault();
+          const step = event.shiftKey ? 10 : 1;
+          const [dx, dy] = arrows[event.key];
+          const root = view.dom as HTMLElement;
+          const cs = getComputedStyle(root);
+          const col = root.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) || 1;
+          const a = sel.node.attrs;
+          const w = parseFloat(a.width) || 0;
+          const x = Math.max(0, Math.min(100 - w, (a.offsetX || 0) + ((dx * step) / col) * 100));
+          const tr = view.state.tr.setNodeMarkup(sel.from, undefined, { ...a, offsetX: Math.round(x * 100) / 100, offsetY: Math.round((a.offsetY || 0) + dy * step) });
+          tr.setSelection(NodeSelection.create(tr.doc, sel.from));
+          view.dispatch(tr);
+          return true;
+        }
         const mod = event.ctrlKey || event.metaKey;
         if (!mod) return false;
         const key = event.key.toLowerCase();
@@ -204,7 +298,14 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       },
       // Gambar yang di-drag dari komputer → unggah lalu sisipkan di posisi jatuhnya.
       handleDrop(view, event, _slice, moved) {
-        if (moved) return false; // memindahkan node di dalam editor: biarkan ProseMirror
+        if (moved) {
+          // Gambar dipindah di dalam editor: ProseMirror memindahkan node-nya, lalu sisi
+          // (kiri/tengah/kanan) disesuaikan dengan tempat gambar dilepas, seperti Word.
+          const zone = dropZone(view, event as DragEvent);
+          setDragGuide(null);
+          if (zone) setTimeout(() => applyDropZone(zone), 0);
+          return false;
+        }
         const images = imageFiles((event as DragEvent).dataTransfer?.files);
         if (!images.length) return false;
         event.preventDefault();
@@ -233,6 +334,10 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
   // emitUpdate:false → membuka konten Markdown lama TIDAK otomatis mengubah/menyimpannya.
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
+    // Jalur cepat (tiap ketikan): nilai dari halaman = yang barusan dikirim editor ini.
+    // Lewati getHTML() kedua, yang menyusun ulang seluruh dokumen — terasa di cerita panjang.
+    const emitted = emittedRef.current;
+    if (emitted.length && emitted[emitted.length - 1] === initialValue) return;
     const current = editor.getHTML();
     const currentStored = isEmptyEditorHtml(current) ? '' : wrapRichHtml(current);
     if (currentStored === initialValue) return;
@@ -247,7 +352,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
 
   useImperativeHandle(ref, () => ({
     insertImage(alt, url) {
-      editor?.chain().focus().insertContent({ type: 'image', attrs: { src: url, alt, alignment: 'center', width: '100%' } }).run();
+      editor?.chain().focus().insertContent({ type: 'image', attrs: { src: url, alt, wrap: 'topBottom', align: 'center', width: '100%' } }).run();
     },
     insertLink(text, url) {
       if (!editor) return;
@@ -292,15 +397,25 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     return () => ro?.disconnect();
   }, [editor]);
 
-  const counts = useEditorState({
-    editor,
-    selector: ({ editor: e }) => {
-      if (!e || e.isDestroyed) return { words: 0, chars: 0 };
-      const text = e.state.doc.textBetween(0, e.state.doc.content.size, ' ', ' ');
+  // Jumlah kata/karakter di status bar: dihitung setelah jeda mengetik (bukan tiap ketikan),
+  // supaya editor tidak ikut dirender ulang tiap huruf di dokumen panjang.
+  const [counts, setCounts] = useState({ words: 0, chars: 0 });
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const compute = () => {
+      if (editor.isDestroyed) return;
+      const text = editor.state.doc.textBetween(0, editor.state.doc.content.size, ' ', ' ');
       const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-      return { words, chars: text.replace(/\s+/g, ' ').trim().length };
-    },
-  });
+      const chars = text.replace(/\s+/g, ' ').trim().length;
+      setCounts(prev => (prev.words === words && prev.chars === chars ? prev : { words, chars }));
+    };
+    const onUpdate = () => { clearTimeout(timer); timer = setTimeout(compute, 250); };
+    compute();
+    editor.on('update', onUpdate);
+    return () => { clearTimeout(timer); editor.off('update', onUpdate); };
+  }, [editor]);
+  const openFind = useCallback((replace: boolean) => setFind({ open: true, replace }), []);
 
   if (!editor || editor.isDestroyed) return null;
 
@@ -327,7 +442,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
           editor={editor}
           view={view}
           onViewChange={updateView}
-          onFind={(replace) => setFind({ open: true, replace })}
+          onFind={openFind}
           onOpenImageDialog={onOpenImageDialog}
           onOpenLinkDialog={onOpenLinkDialog}
           onOpenAssetReuser={onOpenAssetReuser}
@@ -336,6 +451,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
           wordCount={counts.words}
           characterCount={counts.chars}
           language={language}
+          onStatus={setUploadStatus}
         />
 
         {find.open && (
@@ -349,7 +465,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         </div>
 
         {/* Ukuran/perataan gambar & embed (muncul saat dipilih) */}
-        <BubbleMenu editor={editor} shouldShow={({ editor: e }) => e.isActive('image') || e.isActive('socialEmbed')}>
+        <BubbleMenu editor={editor} shouldShow={({ editor: e }) => e.isActive('socialEmbed')}>
           <div className="wc-shell" data-wc-theme={view.theme}>
             <div className="bg-[var(--wc-menu)] border border-[var(--wc-border-strong)] rounded-lg shadow-xl p-1 flex items-center gap-1 select-none">
               {['33%', '50%', '75%', '100%'].map(w => (
@@ -375,11 +491,15 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
           if (e.target === e.currentTarget) { e.preventDefault(); editor.commands.focus('end'); }
         }}>
           <div
-            className={`wc-page flex-1 w-full mx-auto shadow-[0_1px_3px_rgba(0,0,0,0.25)] ${view.showMarks ? 'wc-show-marks' : ''}`}
+            className={`wc-page relative flex-1 w-full mx-auto shadow-[0_1px_3px_rgba(0,0,0,0.25)] ${view.showMarks ? 'wc-show-marks' : ''}`}
+            onDragOver={(e) => { const z = dropZone(editor.view, e.nativeEvent); setDragGuide(z); }}
+            onDragLeave={(e) => { if (e.currentTarget === e.target) setDragGuide(null); }}
+            onDragEnd={() => setDragGuide(null)}
             style={{ maxWidth: PAGE_WIDTHS[view.pageWidth], padding: '56px 64px', zoom: view.zoom / 100 }}
             onClick={(e) => { if (e.target === e.currentTarget) editor.commands.focus('end'); }}
           >
             <EditorContent editor={editor} />
+            {dragGuide && <div className={`wc-drag-guide wc-drag-guide-${dragGuide.align}`} aria-hidden="true"><span>{dragGuide.label}</span></div>}
           </div>
         </div>
 

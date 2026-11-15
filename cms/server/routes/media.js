@@ -105,13 +105,16 @@ async function persistUpload(db, file, altText, uploadedBy) {
       // Optimize main image: resize if wider than 1600 and recompress
       const image = sharp(filePath);
       const metadata = await image.metadata();
-      if ((metadata.width || 0) > 1600) {
-        await image.resize({ width: 1600 }).jpeg({ quality: 85 }).toFile(filePath + '.opt');
-        await fs.rename(filePath + '.opt', filePath);
-      } else {
-        await image.jpeg({ quality: 85 }).toFile(filePath + '.opt');
-        await fs.rename(filePath + '.opt', filePath);
-      }
+      const resized = (metadata.width || 0) > 1600 ? image.resize({ width: 1600 }) : image;
+      // Pertahankan format yang punya transparansi: dulu semuanya dipaksa JPEG, sehingga
+      // PNG/WebP berlatar transparan (logo, diagram, gambar "Tight") berubah berlatar hitam.
+      const encoded = metadata.format === 'png'
+        ? resized.png({ compressionLevel: 9 })
+        : metadata.format === 'webp'
+          ? resized.webp({ quality: 85 })
+          : resized.jpeg({ quality: 85 });
+      await encoded.toFile(filePath + '.opt');
+      await fs.rename(filePath + '.opt', filePath);
 
       // Update DB with new size and thumbnail info
       const stats = await fs.stat(filePath);

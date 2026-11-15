@@ -1,118 +1,313 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { NodeViewProps, NodeViewWrapper } from '@tiptap/react';
+/**
+ * Gambar di editor, bergaya Microsoft Word:
+ *  - 8 titik resize (rasio terkunci); satu tarikan = satu langkah Undo
+ *  - tombol "Layout Options" di samping gambar terpilih (Wrap Text cepat)
+ *  - keterangan (caption) yang bisa diketik langsung di bawah gambar
+ *  - seluruh gambar bisa di-drag untuk dipindah (ditangani ProseMirror + RichTextEditor)
+ *
+ * Class wrapper sama persis dengan HTML yang disimpan (lihat CustomImage.renderHTML),
+ * jadi tampilan di editor = tampilan di halaman publik.
+ */
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react';
+import { LayoutGrid } from 'lucide-react';
+import { NodeSelection } from '@tiptap/pm/state';
+import { isFreeWrap, type ImageWrap } from '../lib/tiptap-extensions';
+import { WRAP_OPTIONS, WrapIcon } from './ribbon/imageLayout';
+
+type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+const HANDLES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+const HANDLE_POS: Record<Handle, CSSProperties> = {
+  nw: { left: -5, top: -5, cursor: 'nwse-resize' },
+  n: { left: 'calc(50% - 5px)', top: -5, cursor: 'ns-resize' },
+  ne: { right: -5, top: -5, cursor: 'nesw-resize' },
+  e: { right: -5, top: 'calc(50% - 5px)', cursor: 'ew-resize' },
+  se: { right: -5, bottom: -5, cursor: 'nwse-resize' },
+  s: { left: 'calc(50% - 5px)', bottom: -5, cursor: 'ns-resize' },
+  sw: { left: -5, bottom: -5, cursor: 'nesw-resize' },
+  w: { left: -5, top: 'calc(50% - 5px)', cursor: 'ew-resize' },
+};
+
+const MIN_PCT = 5;
 
 export function ImageNodeView(props: NodeViewProps) {
-  const { src, alt, width, alignment } = props.node.attrs;
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [resizing, setResizing] = useState(false);
-  const isMountedRef = useRef(true);
+  const { node, selected, updateAttributes, editor } = props;
+  const { src, alt, width, wrap, align, styleVariant, caption, offsetX, offsetY } = node.attrs as {
+    src: string; alt: string | null; width: string; wrap: ImageWrap; align: string; styleVariant: string; caption: string | null;
+    offsetX: number; offsetY: number;
+  };
+  const free = isFreeWrap(wrap);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [liveWidth, setLiveWidth] = useState<number | null>(null); // % saat sedang ditarik
+  const liveRef = useRef<number | null>(null);
+  // Posisi sementara saat gambar bebas di-drag/di-resize (sebelum disimpan sebagai satu langkah Undo).
+  const [livePos, setLivePos] = useState<{ x: number; y: number } | null>(null);
+  const livePosRef = useRef<{ x: number; y: number } | null>(null);
+  const [snapGuide, setSnapGuide] = useState<'left' | 'center' | 'right' | null>(null);
+  const [dragging, setDragging] = useState(false);
 
-  // Resize handler using drag
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setResizing(true);
+  /** Paragraf tambatan (offsetParent) + faktor zoom tampilan editor. */
+  const anchorBox = () => {
+    const fig = imgRef.current?.closest('.wc-figure') as HTMLElement | null;
+    const anchor = (fig?.offsetParent as HTMLElement | null) ?? (editor.view.dom as HTMLElement);
+    const rect = anchor.getBoundingClientRect();
+    const zoom = anchor.offsetWidth ? rect.width / anchor.offsetWidth : 1;
+    return { fig, anchor, rect, zoom };
   };
 
+  // ---- Drag bebas (In Front of / Behind Text): gambar mengikuti mouse, snap ke tepi/tengah ----
+  const startFreeDrag = (e: React.PointerEvent) => {
+    if (!free || e.button !== 0) return;
+    if ((e.target as HTMLElement).closest('[data-wc-handle]')) return;
+    const { fig, rect: aRect, zoom } = anchorBox();
+    if (!fig) return;
+    const figRect = fig.getBoundingClientRect();
+    const wPct = (figRect.width / aRect.width) * 100;
+    const startX = e.clientX, startY = e.clientY;
+    const x0 = offsetX || 0, y0 = offsetY || 0;
+    let moved = false;
+    const SNAP = 1.5; // % lebar kolom
+
+    const onMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - startX, dy = ev.clientY - startY;
+      if (!moved && Math.hypot(dx, dy) < 4) return; // klik biasa = pilih, bukan geser
+      if (!moved) { moved = true; setDragging(true); editor.commands.setNodeSelection(props.getPos() as number); }
+      ev.preventDefault();
+      let x = x0 + (dx / aRect.width) * 100;
+      let guide: 'left' | 'center' | 'right' | null = null;
+      if (Math.abs(x) < SNAP) { x = 0; guide = 'left'; }
+      else if (Math.abs(x + wPct / 2 - 50) < SNAP) { x = 50 - wPct / 2; guide = 'center'; }
+      else if (Math.abs(x + wPct - 100) < SNAP) { x = 100 - wPct; guide = 'right'; }
+      x = Math.max(0, Math.min(100 - wPct, x));
+      const pos = { x, y: y0 + dy / zoom };
+      livePosRef.current = pos;
+      setLivePos(pos);
+      setSnapGuide(guide);
+    };
+    const finish = (commit: boolean) => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('keydown', onKey);
+      const pos = livePosRef.current;
+      livePosRef.current = null;
+      setLivePos(null);
+      setSnapGuide(null);
+      setDragging(false);
+      if (commit && moved && pos) commitFreeMove(pos, figRect.top + (pos.y - y0) * zoom, aRect.left);
+    };
+    const onUp = () => finish(true);
+    const onKey = (ev: KeyboardEvent) => { if (ev.key === 'Escape') finish(false); };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('keydown', onKey);
+  };
+
+  /**
+   * Simpan posisi akhir sebagai SATU transaksi: bila gambar dilepas di atas paragraf lain,
+   * tambatannya pindah ke paragraf itu (seperti anchor di Word) dan offset Y dihitung ulang.
+   */
+  const commitFreeMove = (pos: { x: number; y: number }, figTopClient: number, colLeftClient: number) => {
+    const view = editor.view;
+    const from = props.getPos();
+    if (typeof from !== 'number') return;
+    const hit = view.posAtCoords({ left: colLeftClient + 4, top: figTopClient + 2 });
+    let targetStart: number | null = null;
+    let targetDom: HTMLElement | null = null;
+    if (hit) {
+      const $hit = view.state.doc.resolve(hit.pos);
+      for (let d = $hit.depth; d > 0; d--) {
+        if ($hit.node(d).isTextblock) {
+          targetStart = $hit.start(d);
+          targetDom = view.nodeDOM($hit.before(d)) as HTMLElement | null;
+          break;
+        }
+      }
+    }
+    const $from = view.state.doc.resolve(from);
+    const sameBlock = targetStart === null || targetStart === $from.start();
+    const attrs = { ...node.attrs, offsetX: Math.round(pos.x * 100) / 100, offsetY: Math.round(pos.y) };
+    let tr = view.state.tr;
+    if (sameBlock || !targetDom) {
+      tr = tr.setNodeMarkup(from, undefined, attrs);
+      tr.setSelection(NodeSelection.create(tr.doc, from));
+    } else {
+      const tRect = targetDom.getBoundingClientRect();
+      const zoom = targetDom.offsetWidth ? tRect.width / targetDom.offsetWidth : 1;
+      attrs.offsetY = Math.round((figTopClient - tRect.top) / zoom);
+      tr = tr.delete(from, from + node.nodeSize);
+      const insertAt = tr.mapping.map(targetStart as number);
+      tr = tr.insert(insertAt, node.type.create(attrs));
+      tr.setSelection(NodeSelection.create(tr.doc, insertAt));
+    }
+    view.dispatch(tr);
+  };
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [broken, setBroken] = useState(false);
+
+  useEffect(() => { if (!selected) setMenuOpen(false); }, [selected]);
+
+  // Mode bebas: matikan drag HTML bawaan langsung di elemen (fase capture). ProseMirror
+  // memasang pendengarnya sebelum React, jadi pencegahan lewat prop React terlambat.
   useEffect(() => {
-    isMountedRef.current = true;
-    if (!resizing) return;
+    const fig = imgRef.current?.closest('.wc-figure') as HTMLElement | null;
+    if (!fig || !free) return;
+    const block = (e: DragEvent) => { e.preventDefault(); e.stopPropagation(); };
+    fig.addEventListener('dragstart', block, true);
+    fig.draggable = false;
+    return () => { fig.removeEventListener('dragstart', block, true); fig.draggable = true; };
+  }, [free, broken]);
+  useEffect(() => { setBroken(false); }, [src]);
 
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current) return;
-      const parentElement = containerRef.current.parentElement;
-      if (!parentElement) return;
+  const columnWidth = () => {
+    const root = editor.view.dom as HTMLElement;
+    const cs = getComputedStyle(root);
+    return root.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  };
 
-      const parentWidth = parentElement.offsetWidth;
-      const rect = containerRef.current.getBoundingClientRect();
-      
-      // Calculate new width in pixels based on mouse offset from the left edge of the image
-      const newWidthPx = e.clientX - rect.left;
-      
-      // Convert to percentage of parent container
-      let newWidthPercent = Math.round((newWidthPx / parentWidth) * 100);
-      
-      // Clamp between 15% and 100%
-      newWidthPercent = Math.max(15, Math.min(100, newWidthPercent));
+  const startResize = (handle: Handle) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const img = imgRef.current;
+    if (!img) return;
+    const rect = img.getBoundingClientRect();
+    const col = columnWidth() || rect.width;
+    const startX = e.clientX, startY = e.clientY;
+    const startW = rect.width, startH = rect.height || 1;
+    const aspect = startW / startH;
+    // Gambar rata kanan/tengah tumbuh ke dua arah, jadi gerakan mouse dihitung ganda.
+    const grow = (wrap === 'topBottom' && align === 'center') ? 2 : 1;
 
-      if (isMountedRef.current) {
-        props.updateAttributes({
-          width: `${newWidthPercent}%`
-        });
+    const startWPct = (startW / col) * 100;
+    const { zoom } = anchorBox();
+    const x0 = offsetX || 0, y0 = offsetY || 0;
+
+    const onMove = (ev: MouseEvent) => {
+      const dx = (ev.clientX - startX) * (handle.includes('w') ? -1 : handle.includes('e') ? 1 : 0);
+      const dy = (ev.clientY - startY) * (handle.includes('n') ? -1 : handle.includes('s') ? 1 : 0);
+      const fromX = startW + dx * grow;
+      const fromY = (startH + dy * grow) * aspect;
+      const next = handle.length === 2 ? Math.max(fromX, fromY) : (dx !== 0 ? fromX : fromY);
+      const maxPct = free && !handle.includes('w') ? 100 - x0 : free ? x0 + startWPct : 100;
+      const pct = Math.max(MIN_PCT, Math.min(maxPct, Math.round((next / col) * 100)));
+      liveRef.current = pct;
+      setLiveWidth(pct);
+      // Mode bebas: tarik dari kiri/atas → sisi seberang tetap di tempat (seperti Word).
+      if (free) {
+        const x = handle.includes('w') ? x0 + (startWPct - pct) : x0;
+        const newH = ((pct / 100) * col) / aspect;
+        const y = handle.includes('n') ? y0 + (startH - newH) / zoom : y0;
+        livePosRef.current = { x, y };
+        setLivePos({ x, y });
       }
     };
-
-    const handleMouseUp = () => {
-      if (isMountedRef.current) {
-        setResizing(false);
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      if (liveRef.current !== null) {
+        const patch: Record<string, unknown> = { width: `${liveRef.current}%` };
+        if (free && livePosRef.current) {
+          patch.offsetX = Math.round(livePosRef.current.x * 100) / 100;
+          patch.offsetY = Math.round(livePosRef.current.y);
+        }
+        updateAttributes(patch); // satu langkah Undo
       }
+      liveRef.current = null;
+      livePosRef.current = null;
+      setLiveWidth(null);
+      setLivePos(null);
     };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      isMountedRef.current = false;
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [resizing]);
-
-  // Determine width and float styles
-  const widthStyle = width || '100%';
-  let floatStyle = 'none';
-  let marginStyle = '1.5rem auto';
-  let displayStyle = 'block';
-
-  if (alignment === 'left') {
-    floatStyle = 'left';
-    marginStyle = '0.5rem 1.5rem 1.5rem 0';
-  } else if (alignment === 'right') {
-    floatStyle = 'right';
-    marginStyle = '0.5rem 0 1.5rem 1.5rem';
+  const shownWidth = liveWidth !== null ? `${liveWidth}%` : width;
+  const cls = ['wc-figure', `wc-wrap-${wrap}`];
+  if (wrap !== 'inline') cls.push(`wc-align-${align}`);
+  if (styleVariant && styleVariant !== 'none') cls.push(`wc-style-${styleVariant}`);
+  const style: CSSProperties = { width: shownWidth };
+  if (wrap === 'tight' && src) Object.assign(style, { shapeOutside: `url("${src}")`, shapeImageThreshold: 0.3, shapeMargin: '0.75rem' });
+  if (free) {
+    const p = livePos ?? { x: offsetX || 0, y: offsetY || 0 };
+    Object.assign(style, { left: `${p.x}%`, top: `${p.y}px` });
   }
-
-  const isSelected = props.selected;
-  const borderClass = isSelected 
-    ? 'ring-2 ring-blue-500 border-blue-500' 
-    : 'border-[#334155] hover:border-[#475569]';
 
   return (
     <NodeViewWrapper
-      className="image-node-wrapper select-none group"
-      style={{
-        width: widthStyle,
-        float: floatStyle as any,
-        margin: marginStyle,
-        display: displayStyle,
-        clear: floatStyle !== 'none' ? 'none' : 'both',
-      }}
+      as="span"
+      className={`${cls.join(' ')} wc-figure-editing ${selected ? 'is-selected' : ''} ${dragging ? 'is-dragging' : ''}`}
+      style={style}
+      // Mode bebas memakai drag sendiri (mengikuti mouse); drag HTML bawaan dimatikan.
+      onDragStart={free ? (e: React.DragEvent) => e.preventDefault() : undefined}
+      onPointerDown={free ? startFreeDrag : undefined}
     >
-      <div 
-        ref={containerRef} 
-        className={`relative rounded-lg overflow-hidden border bg-[#1E293B] shadow-md transition-all ${borderClass}`}
-      >
-        <img 
-          src={src} 
-          alt={alt || 'Visual Image'} 
-          className="w-full h-auto block rounded-lg cursor-pointer max-w-full"
-          loading="lazy"
-        />
+      {snapGuide && <span className={`wc-snap-guide wc-snap-guide-${snapGuide}`} aria-hidden="true" />}
+      <span className="wc-figure-frame" data-drag-handle={free ? undefined : true}>
+        {broken ? (
+          <span className="wc-img-broken" title={src}>Gambar tidak dapat dimuat</span>
+        ) : (
+          <img ref={imgRef} src={src} alt={alt || ''} draggable={false} onError={() => setBroken(true)} />
+        )}
 
-        {/* Diagonal resizing handles in bottom-right corner */}
-        <div
-          onMouseDown={handleMouseDown}
-          className="absolute bottom-2 right-2 w-5 h-5 bg-blue-600 rounded-full border-2 border-white cursor-se-resize shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-20"
-          title="Drag to resize"
-        >
-          {/* Arrow cursor icon lines */}
-          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-            <polyline points="15 3 21 3 21 9"></polyline>
-            <polyline points="9 21 3 21 3 15"></polyline>
-            <line x1="21" y1="3" x2="3" y2="21"></line>
-          </svg>
-        </div>
-      </div>
+        {selected && (
+          <>
+            {HANDLES.map(h => (
+              <span
+                key={h}
+                data-wc-handle
+                contentEditable={false}
+                draggable={false}
+                onMouseDown={startResize(h)}
+                className="wc-img-handle"
+                style={HANDLE_POS[h]}
+              />
+            ))}
+            {liveWidth !== null && <span className="wc-img-size-tip">{liveWidth}%</span>}
+
+            {/* Layout Options, seperti tombol kecil di samping gambar di Word */}
+            <span className="wc-layout-btn-wrap" data-wc-handle contentEditable={false}>
+              <button
+                type="button"
+                title="Layout Options"
+                className="wc-layout-btn"
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onClick={() => setMenuOpen(o => !o)}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              {menuOpen && (
+                <span className="wc-layout-menu" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                  <span className="wc-layout-menu-title">Layout Options</span>
+                  {WRAP_OPTIONS.map(opt => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      title={opt.hint}
+                      className={`wc-layout-item ${wrap === opt.id ? 'is-active' : ''}`}
+                      onClick={() => { updateAttributes(opt.apply(node.attrs)); setMenuOpen(false); }}
+                    >
+                      <WrapIcon wrap={opt.id} />
+                      <span>{opt.label}</span>
+                    </button>
+                  ))}
+                </span>
+              )}
+            </span>
+          </>
+        )}
+      </span>
+
+      {caption !== null && caption !== undefined && (
+        <input
+          className="wc-caption wc-caption-input"
+          value={caption}
+          placeholder="Tulis keterangan gambar…"
+          onChange={(e) => updateAttributes({ caption: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); editor.commands.focus(); }
+            if (e.key === 'Backspace' && caption === '') { e.preventDefault(); updateAttributes({ caption: null }); editor.commands.focus(); }
+          }}
+        />
+      )}
     </NodeViewWrapper>
   );
 }

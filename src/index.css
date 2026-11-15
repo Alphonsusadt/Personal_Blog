@@ -598,3 +598,132 @@ twitter-widget {
     display: block;
   }
 }
+
+/* ==========================================================================
+   Gambar bergaya Word (.wc-figure) — editor & halaman publik memakai aturan yang sama.
+   Struktur: <span class="wc-figure wc-wrap-* wc-align-* wc-style-*" style="width:N%">
+               <img> <span class="wc-caption">…</span> </span>
+   ========================================================================== */
+.wc-figure { box-sizing: border-box; max-width: 100%; position: relative; text-indent: 0; }
+.wc-figure img { display: block; width: 100%; height: auto; max-width: 100%; margin: 0; border-radius: 0; }
+.wc-figure .wc-caption {
+  display: block; width: 100%; margin-top: 0.4rem;
+  font-size: 0.85em; font-style: italic; line-height: 1.4; text-align: center; opacity: 0.75;
+  white-space: normal;
+}
+/* In Line with Text: seperti satu huruf besar di dalam baris. */
+.wc-figure.wc-wrap-inline { display: inline-block; vertical-align: bottom; margin: 0 0.2em; }
+/* Square & Tight: mengambang, teks mengalir di sampingnya. */
+.wc-figure.wc-wrap-square.wc-align-left, .wc-figure.wc-wrap-tight.wc-align-left { float: left; margin: 0.35em 1.5em 0.75em 0; }
+.wc-figure.wc-wrap-square.wc-align-right, .wc-figure.wc-wrap-tight.wc-align-right { float: right; margin: 0.35em 0 0.75em 1.5em; }
+.wc-figure.wc-wrap-square.wc-align-center, .wc-figure.wc-wrap-tight.wc-align-center { float: left; margin: 0.35em 1.5em 0.75em 0; }
+.wc-figure.wc-wrap-tight { margin-left: 0.75em; margin-right: 0.75em; }
+.wc-figure.wc-wrap-tight.wc-align-left { margin-left: 0; }
+.wc-figure.wc-wrap-tight.wc-align-right { margin-right: 0; }
+/* Top and Bottom: berdiri sendiri, teks di atas & bawah. */
+.wc-figure.wc-wrap-topBottom { display: block; clear: both; margin-top: 1.25em; margin-bottom: 1.25em; }
+.wc-figure.wc-wrap-topBottom.wc-align-left { margin-right: auto; margin-left: 0; }
+.wc-figure.wc-wrap-topBottom.wc-align-center { margin-left: auto; margin-right: auto; }
+.wc-figure.wc-wrap-topBottom.wc-align-right { margin-left: auto; margin-right: 0; }
+/* Gaya gambar */
+.wc-figure.wc-style-rounded img, .wc-figure.wc-style-roundedShadow img { border-radius: 14px; }
+.wc-figure.wc-style-shadow img, .wc-figure.wc-style-roundedShadow img { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22); }
+.wc-figure.wc-style-border img { border: 6px solid #ffffff; outline: 1px solid rgba(0, 0, 0, 0.15); box-sizing: border-box; }
+.dark .rich-content .wc-figure.wc-style-border img { outline-color: rgba(255, 255, 255, 0.2); }
+/* Paragraf setelah gambar mengambang tidak boleh "menggantung" di samping gambar lain. */
+.rich-content::after, .wc-page .ProseMirror::after { content: ''; display: block; clear: both; }
+
+/* Layar sempit: Square/Tight jadi lebar penuh di antara paragraf (teks tidak terjepit). */
+@media (max-width: 640px) {
+  .rich-content .wc-figure.wc-wrap-square, .rich-content .wc-figure.wc-wrap-tight {
+    float: none !important; width: 100% !important; margin: 1rem 0 !important; display: block; shape-outside: none !important;
+  }
+  .rich-content .wc-figure.wc-wrap-topBottom { width: 100% !important; }
+}
+
+/* ---- Khusus editor: seleksi, titik resize, Layout Options, keterangan, drag ---- */
+.wc-figure-editing { cursor: grab; }
+.wc-figure-editing:active { cursor: grabbing; }
+.wc-figure-frame { position: relative; display: block; line-height: 0; }
+.wc-figure-editing.is-selected .wc-figure-frame { outline: 2px solid #3b5bdb; outline-offset: 1px; }
+.wc-page .ProseMirror .wc-figure.ProseMirror-selectednode { outline: none; }
+.wc-img-handle {
+  position: absolute; width: 10px; height: 10px; z-index: 5;
+  background: #ffffff; border: 1.5px solid #3b5bdb; border-radius: 2px;
+}
+.wc-img-size-tip {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 6;
+  background: rgba(15, 23, 42, 0.85); color: #fff; font: 600 12px/1 Inter, sans-serif; padding: 5px 8px; border-radius: 4px;
+}
+.wc-img-broken {
+  display: flex; align-items: center; justify-content: center; min-height: 90px; line-height: 1.4;
+  background: #f1f5f9; color: #64748b; font: 13px Inter, sans-serif; border: 1px dashed #cbd5e1;
+}
+.wc-layout-btn-wrap { position: absolute; top: 0; right: -38px; z-index: 7; line-height: normal; }
+.wc-wrap-square.wc-align-right .wc-layout-btn-wrap, .wc-wrap-tight.wc-align-right .wc-layout-btn-wrap { right: auto; left: -38px; }
+.wc-layout-btn {
+  width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+  background: #ffffff; color: #334155; border: 1px solid #cbd5e1; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,.15);
+}
+.wc-layout-btn:hover { background: #eef2ff; color: #3b5bdb; }
+.wc-layout-menu {
+  position: absolute; top: 34px; right: 0; width: 210px; display: flex; flex-direction: column; padding: 6px;
+  background: #1E293B; color: #F8FAFC; border: 1px solid #475569; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  font: 13px Inter, sans-serif; white-space: nowrap;
+}
+.wc-wrap-square.wc-align-right .wc-layout-menu, .wc-wrap-tight.wc-align-right .wc-layout-menu { right: auto; left: 0; }
+.wc-layout-menu-title { padding: 4px 6px 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #94A3B8; }
+.wc-layout-item { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 5px; text-align: left; color: #CBD5E1; }
+.wc-layout-item:hover { background: #334155; color: #F8FAFC; }
+.wc-layout-item.is-active { background: rgba(30, 64, 175, .45); color: #F8FAFC; }
+.wc-icon-pic { fill: #60A5FA; stroke: none; }
+.wc-caption-input {
+  border: none; outline: none; background: transparent; color: inherit; font-family: inherit; padding: 2px 0;
+}
+.wc-caption-input:focus { background: rgba(59, 91, 219, 0.08); }
+.wc-caption-input::placeholder { color: #94a3b8; }
+/* Garis bantu saat gambar di-drag: sisi tempat gambar akan menempel. */
+.wc-drag-guide {
+  position: absolute; top: 0; bottom: 0; width: 0; z-index: 8; pointer-events: none;
+  border-left: 2px dashed #3b5bdb;
+}
+.wc-drag-guide span {
+  position: sticky; top: 40%; display: inline-block; transform: translateX(-50%);
+  background: #3b5bdb; color: #fff; font: 600 11px/1 Inter, sans-serif; padding: 5px 8px; border-radius: 4px; white-space: nowrap;
+}
+.wc-drag-guide-left { left: 64px; }
+.wc-drag-guide-center { left: 50%; }
+.wc-drag-guide-right { right: 64px; }
+.wc-drag-guide-left span { transform: none; }
+.wc-drag-guide-right span { transform: translateX(-100%); }
+/* Pratinjau gaya di ribbon */
+.wc-style-swatch { width: 30px; height: 22px; background: linear-gradient(135deg, #93c5fd, #3b5bdb); display: block; }
+.wc-style-swatch-rounded, .wc-style-swatch-roundedShadow { border-radius: 6px; }
+.wc-style-swatch-shadow, .wc-style-swatch-roundedShadow { box-shadow: 0 4px 8px rgba(0,0,0,.45); }
+.wc-style-swatch-border { border: 3px solid #fff; outline: 1px solid #94a3b8; }
+
+/* ---- Gambar bebas: In Front of Text / Behind Text (posisi persis, ditambatkan ke paragraf) ---- */
+/* Paragraf jadi acuan posisi gambar bebas. Konten = satu konteks tumpukan, supaya gambar
+   "Behind" tetap di atas latar halaman tetapi di bawah teks, dan "Front" di atas semua teks. */
+.rich-content, .wc-page .ProseMirror { isolation: isolate; }
+.rich-content p, .rich-content h1, .rich-content h2, .rich-content h3, .rich-content h4,
+.wc-page .ProseMirror p, .wc-page .ProseMirror h1, .wc-page .ProseMirror h2,
+.wc-page .ProseMirror h3, .wc-page .ProseMirror h4 { position: relative; }
+.wc-figure.wc-wrap-front, .wc-figure.wc-wrap-behind { position: absolute; margin: 0; float: none; display: block; }
+.wc-figure.wc-wrap-front { z-index: 3; }
+.wc-figure.wc-wrap-behind { z-index: -1; }
+.wc-figure-editing.wc-wrap-front, .wc-figure-editing.wc-wrap-behind { cursor: move; touch-action: none; }
+.wc-figure-editing.is-dragging { opacity: 0.85; }
+.wc-figure-editing.is-dragging .wc-layout-btn-wrap { display: none; }
+/* Di editor, gambar "Behind" yang terpilih tetap bisa dipegang walau di bawah teks. */
+.wc-figure-editing.wc-wrap-behind.is-selected { z-index: 4; }
+/* Garis bantu snap (hijau, seperti Word) di tepi/tengah gambar saat sejajar kolom. */
+.wc-snap-guide { position: absolute; top: -48px; bottom: -48px; width: 0; border-left: 1.5px solid #22c55e; z-index: 9; pointer-events: none; }
+.wc-snap-guide-left { left: 0; }
+.wc-snap-guide-center { left: 50%; }
+.wc-snap-guide-right { right: 0; }
+@media (max-width: 640px) {
+  .rich-content .wc-figure.wc-wrap-front, .rich-content .wc-figure.wc-wrap-behind {
+    position: static !important; width: 100% !important; margin: 1rem 0 !important; left: auto !important; top: auto !important; z-index: auto;
+  }
+}

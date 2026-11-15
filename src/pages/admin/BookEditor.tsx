@@ -20,7 +20,7 @@ import { useAutoFixLanguage } from '../../hooks/useAutoFixLanguage';
 import { getAutoFixSuggestionsForWord } from '../../utils/textAutoFix';
 import { getSpellSuggestions } from '../../utils/spellSuggester';
 import { resolveLocalizedText, getExactLocalizedText, setLocalizedText, type LocalizedTextValue } from '../../lib/localized';
-import { useAdminAutosave } from '../../hooks/useAdminAutosave';
+import { useAdminAutosave, clearLocalDraft, pruneStaleDrafts } from '../../hooks/useAdminAutosave';
 
 interface Book {
   _id?: string;
@@ -263,6 +263,9 @@ export function BookEditor() {
           setRuntimeCache(`admin:books:item:${response.id || autoSlug}`, updated);
           invalidateRuntimeCache('admin:books:list');
           justCreatedRef.current = true;
+          // Draf "book_draft_new" kini milik tulisan yang sudah tersimpan: hapus supaya tidak
+          // ditawarkan ("Draft Ditemukan") ke tulisan baru berikutnya.
+          clearLocalDraft('book_draft_new');
           // Jangan timpa isi dengan snapshot/echo server: ketikan selama request akan hilang.
           setBook(prev => ({
             ...prev,
@@ -312,8 +315,17 @@ export function BookEditor() {
   const wordCount = plainContent ? plainContent.split(' ').length : 0;
   const characterCount = plainContent.length;
 
+  // Draf lokal > 3 hari tidak pernah ditawarkan lagi; buang supaya kuota localStorage aman.
+  useEffect(() => { pruneStaleDrafts(); }, []);
+
+  // Kunci draf sebelumnya: bila berpindah dari "*_new" ke slug, tulisan baru saja dibuat
+  // dan draf lokalnya = isi editor yang sedang aktif, bukan draf tertinggal.
+  const prevDraftKeyRef = useRef(draftKey);
   // Check for local draft on mount
   useEffect(() => {
+    const prevKey = prevDraftKeyRef.current;
+    prevDraftKeyRef.current = draftKey;
+    if (prevKey !== draftKey && prevKey.endsWith('_new')) { clearLocalDraft(prevKey); return; }
     const draft = autosave.readDraft();
     if (draft && hasMeaningfulBookDraft(draft.data) && (Date.now() - draft.timestamp) < 86_400_000) {
       setShowDraftRecovery(true);

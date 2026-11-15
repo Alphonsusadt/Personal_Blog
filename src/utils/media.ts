@@ -182,8 +182,8 @@ export async function compressImage(
           return;
         }
 
-        // Calculate dimensions
-        const maxHeight = 800;
+        // Calculate dimensions (gambar tegak boleh setinggi lebar maksimalnya)
+        const maxHeight = Math.max(800, maxWidth);
         let width = img.width;
         let height = img.height;
 
@@ -203,7 +203,11 @@ export async function compressImage(
         canvas.height = height;
         ctx.drawImage(img, 0, 0, width, height);
 
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        // PNG/WebP tetap formatnya supaya latar transparan tidak berubah jadi hitam
+        // (logo, diagram, dan gambar untuk wrap "Tight" butuh transparansi).
+        const keepAlpha = file.type === 'image/png' || file.type === 'image/webp' || file.type === 'image/gif';
+        const outType = file.type === 'image/webp' ? 'image/webp' : keepAlpha ? 'image/png' : 'image/jpeg';
+        resolve(canvas.toDataURL(outType, quality));
       };
       img.onerror = () => reject(new Error('Failed to load image'));
       img.src = e.target?.result as string;

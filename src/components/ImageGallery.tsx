@@ -19,9 +19,18 @@ export function ImageGallery({ content, onRemoveImage }: ImageGalleryProps) {
     });
   }
 
-  // Konten rich (HTML dari editor ribbon): tag <img> utuh dipakai sebagai kunci hapus,
-  // karena onRemoveImage menghapus string itu persis dari konten.
-  for (const tag of content.match(/<img\b[^>]*>/gi) || []) {
+  // Konten rich (HTML dari editor ribbon). Kunci hapus = string persis di konten, karena
+  // onRemoveImage menghapus string itu. Gambar bergaya Word dibungkus <span class="wc-figure">
+  // (plus keterangan), jadi seluruh pembungkus ikut dihapus, bukan hanya <img>-nya.
+  const figureRe = /<span class="wc-figure[^"]*"[^>]*>\s*<img\b[^>]*>(?:\s*<span class="wc-caption">[\s\S]*?<\/span>)?\s*<\/span>/gi;
+  let rest = content;
+  for (const figure of content.match(figureRe) || []) {
+    const tag = figure.match(/<img\b[^>]*>/i)?.[0] || '';
+    const src = tag.match(/\ssrc="([^"]+)"/i)?.[1];
+    if (src) images.push({ alt: tag.match(/\salt="([^"]*)"/i)?.[1] || '', src, markdown: figure });
+    rest = rest.replace(figure, '');
+  }
+  for (const tag of rest.match(/<img\b[^>]*>/gi) || []) {
     const src = tag.match(/\ssrc="([^"]+)"/i)?.[1];
     if (!src) continue;
     images.push({ alt: tag.match(/\salt="([^"]*)"/i)?.[1] || '', src, markdown: tag });
