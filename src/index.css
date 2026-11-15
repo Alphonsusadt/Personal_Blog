@@ -577,3 +577,8 @@ twitter-widget {
 .wc-page .ProseMirror strong, .wc-page .ProseMirror b { font-weight: 700; }
 /* Sel tabel kosong (<td><p></p></td>) tetap setinggi satu baris teks. */
 .rich-content td > p:empty::after, .rich-content th > p:empty::after { content: '\00a0'; }
+/* Tab di tengah kalimat & spasi berturut-turut tampil sama seperti di editor (ProseMirror
+   memakai pre-wrap). Indentasi paragraf (Tab di awal) disimpan sebagai text-indent/margin. */
+.rich-content p, .rich-content h1, .rich-content h2, .rich-content h3, .rich-content h4,
+.rich-content li, .rich-content td, .rich-content th { white-space: pre-wrap; tab-size: 4; }
+.wc-page .ProseMirror { tab-size: 4; }

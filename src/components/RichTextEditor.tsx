@@ -12,6 +12,7 @@ import { TableKit } from '@tiptap/extension-table';
 import { Placeholder } from '@tiptap/extensions';
 import { CustomImage, SocialEmbed, CustomCodeBlock, MathBlock, MathInline, TikzBlock } from '../lib/tiptap-extensions';
 import { SearchReplace } from '../lib/searchReplace';
+import { Indent } from '../lib/indent';
 import { detectSocialEmbed, markdownToEditorHtml } from '../lib/markdownConverter';
 import { toEditorHtml, wrapRichHtml, isEmptyEditorHtml } from '../lib/richContent';
 import { Ribbon, type RibbonViewState } from './ribbon/Ribbon';
@@ -86,6 +87,16 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
   const initialValueRef = useRef(initialValue);
   initialValueRef.current = initialValue;
 
+  // Versi yang baru saja dikirim editor ini sendiri. Bila halaman mengembalikan salah satunya
+  // (mis. state disetel ulang dari snapshot autosave yang sudah lewat), itu "gema" lama:
+  // menerapkannya akan menghapus ketikan yang dibuat sesudahnya, jadi diabaikan.
+  const emittedRef = useRef<string[]>([]);
+  const rememberEmitted = (value: string) => {
+    const list = emittedRef.current;
+    list.push(value);
+    if (list.length > 60) list.splice(0, list.length - 60);
+  };
+
   // Editor dibuat ulang saat BAHASA berganti, supaya riwayat Undo tidak terbawa lintas
   // bahasa (Ctrl+Z setelah ganti tab bisa memunculkan teks bahasa lain lalu tersimpan).
   // Sengaja bukan saat id dokumen berubah: id tulisan baru muncul setelah simpan pertama,
@@ -107,6 +118,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       TableKit.configure({ table: { resizable: true } }),
       Placeholder.configure({ placeholder }),
       SearchReplace,
+      Indent,
       SocialEmbed,
       CustomCodeBlock,
       MathBlock,
@@ -116,7 +128,9 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     content: toEditorHtml(initialValueRef.current),
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
-      onCommitRef.current(isEmptyEditorHtml(html) ? '' : wrapRichHtml(html));
+      const value = isEmptyEditorHtml(html) ? '' : wrapRichHtml(html);
+      rememberEmitted(value);
+      onCommitRef.current(value);
     },
     editorProps: {
       attributes: { class: 'focus:outline-none', spellcheck: 'true' },
@@ -163,6 +177,8 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     const current = editor.getHTML();
     const currentStored = isEmptyEditorHtml(current) ? '' : wrapRichHtml(current);
     if (currentStored === initialValue) return;
+    // Gema versi lama milik editor ini sendiri → abaikan (lihat emittedRef).
+    if (emittedRef.current.includes(initialValue)) return;
     const next = toEditorHtml(initialValue);
     if (next === current) return;
     // addToHistory:false → isi dari luar (data dimuat, Auto Fix, pulihkan draf) bukan

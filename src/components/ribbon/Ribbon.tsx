@@ -342,8 +342,8 @@ export function Ribbon(props: RibbonProps) {
             <SmallButton icon={<List />} title="Bullets" active={s.bullet} onClick={() => chain().toggleBulletList().run()} />
             <SmallButton icon={<ListOrdered />} title="Numbering" active={s.ordered} onClick={() => chain().toggleOrderedList().run()} />
             <Divider />
-            <SmallButton icon={<IndentDecrease />} title="Decrease Indent (Shift+Tab di daftar)" disabled={!s.inList} onClick={() => indent(editor, -1)} />
-            <SmallButton icon={<IndentIncrease />} title="Increase Indent (Tab di daftar)" disabled={!s.inList} onClick={() => indent(editor, 1)} />
+            <SmallButton icon={<IndentDecrease />} title="Decrease Indent (Shift+Tab)" onClick={() => indent(editor, -1)} />
+            <SmallButton icon={<IndentIncrease />} title="Increase Indent (Tab di awal paragraf)" onClick={() => indent(editor, 1)} />
             <Divider />
             <SmallButton icon={<Pilcrow />} title="Show/Hide ¶" active={view.showMarks} onClick={() => onViewChange({ showMarks: !view.showMarks })} />
           </Row>

@@ -325,7 +325,8 @@ export function WritingEditor() {
           setRuntimeCache(`admin:writings:item:${updated.id}`, updated);
         }
         invalidateRuntimeCache('admin:writings:list');
-        setWriting(updated);
+        // Hanya metadata: isi di layar bisa sudah lebih baru dari snapshot yang dikirim.
+        setWriting(prev => ({ ...prev, _id: currentDbId }));
         return updated;
       } else if (!pendingCreateRef.current) {
         pendingCreateRef.current = true;
@@ -343,7 +344,14 @@ export function WritingEditor() {
           setRuntimeCache(`admin:writings:item:${response.id || draftId}`, updated);
           invalidateRuntimeCache('admin:writings:list');
           justCreatedRef.current = true;
-          setWriting(updated);
+          // Jangan timpa isi dengan snapshot/echo server: ketikan selama request akan hilang.
+          setWriting(prev => ({
+            ...prev,
+            _id: response._id,
+            id: response.id || draftId,
+            ...(response.createdAt ? { createdAt: response.createdAt } : {}),
+            ...(response.updatedAt ? { updatedAt: response.updatedAt } : {}),
+          }));
           navigate(`${ADMIN_PATH}/writings/edit/${response.id || draftId}`, { replace: true });
           pendingCreateRef.current = false;
           return updated;

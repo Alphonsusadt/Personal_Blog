@@ -240,7 +240,8 @@ export function BookEditor() {
           setRuntimeCache(`admin:books:item:${updated.id}`, updated);
         }
         invalidateRuntimeCache('admin:books:list');
-        setBook(updated);
+        // Hanya metadata: isi di layar bisa sudah lebih baru dari snapshot yang dikirim.
+        setBook(prev => ({ ...prev, _id: currentDbId }));
         return updated;
       } else if (!pendingCreateRef.current) {
         pendingCreateRef.current = true;
@@ -262,7 +263,14 @@ export function BookEditor() {
           setRuntimeCache(`admin:books:item:${response.id || autoSlug}`, updated);
           invalidateRuntimeCache('admin:books:list');
           justCreatedRef.current = true;
-          setBook(updated);
+          // Jangan timpa isi dengan snapshot/echo server: ketikan selama request akan hilang.
+          setBook(prev => ({
+            ...prev,
+            _id: response._id,
+            id: response.id || autoSlug,
+            ...(response.createdAt ? { createdAt: response.createdAt } : {}),
+            ...(response.updatedAt ? { updatedAt: response.updatedAt } : {}),
+          }));
           navigate(`${ADMIN_PATH}/books/edit/${response.id || autoSlug}`, { replace: true });
           pendingCreateRef.current = false;
           return updated;

@@ -318,7 +318,8 @@ export function ProjectEditor() {
           setRuntimeCache(`admin:projects:item:${updated.id}`, updated);
         }
         invalidateRuntimeCache('admin:projects:list');
-        setProject(updated);
+        // Hanya metadata: isi di layar bisa sudah lebih baru dari snapshot yang dikirim.
+        setProject(prev => ({ ...prev, _id: currentDbId }));
         return updated;
       } else if (!pendingCreateRef.current) {
         pendingCreateRef.current = true;
@@ -340,7 +341,14 @@ export function ProjectEditor() {
           setRuntimeCache(`admin:projects:item:${response.id || autoSlug}`, updated);
           invalidateRuntimeCache('admin:projects:list');
           justCreatedRef.current = true;
-          setProject(updated);
+          // Jangan timpa isi dengan snapshot/echo server: ketikan selama request akan hilang.
+          setProject(prev => ({
+            ...prev,
+            _id: response._id,
+            id: response.id || autoSlug,
+            ...(response.createdAt ? { createdAt: response.createdAt } : {}),
+            ...(response.updatedAt ? { updatedAt: response.updatedAt } : {}),
+          }));
           navigate(`${ADMIN_PATH}/projects/edit/${response.id || autoSlug}`, { replace: true });
           pendingCreateRef.current = false;
           return updated;

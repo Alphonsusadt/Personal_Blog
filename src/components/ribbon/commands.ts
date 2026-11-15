@@ -142,11 +142,14 @@ export function applyFormat(editor: Editor, fmt: PaintedFormat) {
 
 /* -------------------------------------------------- Indent */
 
-/** Increase/Decrease Indent: di dalam daftar = turun/naik level; di luar = tidak berlaku. */
+/** Increase/Decrease Indent: di daftar = naik/turun level; di paragraf/judul = geser kiri. */
 export function indent(editor: Editor, direction: 1 | -1) {
-  if (!editor.isActive('listItem')) return;
-  if (direction > 0) editor.chain().focus().sinkListItem('listItem').run();
-  else editor.chain().focus().liftListItem('listItem').run();
+  if (editor.isActive('listItem')) {
+    if (direction > 0) editor.chain().focus().sinkListItem('listItem').run();
+    else editor.chain().focus().liftListItem('listItem').run();
+    return;
+  }
+  editor.chain().focus().changeIndent(direction).run();
 }
 
 /* -------------------------------------------------- Clipboard */
