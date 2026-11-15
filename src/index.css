@@ -582,3 +582,19 @@ twitter-widget {
 .rich-content p, .rich-content h1, .rich-content h2, .rich-content h3, .rich-content h4,
 .rich-content li, .rich-content td, .rich-content th { white-space: pre-wrap; tab-size: 4; }
 .wc-page .ProseMirror { tab-size: 4; }
+/* Tabel bergulir di wadahnya sendiri (lihat richRenderer.ts). */
+.rich-content .rich-table-scroll { overflow-x: auto; max-width: 100%; margin: 1.5rem 0; }
+.rich-content .rich-table-scroll > table { margin: 0; }
+/* Layar sempit: gambar/embed yang mengambang jadi lebar penuh di antara paragraf,
+   supaya teks di sampingnya tidak terjepit menjadi 2-3 kata per baris. */
+@media (max-width: 640px) {
+  .rich-content img[style*="float"],
+  .rich-content .youtube-embed-outer[style*="float"],
+  .rich-content .instagram-embed-outer[style*="float"],
+  .rich-content .x-tweet-outer[style*="float"] {
+    float: none !important;
+    width: 100% !important;
+    margin: 1rem 0 !important;
+    display: block;
+  }
+}

@@ -80,6 +80,16 @@ async function renderSpecialNodes(root: HTMLElement): Promise<void> {
   root.querySelectorAll('img').forEach(img => {
     img.setAttribute('loading', 'lazy');
   });
+
+  // Tabel (lebar kolom bisa tetap dalam px) digulir di dalam wadahnya sendiri, supaya
+  // halaman di HP tidak ikut melebar dan bisa digeser ke samping.
+  root.querySelectorAll('table').forEach(table => {
+    if (table.parentElement?.classList.contains('rich-table-scroll')) return;
+    const wrap = doc.createElement('div');
+    wrap.className = 'rich-table-scroll';
+    table.replaceWith(wrap);
+    wrap.appendChild(table);
+  });
 }
 
 /** Pecah konten rich menjadi part HTML / TikZ / Mermaid, siap dirender. */

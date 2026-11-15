@@ -214,7 +214,13 @@ export function Ribbon(props: RibbonProps) {
     }
   };
 
+  // Pendengar Format Painter disimpan supaya bisa dilepas saat tombol dimatikan
+  // (dulu tetap aktif dan menempelkan format pada klik berikutnya).
+  const painterCleanup = useRef<(() => void) | null>(null);
+  useEffect(() => () => painterCleanup.current?.(), []);
   const onPainter = () => {
+    painterCleanup.current?.();
+    painterCleanup.current = null;
     if (painter) { setPainter(null); return; }
     const fmt = captureFormat(editor);
     setPainter(fmt);
@@ -222,12 +228,14 @@ export function Ribbon(props: RibbonProps) {
     const dom = editor.view.dom;
     const onUp = () => {
       setTimeout(() => {
-        if (!editor.state.selection.empty) applyFormat(editor, fmt);
+        if (!editor.isDestroyed && !editor.state.selection.empty) applyFormat(editor, fmt);
         setPainter(null);
       }, 0);
-      dom.removeEventListener('mouseup', onUp);
+      painterCleanup.current?.();
+      painterCleanup.current = null;
     };
     dom.addEventListener('mouseup', onUp);
+    painterCleanup.current = () => dom.removeEventListener('mouseup', onUp);
   };
 
   /* ------------------------------------------------------------ Tab: Home */

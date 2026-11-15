@@ -19,6 +19,10 @@ import { Ribbon, type RibbonViewState } from './ribbon/Ribbon';
 import { RibbonThemeContext } from './ribbon/primitives';
 import { FindReplaceBar } from './ribbon/panels';
 import { stepFontSize } from './ribbon/commands';
+import { uploadImage } from '../lib/mediaUploader';
+import { API_BASE } from '../lib/api';
+
+const imageFiles = (list?: FileList | null) => Array.from(list || []).filter(f => /^image\/(png|jpe?g|gif|webp)$/i.test(f.type));
 import { AlignLeft, AlignCenter, AlignRight, Trash2, Minus, Plus } from 'lucide-react';
 
 interface RichTextEditorProps {
@@ -86,6 +90,33 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
 
   const initialValueRef = useRef(initialValue);
   initialValueRef.current = initialValue;
+  const onOpenLinkDialogRef = useRef(onOpenLinkDialog);
+  onOpenLinkDialogRef.current = onOpenLinkDialog;
+
+  // Unggah gambar yang ditempel/di-drag. Disisipkan sebagai URL server (bukan base64,
+  // yang membengkakkan dokumen & autosave). Status tampil di status bar.
+  const [uploadStatus, setUploadStatus] = useState('');
+  const editorRef = useRef<ReturnType<typeof useEditor>>(null);
+  const uploadAndInsert = async (files: File[], pos: number) => {
+    for (const [i, file] of files.entries()) {
+      setUploadStatus(`Mengunggah gambar ${i + 1}/${files.length}…`);
+      try {
+        const url = await uploadImage(file, { apiBaseUrl: API_BASE, maxWidth: 1600 });
+        const ed = editorRef.current;
+        if (!ed || ed.isDestroyed) return;
+        const at = Math.min(pos, ed.state.doc.content.size);
+        ed.chain().focus().insertContentAt(at, {
+          type: 'image',
+          attrs: { src: url, alt: file.name.replace(/\.[^.]+$/, ''), alignment: 'center', width: '100%' },
+        }).run();
+        pos = Math.min(at + 1, ed.state.doc.content.size);
+      } catch (err) {
+        setUploadStatus(`Gagal mengunggah ${file.name}: ${err instanceof Error ? err.message : 'error'}`);
+        return;
+      }
+    }
+    setUploadStatus('');
+  };
 
   // Versi yang baru saja dikirim editor ini sendiri. Bila halaman mengembalikan salah satunya
   // (mis. state disetel ulang dari snapshot autosave yang sudah lewat), itu "gema" lama:
@@ -140,12 +171,29 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         const key = event.key.toLowerCase();
         if (key === 'f') { event.preventDefault(); setFind({ open: true, replace: false }); return true; }
         if (key === 'h') { event.preventDefault(); setFind({ open: true, replace: true }); return true; }
+        if (key === 'k' && onOpenLinkDialogRef.current) { event.preventDefault(); onOpenLinkDialogRef.current(); return true; }
         return false;
       },
-      // Link sosial yang ditempel langsung jadi embed.
+      // HTML dari Word/Google Docs: buang gambar yang menunjuk ke berkas lokal (file:///…),
+      // yang hanya ada di komputer penulis dan tampil rusak di situs, plus sampah khas Word.
+      transformPastedHTML(html) {
+        return html
+          .replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, '')
+          .replace(/<img\b[^>]*\bsrc=["'](?:file:|blob:|webkit-fake-url:)[^"']*["'][^>]*>/gi, '')
+          .replace(/<\/?o:p>/gi, '')
+          .replace(/<v:[^>]*>[\s\S]*?<\/v:[^>]*>/gi, '');
+      },
       handlePaste(view, event) {
-        const text = event.clipboardData?.getData('text/plain') || '';
         const html = event.clipboardData?.getData('text/html') || '';
+        const text = event.clipboardData?.getData('text/plain') || '';
+        // Screenshot/gambar yang disalin (tanpa HTML) → unggah lalu sisipkan.
+        const images = imageFiles(event.clipboardData?.files);
+        if (images.length && !html) {
+          event.preventDefault();
+          void uploadAndInsert(images, view.state.selection.from);
+          return true;
+        }
+        // Link sosial yang ditempel langsung jadi embed.
         const social = !html ? detectSocialEmbed(text) : null;
         if (social) {
           const node = view.state.schema.nodes.socialEmbed.create({ url: text.trim(), type: social.type, width: '100%', alignment: 'center' });
@@ -154,8 +202,19 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         }
         return false;
       },
+      // Gambar yang di-drag dari komputer → unggah lalu sisipkan di posisi jatuhnya.
+      handleDrop(view, event, _slice, moved) {
+        if (moved) return false; // memindahkan node di dalam editor: biarkan ProseMirror
+        const images = imageFiles((event as DragEvent).dataTransfer?.files);
+        if (!images.length) return false;
+        event.preventDefault();
+        const coords = view.posAtCoords({ left: (event as DragEvent).clientX, top: (event as DragEvent).clientY });
+        void uploadAndInsert(images, coords?.pos ?? view.state.selection.from);
+        return true;
+      },
     },
   }, [language]);
+  editorRef.current = editor;
 
   // Ctrl+] / Ctrl+[ seperti Word (tidak bisa lewat handleKeyDown karena butuh instance editor).
   useEffect(() => {
@@ -329,6 +388,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
           <span>{counts.words.toLocaleString()} words</span>
           <span>{counts.chars.toLocaleString()} characters</span>
           <span>{language === 'id' ? 'Indonesian' : 'English'}</span>
+          {uploadStatus && <span className={uploadStatus.startsWith('Gagal') ? 'text-[#f87171]' : 'text-[var(--wc-accent-text)]'}>{uploadStatus}</span>}
           <div className="ml-auto flex items-center gap-1.5">
             <button type="button" title="Zoom out" onClick={() => updateView({ zoom: Math.max(50, view.zoom - 10) })} className="p-0.5 rounded hover:bg-[var(--wc-hover)]"><Minus className="w-3 h-3" /></button>
             <input
