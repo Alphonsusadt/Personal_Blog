@@ -18,6 +18,10 @@ import {
   logTranslationEvent,
 } from '../utils/translationHelpers.js';
 import { supabase } from '../config/supabase.js';
+import {
+  RICH_HTML_MARKER, isRichHtml, protectRichHtml, restoreRichHtml, segmentRichHtml, rebuildRichHtml,
+  isValidSegmentArray, parseJsonArray, SEGMENT_RULE,
+} from '../utils/richHtml.js';
 import { ObjectId } from 'mongodb';
 
 // Heuristics-based language detector for plain strings
@@ -95,6 +99,54 @@ function extractPlaceholders(text) {
   return { text: processedText, placeholders };
 }
 
+// ---------------------------------------------------------------------------
+// Konten rich (HTML dari editor ribbon) — lihat utils/richHtml.js.
+// Struktur HTML tidak pernah diserahkan ke AI; hanya potongan teksnya.
+// ---------------------------------------------------------------------------
+
+/** Google Translate mode html: tag dijaga Google, blok terlindungi dikembalikan utuh. */
+async function translateRichWithGoogle(sourceText, tgtLang) {
+  const { html, keeps } = protectRichHtml(sourceText);
+  const translated = await translateGoogle(html, tgtLang, '', 'html');
+  const restored = restoreRichHtml(translated, keeps);
+  if (restored.missing.length) {
+    throw new Error('Google Translate mengubah struktur konten (blok kode/rumus/gambar hilang); terjemahan dibatalkan agar konten tidak rusak');
+  }
+  return RICH_HTML_MARKER + restored.html;
+}
+
+/** Jalankan satu permintaan teks ke model (OpenRouter / Ollama) lewat antrean fallback. */
+function runLLM(key, button, userPrompt, systemPrompt) {
+  return translationQueue.executeWithFallback(key, button, async (modelId) => (
+    modelId.includes('ollama')
+      ? callOllamaLLM(userPrompt, systemPrompt, modelId)
+      : callOpenRouterLLM(userPrompt, systemPrompt, modelId)
+  ));
+}
+
+/**
+ * Hybrid: haluskan hasil Google per potongan teks. Bila model gagal atau jumlah
+ * potongannya tidak cocok, hasil Google dipakai apa adanya (tetap utuh & benar).
+ */
+async function polishRichSegments(richTranslated, tgtLang, key) {
+  const { html, keeps } = protectRichHtml(richTranslated);
+  const seg = segmentRichHtml(html);
+  if (!seg.texts.length) return richTranslated;
+  const language = tgtLang === 'id' ? 'Indonesian' : 'English';
+  const systemPrompt = `You polish machine-translated ${language} text written by Alphonsus, a biomedical engineering student, so it reads naturally and keeps his warm, personal voice.
+The input is a JSON array of text segments taken, in order, from one formatted document.
+Return ONLY a JSON array with EXACTLY ${seg.texts.length} strings, in the same order. Never merge, split, drop, or add elements. Do not add HTML or Markdown. Keep the meaning and technical terms.`;
+  const result = await runLLM(key, 'button-hybrid', JSON.stringify(seg.texts), systemPrompt);
+  if (!result.success) return richTranslated;
+  const arr = parseJsonArray(result.result);
+  if (!isValidSegmentArray(arr, seg.texts.length)) {
+    console.warn(`[translation] Polish rich dilewati: model mengembalikan ${Array.isArray(arr) ? arr.length : 'bukan array'} dari ${seg.texts.length} potongan`);
+    return richTranslated;
+  }
+  const restored = restoreRichHtml(rebuildRichHtml(seg, arr), keeps);
+  return restored.missing.length ? richTranslated : RICH_HTML_MARKER + restored.html;
+}
+
 // Restore placeholders in text
 function restorePlaceholders(text, placeholders) {
   if (!text || typeof text !== 'string') return text;
@@ -121,26 +173,6 @@ function restorePlaceholders(text, placeholders) {
   return restoredText;
 }
 
-// Helper: try supabase, fall back to mongo on any error
-async function trySupabase(supabaseFn, mongoFn) {
-  if (supabase) {
-    try {
-      return await supabaseFn();
-    } catch (err) {
-      const status = err?.status || err?.code || 'unknown';
-      const msg = err?.message || String(err);
-      console.warn(
-        `[translation] Supabase failed (${status}): ${msg}. Falling back to MongoDB.`
-      );
-      // In development, include the full stack for debugging
-      if (process.env.NODE_ENV === 'development' && err?.stack) {
-        console.debug('[translation] Supabase error stack:', err.stack);
-      }
-    }
-  }
-  return mongoFn();
-}
-
 export default function createTranslationRoutes(db) {
   const router = express.Router();
 
@@ -153,51 +185,20 @@ export default function createTranslationRoutes(db) {
       project: 'projects',
       book: 'books',
     };
-    
-    const supabaseTableMap = {
-      writing: 'artikel',
-      project: 'projects',
-      book: 'books', // assuming same names for these in Supabase
-    };
 
     const collection = mongoCollectionMap[contentType];
-    const table = supabaseTableMap[contentType];
     if (!collection) throw new Error(`Invalid content type: ${contentType}`);
 
-    if (contentType !== 'writing') {
-      const orConditions = [{ id: postId }, { _id: postId }];
-      try {
-        orConditions.push({ _id: new ObjectId(postId) });
-      } catch {}
-      const data = await db.collection(collection).findOne({ $or: orConditions });
-      if (!data) throw new Error('Not found in MongoDB');
-      return data;
-    }
-
-    const doc = await trySupabase(
-      async () => {
-        // Try exact match on _id
-        let { data, error } = await supabase.from(table).select('*').eq('_id', postId).single();
-        if (error || !data) {
-          // Fallback to id (slug)
-          const res = await supabase.from(table).select('*').eq('id', postId).limit(1).single();
-          if (res.error) throw res.error;
-          data = res.data;
-        }
-        if (!data) throw new Error('Not found in Supabase');
-        return data;
-      },
-      async () => {
-        const orConditions = [{ id: postId }, { _id: postId }];
-        try {
-          orConditions.push({ _id: new ObjectId(postId) });
-        } catch {}
-        const data = await db.collection(collection).findOne({ $or: orConditions });
-        if (!data) throw new Error('Not found in MongoDB');
-        return data;
-      }
-    );
-
+    // SUMBER KEBENARAN: MongoDB, untuk SEMUA jenis konten (writings juga).
+    // Dulu writings dibaca dari Supabase lebih dulu. Hasil terjemahan disimpan sebagai
+    // objek utuh { <bahasa sumber>, <bahasa target> } yang dibangun dari dokumen yang dibaca,
+    // jadi salinan Supabase yang tertinggal sedikit saja akan MENIMPA teks sumber terbaru
+    // di Mongo. Supabase hanya cadangan tulis (lihat utils/dataSync.js), tidak pernah dibaca.
+    const orConditions = [{ id: postId }, { _id: postId }];
+    try {
+      orConditions.push({ _id: new ObjectId(postId) });
+    } catch {}
+    const doc = await db.collection(collection).findOne({ $or: orConditions });
     if (!doc) throw new Error(`Content not found: ${contentType}/${postId}`);
     return doc;
   }
@@ -368,6 +369,23 @@ export default function createTranslationRoutes(db) {
     }
     mongoSetObj.updatedAt = now;
 
+    // Hanya tulis bahasa TARGET (mis. content.en), jangan seluruh objek { id, en }.
+    // Terjemahan LLM bisa makan belasan detik; kalau selama itu pengguna terus mengetik
+    // dan autosave menyimpan, menulis objek utuh akan menimpa ketikan terbaru di bahasa
+    // sumber dengan salinan lama. Field yang masih berupa string (data lama) tidak bisa
+    // diberi path bertitik, jadi untuk itu tetap ditulis utuh.
+    const tgtLang = setObj.translationMetadata?.language;
+    if (tgtLang === 'en' || tgtLang === 'id') {
+      for (const field of ['title', 'excerpt', 'content', 'description', 'review', 'author']) {
+        const value = mongoSetObj[field];
+        const stored = doc[field];
+        if (value && typeof value === 'object' && stored && typeof stored === 'object' && !Array.isArray(stored)) {
+          mongoSetObj[`${field}.${tgtLang}`] = value[tgtLang];
+          delete mongoSetObj[field];
+        }
+      }
+    }
+
     const orConditions = [{ id: doc.id || postId }, { _id: postId }];
     try {
       orConditions.push({ _id: new ObjectId(postId) });
@@ -517,11 +535,15 @@ export default function createTranslationRoutes(db) {
       for (const field of fields.localized) {
         const sourceText = resolveText(doc[field], srcLang);
         if (sourceText && sourceText.trim()) {
-          const { text: protectedText, placeholders } = extractPlaceholders(sourceText);
-          const rawTranslated = await translateGoogle(protectedText, tgtLang);
-          const sanitizedText = sanitizeTranslatedMarkdown(rawTranslated);
-          const translatedText = restorePlaceholders(sanitizedText, placeholders);
-          
+          let translatedText;
+          if (isRichHtml(sourceText)) {
+            translatedText = await translateRichWithGoogle(sourceText, tgtLang);
+          } else {
+            const { text: protectedText, placeholders } = extractPlaceholders(sourceText);
+            const rawTranslated = await translateGoogle(protectedText, tgtLang);
+            translatedText = restorePlaceholders(sanitizeTranslatedMarkdown(rawTranslated), placeholders);
+          }
+
           const currentObj = safeParse(doc[field], tgtLang);
           currentObj[tgtLang] = translatedText;
           setObj[field] = currentObj;
@@ -626,31 +648,27 @@ export default function createTranslationRoutes(db) {
       for (const field of fields.localized) {
         const sourceText = resolveText(doc[field], srcLang);
         if (sourceText && sourceText.trim()) {
-          const { text: protectedText, placeholders } = extractPlaceholders(sourceText);
-          const rawTranslated = await translateGoogle(protectedText, tgtLang);
-          const rawSanitized = sanitizeTranslatedMarkdown(rawTranslated);
-          let polishedText = rawSanitized;
+          let translatedText;
+          if (isRichHtml(sourceText)) {
+            // Google (struktur aman) → haluskan per potongan teks; tag tidak pernah ke AI.
+            const googleRich = await translateRichWithGoogle(sourceText, tgtLang);
+            translatedText = await polishRichSegments(googleRich, tgtLang, `${postId}:hybrid:polish-${field}`);
+          } else {
+            const { text: protectedText, placeholders } = extractPlaceholders(sourceText);
+            const rawTranslated = await translateGoogle(protectedText, tgtLang);
+            const rawSanitized = sanitizeTranslatedMarkdown(rawTranslated);
+            let polishedText = rawSanitized;
 
-          if (rawSanitized.trim().length > 0 && field !== 'title') {
-            const polishResult = await translationQueue.executeWithFallback(
-              `${postId}:hybrid:polish-${field}`,
-              'button-hybrid',
-              async (modelId) => {
-                const systemPrompt = getSystemPrompt('polish', tgtLang);
-                const promptText = `<text_to_polish>${rawSanitized}</text_to_polish>`;
-                if (modelId.includes('ollama')) {
-                  return await callOllamaLLM(promptText, systemPrompt, modelId);
-                } else {
-                  return await callOpenRouterLLM(promptText, systemPrompt, modelId);
-                }
+            if (rawSanitized.trim().length > 0 && field !== 'title') {
+              const promptText = `<text_to_polish>${rawSanitized}</text_to_polish>`;
+              const polishResult = await runLLM(`${postId}:hybrid:polish-${field}`, 'button-hybrid', promptText, getSystemPrompt('polish', tgtLang));
+              if (polishResult.success) {
+                polishedText = cleanLLMResponse(polishResult.result);
               }
-            );
-            if (polishResult.success) {
-              polishedText = cleanLLMResponse(polishResult.result);
             }
+            translatedText = restorePlaceholders(polishedText, placeholders);
           }
 
-          const translatedText = restorePlaceholders(polishedText, placeholders);
           const currentObj = safeParse(doc[field], tgtLang);
           currentObj[tgtLang] = translatedText;
           setObj[field] = currentObj;
@@ -735,12 +753,22 @@ export default function createTranslationRoutes(db) {
       // Build JSON to translate and extract placeholders
       const sourceJson = {};
       const allPlaceholders = {};
+      const richState = {}; // field → { seg, keeps } untuk konten rich (HTML)
       for (const field of fields.localized) {
         const textVal = resolveText(doc[field], srcLang);
         if (textVal && textVal.trim()) {
-          const { text: protectedText, placeholders } = extractPlaceholders(textVal);
-          sourceJson[field] = protectedText;
-          allPlaceholders[field] = placeholders;
+          if (isRichHtml(textVal)) {
+            // Konten rich: kirim HANYA potongan teks (array), struktur HTML disimpan di sini.
+            const { html, keeps } = protectRichHtml(textVal);
+            const seg = segmentRichHtml(html);
+            if (!seg.texts.length) continue;
+            sourceJson[field] = seg.texts;
+            richState[field] = { seg, keeps };
+          } else {
+            const { text: protectedText, placeholders } = extractPlaceholders(textVal);
+            sourceJson[field] = protectedText;
+            allPlaceholders[field] = placeholders;
+          }
         }
       }
       for (const field of fields.plain) {
@@ -764,51 +792,71 @@ RULES:
 1. Translate only the JSON values into natural, fluid ${resolvedLang}. Do not change the JSON keys.
 2. Preserve Alphonsus's warm, personal, conversational engineering student voice. Keep biomedical terms accurate.
 3. Keep all Markdown formatting (headings, lists, bold, italics, links, and code blocks) exactly preserved.
-4. Return ONLY the final translated JSON. Do not wrap in markdown blocks like \`\`\`json. Do not include intro or explanations.`;
+4. Return ONLY the final translated JSON. Do not wrap in markdown blocks like \`\`\`json. Do not include intro or explanations.` + (Object.keys(richState).length ? SEGMENT_RULE : '');
 
       const userPrompt = JSON.stringify(sourceJson);
 
-      const result = await translationQueue.executeWithFallback(
-        `${postId}:smartai`,
-        'button-smartai',
-        async (modelId) => {
-          if (modelId.includes('ollama')) {
-            return await callOllamaLLM(userPrompt, systemPrompt, modelId);
-          } else {
-            return await callOpenRouterLLM(userPrompt, systemPrompt, modelId);
+      // Parse JSON dari jawaban model secara toleran.
+      const parseFields = (text) => {
+        const fieldsOut = {};
+        try {
+          let cleaned = text.trim();
+          const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+          if (jsonMatch) cleaned = jsonMatch[0];
+          else if (cleaned.startsWith('```')) cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
+          return JSON.parse(cleaned);
+        } catch (e) {
+          console.warn('[SmartAI] Failed to parse JSON response, falling back to split parsing:', e.message);
+          const parsed = parseAIResponse(text);
+          if (parsed.title) fieldsOut.title = parsed.title;
+          if (parsed.content) {
+            if (contentType === 'writing') fieldsOut.content = parsed.content;
+            else if (contentType === 'project') fieldsOut.description = parsed.content;
+            else if (contentType === 'book') fieldsOut.review = parsed.content;
           }
+          return fieldsOut;
         }
-      );
+      };
 
-      if (!result.success) {
-        return res.status(503).json({
-          error: 'All translation models failed',
-          message: 'Please try again later',
-          details: result.error,
-        });
-      }
-
-      // Parse JSON from LLM response resiliently
+      // Konten rich: rakit ulang dari potongan. Model gratis kadang memecah/menggabung
+      // potongan (mis. 19 dari 18) — coba ulang dengan pengingat, maksimal 3 kali.
+      // Bila tetap tidak valid, TIDAK ADA yang disimpan (lebih baik daripada konten rusak).
+      const MAX_ATTEMPTS = Object.keys(richState).length ? 3 : 1;
+      let result = null;
       let translatedFields = {};
-      try {
-        let cleaned = result.result.trim();
-        // Resiliently extract only the JSON object if LLM added introductory/concluding text
-        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          cleaned = jsonMatch[0];
-        } else if (cleaned.startsWith('```')) {
-          cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
+      let richResults = {};
+      let lastProblem = '';
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        const reminder = attempt === 1 ? '' : `
+IMPORTANT: your previous answer was rejected because ${lastProblem}. Return each array with EXACTLY the required number of elements: ${Object.entries(richState).map(([f, r]) => `"${f}" = ${r.seg.texts.length}`).join(', ')}.`;
+        result = await runLLM(`${postId}:smartai`, 'button-smartai', userPrompt, systemPrompt + reminder);
+        if (!result.success) {
+          return res.status(503).json({
+            error: 'All translation models failed',
+            message: 'Please try again later',
+            details: result.error,
+          });
         }
-        translatedFields = JSON.parse(cleaned);
-      } catch (e) {
-        console.warn('[SmartAI] Failed to parse JSON response, falling back to split parsing:', e);
-        const parsed = parseAIResponse(result.result);
-        if (parsed.title) translatedFields.title = parsed.title;
-        if (parsed.content) {
-          if (contentType === 'writing') translatedFields.content = parsed.content;
-          else if (contentType === 'project') translatedFields.description = parsed.content;
-          else if (contentType === 'book') translatedFields.review = parsed.content;
+        translatedFields = parseFields(result.result);
+        richResults = {};
+        lastProblem = '';
+        for (const [field, { seg, keeps }] of Object.entries(richState)) {
+          const arr = translatedFields[field];
+          const restored = isValidSegmentArray(arr, seg.texts.length) ? restoreRichHtml(rebuildRichHtml(seg, arr), keeps) : null;
+          if (!restored || restored.missing.length) {
+            lastProblem = `"${field}" had ${Array.isArray(arr) ? `${arr.length} elements instead of ${seg.texts.length}` : 'no array'}`;
+            break;
+          }
+          richResults[field] = RICH_HTML_MARKER + restored.html;
         }
+        if (!lastProblem) break;
+        console.warn(`[SmartAI] Percobaan ${attempt}/${MAX_ATTEMPTS} ditolak: ${lastProblem}`);
+      }
+      if (lastProblem) {
+        return res.status(502).json({
+          error: 'Hasil AI tidak lengkap',
+          message: 'Model AI berulang kali mengembalikan terjemahan yang tidak lengkap, jadi tidak ada yang disimpan. Coba lagi, atau pakai tombol Translate.',
+        });
       }
 
       const responseData = {
@@ -833,8 +881,8 @@ RULES:
 
       // Apply and save localized fields
       for (const field of fields.localized) {
-        if (translatedFields[field]) {
-          const restoredText = restorePlaceholders(translatedFields[field], allPlaceholders[field] || []);
+        if (richResults[field] || (translatedFields[field] && !richState[field])) {
+          const restoredText = richResults[field] ?? restorePlaceholders(translatedFields[field], allPlaceholders[field] || []);
           const currentObj = safeParse(doc[field], tgtLang);
           currentObj[tgtLang] = restoredText;
           setObj[field] = currentObj;

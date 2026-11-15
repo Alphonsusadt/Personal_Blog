@@ -55,8 +55,10 @@ export function TranslationButtonGroup({
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        // Server bisa mengirim judul (error) + penjelasan (message); tampilkan keduanya.
+        const detail = errorData.message && errorData.message !== errorData.error ? ` ${errorData.message}` : '';
+        throw new Error(`${errorData.error || `HTTP ${response.status}`}${detail ? '.' + detail : ''}`);
       }
 
       const data = await response.json();

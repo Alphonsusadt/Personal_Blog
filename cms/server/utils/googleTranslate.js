@@ -61,9 +61,10 @@ export async function detectLanguageGoogle(text) {
  * @param {string} text - text to translate
  * @param {string} targetLanguage - target language code (e.g., 'en', 'id')
  * @param {string} sourceLanguage - source language code (optional)
+ * @param {'text'|'html'} format - 'html' keeps tags intact (rich content)
  * @returns {Promise<string>} - translated text
  */
-export async function translateGoogle(text, targetLanguage, sourceLanguage = '') {
+export async function translateGoogle(text, targetLanguage, sourceLanguage = '', format = 'text') {
   if (!text || text.trim().length === 0) {
     return '';
   }
@@ -82,7 +83,7 @@ export async function translateGoogle(text, targetLanguage, sourceLanguage = '')
         q: text,
         target: targetLanguage,
         source: sourceLanguage || undefined,
-        format: 'text',
+        format, // 'html' untuk konten rich: tag dipertahankan, hanya teks yang diterjemahkan
       },
       {
         params: {
@@ -115,9 +116,15 @@ export async function translateGoogle(text, targetLanguage, sourceLanguage = '')
       throw timeoutError;
     }
 
-    console.error('[Google] Translation failed:', error.message);
+    // Alasan dari Google (mis. "User Rate Limit Exceeded" saat kuota habis) jauh lebih
+    // berguna daripada "Request failed with status code 403".
+    const reason = error.response?.data?.error?.message;
+    const quota = error.response?.status === 403 && /rate limit|quota/i.test(reason || '');
+    console.error('[Google] Translation failed:', error.message, reason ? `(${reason})` : '');
     throw {
-      message: `Google Translate failed: ${error.message}`,
+      message: quota
+        ? `Kuota Google Translate habis (${reason}). Coba lagi nanti, atau pakai tombol Smart AI.`
+        : `Google Translate failed: ${reason || error.message}`,
       status: error.response?.status || 500,
       code: error.code,
       originalError: error,
