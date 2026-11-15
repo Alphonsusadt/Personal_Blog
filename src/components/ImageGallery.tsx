@@ -19,6 +19,14 @@ export function ImageGallery({ content, onRemoveImage }: ImageGalleryProps) {
     });
   }
 
+  // Konten rich (HTML dari editor ribbon): tag <img> utuh dipakai sebagai kunci hapus,
+  // karena onRemoveImage menghapus string itu persis dari konten.
+  for (const tag of content.match(/<img\b[^>]*>/gi) || []) {
+    const src = tag.match(/\ssrc="([^"]+)"/i)?.[1];
+    if (!src) continue;
+    images.push({ alt: tag.match(/\salt="([^"]*)"/i)?.[1] || '', src, markdown: tag });
+  }
+
   if (images.length === 0) {
     return null;
   }

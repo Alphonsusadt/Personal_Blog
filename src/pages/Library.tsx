@@ -5,6 +5,7 @@ import { BookCard } from '../components/BookCard';
 import { api, API_BASE } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { resolveLocalizedText, getExactLocalizedText } from '../lib/localized';
+import { contentToPlainText } from '../lib/richContent';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
 
@@ -131,7 +132,8 @@ export function Library() {
       if (!title) return false;
 
       const author = resolveLocalizedText(book.author, language);
-      const review = resolveLocalizedText(book.review, language);
+      // Cari di teks polos, bukan di tag HTML (ulasan dari editor ribbon berupa HTML).
+      const review = contentToPlainText(resolveLocalizedText(book.review, language));
       const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            (author?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
                            (review?.toLowerCase().includes(searchTerm.toLowerCase()) || false);

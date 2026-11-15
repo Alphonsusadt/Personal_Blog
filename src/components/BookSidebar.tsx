@@ -220,22 +220,6 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, c
 
   return (
     <aside className="space-y-4">
-      {/* Editor Language (Replaces Auto Fix Label) */}
-      <SidebarCard title="Editor Language / Bahasa Editor" cardKey="autofix" collapsed={collapsed} onToggle={toggleCard}>
-        <div className="space-y-2">
-          <label className="block text-xs text-[#94A3B8]">Pilih tab bahasa yang sedang diedit:</label>
-          <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value as 'id' | 'en')}
-            className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
-          >
-            <option value="id">🇮🇩 Indonesia (ID)</option>
-            <option value="en">🇬🇧 English (EN)</option>
-          </select>
-          <p className="text-[11px] text-[#94A3B8]">Mengganti ini akan mengubah isi Title, Author, dan Review di editor sesuai bahasa yang dipilih.</p>
-        </div>
-      </SidebarCard>
-
       {/* Content Mode & Translation Link */}
       <SidebarCard title="Content Mode & Linking" cardKey="contentMode" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-3">
@@ -266,20 +250,6 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, c
               <p className="text-[11px] text-[#94A3B8] mt-1">Jika ini buku bahasa ID, masukkan ID buku bahasa EN-nya agar terhubung di website.</p>
             </div>
           )}
-        </div>
-      </SidebarCard>
-
-      {/* Content Stats */}
-      <SidebarCard title="Content Stats" cardKey="stats" collapsed={collapsed} onToggle={toggleCard}>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="bg-[#0F172A] border border-[#334155] rounded-lg p-3">
-            <p className="text-[11px] text-[#94A3B8]">Words</p>
-            <p className="text-lg font-semibold text-[#F8FAFC]">{wordCount}</p>
-          </div>
-          <div className="bg-[#0F172A] border border-[#334155] rounded-lg p-3">
-            <p className="text-[11px] text-[#94A3B8]">Characters</p>
-            <p className="text-lg font-semibold text-[#F8FAFC]">{characterCount}</p>
-          </div>
         </div>
       </SidebarCard>
 

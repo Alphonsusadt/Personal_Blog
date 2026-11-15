@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { renderMarkdown } from '../utils/renderers';
+import { renderRichContentToHtml } from '../utils/richRenderer';
+import { isRichHtml } from '../lib/richContent';
 
 export function useRenderedMarkdown(content: string): string {
   const [html, setHtml] = useState('');
 
   useEffect(() => {
     let cancelled = false;
-    renderMarkdown(content)
+    (isRichHtml(content) ? renderRichContentToHtml(content) : renderMarkdown(content))
       .then((result) => {
         if (!cancelled) setHtml(result);
       })

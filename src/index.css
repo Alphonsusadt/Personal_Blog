@@ -420,3 +420,160 @@ twitter-widget {
   font-family: inherit;
   fill: #000000 !important;
 }
+
+/* ==========================================================================
+   Konten rich (HTML dari editor ribbon) — dipakai di halaman publik, preview,
+   DAN di "halaman kertas" editor, supaya tampilan editor = tampilan publik.
+   Font/warna/perataan dari pengguna disimpan sebagai style inline dan menang.
+   ========================================================================== */
+.rich-content,
+.wc-page .ProseMirror {
+  font-family: 'Merriweather', Georgia, serif;
+  font-size: 12pt;
+  line-height: 1.75;
+  color: inherit;
+  overflow-wrap: break-word;
+}
+.rich-content > *:first-child,
+.wc-page .ProseMirror > *:first-child { margin-top: 0; }
+.rich-content p,
+.wc-page .ProseMirror p { margin: 0 0 1rem; line-height: inherit; }
+.rich-content h1, .rich-content h2, .rich-content h3, .rich-content h4,
+.wc-page .ProseMirror h1, .wc-page .ProseMirror h2, .wc-page .ProseMirror h3, .wc-page .ProseMirror h4 {
+  font-family: inherit;
+  color: inherit;
+  line-height: 1.25;
+}
+.rich-content h1, .wc-page .ProseMirror h1 { font-size: 26pt; font-weight: 400; margin: 2.5rem 0 1.25rem; }
+.rich-content h2, .wc-page .ProseMirror h2 { font-size: 20pt; font-weight: 400; margin: 2.25rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--color-hairline); }
+.rich-content h3, .wc-page .ProseMirror h3 { font-size: 16pt; font-weight: 700; margin: 2rem 0 0.75rem; }
+.rich-content h4, .wc-page .ProseMirror h4 { font-size: 13pt; font-weight: 700; margin: 1.5rem 0 0.5rem; }
+.rich-content ul, .wc-page .ProseMirror ul { list-style: disc; padding-left: 1.75rem; margin: 0 0 1rem; }
+.rich-content ol, .wc-page .ProseMirror ol { list-style: decimal; padding-left: 1.75rem; margin: 0 0 1rem; }
+.rich-content ul ul, .wc-page .ProseMirror ul ul { list-style: circle; }
+.rich-content ul ul ul, .wc-page .ProseMirror ul ul ul { list-style: square; }
+.rich-content li, .wc-page .ProseMirror li { margin: 0 0 0.25rem; }
+.rich-content li > p, .wc-page .ProseMirror li > p { margin: 0; }
+.rich-content blockquote, .wc-page .ProseMirror blockquote {
+  border-left: 4px solid currentColor;
+  padding-left: 1rem;
+  margin: 1.5rem 0;
+  font-style: italic;
+  opacity: 0.85;
+  color: inherit;
+}
+.rich-content a, .wc-page .ProseMirror a { color: #2563eb; text-decoration: underline; }
+.dark .rich-content a { color: #93c5fd; }
+.rich-content hr, .wc-page .ProseMirror hr { border: 0; border-top: 1px solid var(--color-hairline); margin: 2rem 0; }
+.rich-content mark, .wc-page .ProseMirror mark { padding: 0 0.1em; border-radius: 2px; color: inherit; }
+.rich-content code, .wc-page .ProseMirror :not(pre) > code {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.875em;
+  background: rgba(127, 127, 127, 0.15);
+  color: inherit;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.rich-content img { max-width: 100%; height: auto; border-radius: 12px; }
+.rich-content table, .wc-page .ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1.5rem 0;
+  table-layout: fixed;
+  font-size: 0.95em;
+}
+.rich-content th, .rich-content td,
+.wc-page .ProseMirror th, .wc-page .ProseMirror td {
+  border: 1px solid var(--color-hairline, #d4d4d4);
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+  position: relative;
+}
+.rich-content th, .wc-page .ProseMirror th { font-weight: 700; background: rgba(127, 127, 127, 0.08); text-align: left; }
+.rich-content th > p, .rich-content td > p,
+.wc-page .ProseMirror th > p, .wc-page .ProseMirror td > p { margin: 0; }
+.rich-content .tableWrapper, .wc-page .ProseMirror .tableWrapper { overflow-x: auto; }
+
+/* ==========================================================================
+   Editor bergaya Word di dalam CMS. Struktur ribbon dari WordCraft, tetapi warnanya
+   memakai palet CMS (sama dengan kartu sidebar & header) supaya menyatu, bukan
+   tempelan. Hanya "halaman" yang putih: itu pratinjau tampilan publik.
+   ========================================================================== */
+.wc-shell {
+  --wc-ribbon: #1E293B;      /* = kartu CMS */
+  --wc-tabstrip: #1E293B;
+  --wc-canvas: #0F172A;      /* = latar CMS */
+  --wc-border: #334155;      /* = border CMS */
+  --wc-border-strong: #475569;
+  --wc-text: #F8FAFC;
+  --wc-text-dim: #94A3B8;
+  --wc-text-disabled: #475569;
+  --wc-icon: #CBD5E1;
+  --wc-hover: #334155;
+  --wc-pressed: #475569;
+  --wc-checked: rgba(30, 64, 175, 0.45);  /* #1E40AF, tombol utama CMS */
+  --wc-accent: #60A5FA;                    /* = fokus input CMS */
+  --wc-accent-text: #93C5FD;
+  --wc-input: #0F172A;
+  --wc-input-border: #334155;
+  --wc-group-label: #64748B;
+  --wc-menu: #1E293B;
+  --wc-page: #ffffff;
+  --wc-page-text: #000000;
+  color: var(--wc-text);
+}
+/* Panel ribbon tidak pernah menampilkan scrollbar; isinya menyesuaikan lebar. */
+.wc-no-scrollbar { scrollbar-width: none; }
+.wc-no-scrollbar::-webkit-scrollbar { display: none; }
+.wc-page { background: var(--wc-page); color: var(--wc-page-text); --color-hairline: #e1e1e1; }
+.wc-page .ProseMirror { min-height: 60vh; outline: none; }
+.wc-page .ProseMirror blockquote { color: inherit; }
+.wc-page .ProseMirror pre { margin: 1.5rem 0; }
+.wc-page .ProseMirror .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(59, 91, 219, 0.18);
+  pointer-events: none;
+}
+.wc-page .ProseMirror .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background-color: #3b5bdb;
+  pointer-events: none;
+}
+.wc-page .ProseMirror.resize-cursor { cursor: col-resize; }
+.wc-page .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #a8a8a8;
+  pointer-events: none;
+  height: 0;
+}
+/* Tampilkan tanda paragraf (tombol ¶) */
+.wc-page.wc-show-marks .ProseMirror p::after,
+.wc-page.wc-show-marks .ProseMirror h1::after,
+.wc-page.wc-show-marks .ProseMirror h2::after,
+.wc-page.wc-show-marks .ProseMirror h3::after,
+.wc-page.wc-show-marks .ProseMirror h4::after,
+.wc-page.wc-show-marks .ProseMirror li > p::after {
+  content: '¶';
+  color: #9aa7c7;
+  font-weight: 400;
+  font-style: normal;
+  margin-left: 2px;
+}
+/* Hasil pencarian Find & Replace */
+.wc-page .wc-search-match { background: rgba(255, 224, 61, 0.55); border-radius: 2px; }
+.wc-page .wc-search-current { background: rgba(255, 150, 30, 0.75); }
+/* Panel Live Preview admin berlatar putih */
+.preview-scroll-light .rich-content { color: #1a1a1a; }
+/* Body situs ber-weight 320, dan preflight Tailwind membuat <strong> hanya "bolder" (=400),
+   sehingga Bold nyaris tak terlihat. Di konten rich, Bold harus benar-benar tebal seperti Word. */
+.rich-content strong, .rich-content b,
+.wc-page .ProseMirror strong, .wc-page .ProseMirror b { font-weight: 700; }
+/* Sel tabel kosong (<td><p></p></td>) tetap setinggi satu baris teks. */
+.rich-content td > p:empty::after, .rich-content th > p:empty::after { content: '\00a0'; }

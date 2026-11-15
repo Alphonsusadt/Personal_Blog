@@ -2,6 +2,7 @@ import { Book } from '../data/library';
 import { Star, StarHalf, BookOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { resolveLocalizedText } from '../lib/localized';
+import { contentToPlainText } from '../lib/richContent';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
 import { getDeterministicCategoryColor } from '../utils/categoryColor';
@@ -109,7 +110,8 @@ export function BookCard({ book }: BookCardProps) {
 
         {/* Review */}
         <p className="text-ink opacity-60 text-sm mb-4 line-clamp-3 serif-font">
-          {resolveLocalizedText(book.review, language)}
+          {/* Ulasan bisa berupa HTML dari editor ribbon: tampilkan teks polosnya saja. */}
+          {contentToPlainText(resolveLocalizedText(book.review, language)).replace(/\s+/g, ' ').trim()}
         </p>
 
         {/* Key Takeaways */}

@@ -8,6 +8,8 @@ import { TikzDiagram } from '../components/TikzDiagram';
 import { resolveLocalizedText } from '../lib/localized';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
+import { isRichHtml } from '../lib/richContent';
+import { renderRichContentParts } from '../utils/richRenderer';
 
 interface Writing {
   id: string;
@@ -290,12 +292,22 @@ export function WritingDetail() {
     };
   }, [id, navigate]);
 
-  const rawParts = useMemo(() => {
-    if (!writing) return [];
-    return splitContent(resolveLocalizedText(writing.content, language));
-  }, [language, writing]);
+  const rawContent = useMemo(() => (writing ? resolveLocalizedText(writing.content, language) : ''), [language, writing]);
+  const isRich = isRichHtml(rawContent);
+  const rawParts = useMemo(() => (isRich ? [] : splitContent(rawContent)), [isRich, rawContent]);
 
   const [renderedParts, setRenderedParts] = useState<ContentPart[]>([]);
+
+  useEffect(() => {
+    if (!isRich) return;
+    let cancelled = false;
+    // Konten dari editor ribbon (HTML): dirender oleh renderer rich.
+    renderRichContentParts(rawContent).then((parts) => {
+      if (cancelled) return;
+      setRenderedParts(parts.map(p => (p.type === 'html' ? { ...p, content: `<div class="rich-content">${p.content}</div>` } : p)));
+    });
+    return () => { cancelled = true; };
+  }, [isRich, rawContent]);
 
   useEffect(() => {
     if (rawParts.length === 0) return;

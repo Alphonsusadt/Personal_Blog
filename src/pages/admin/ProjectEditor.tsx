@@ -12,6 +12,8 @@ import { useRenderedMarkdown } from '../../hooks/useRenderedMarkdown';
 import { formatDraftTime } from '../../hooks/useLocalDraft';
 import { RichTextEditor, type RichTextEditorRef } from '../../components/RichTextEditor';
 import { AutoFixButton } from '../../components/AutoFixButton';
+import { RibbonGroup, BigButton } from '../../components/ribbon/primitives';
+import { isRichHtml, contentToPlainText, applyWordFixesToRichHtml, contentForAssetReuse } from '../../lib/richContent';
 import { AssetReuserDialog } from '../../components/AssetReuserDialog';
 import { useAutoFixLanguage } from '../../hooks/useAutoFixLanguage';
 import { getAutoFixSuggestionsForWord } from '../../utils/textAutoFix';
@@ -368,7 +370,7 @@ export function ProjectEditor() {
 
   // Use resolveLocalizedText with fallback to ensure counter works even when content
   // is stored in a different language than the currently selected one
-  const contentForCounter = resolveLocalizedText(project.content, autoFixLanguage);
+  const contentForCounter = contentToPlainText(resolveLocalizedText(project.content, autoFixLanguage));
   const plainContent = contentForCounter
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`[^`]*`/g, ' ')
@@ -495,10 +497,13 @@ export function ProjectEditor() {
     }));
   }, [autoFixLanguage]);
 
-  const handleAutoFixContent = useCallback((nextContent: string) => {
+  const handleAutoFixContent = useCallback((nextContent: string, changes?: Array<{ from: string; to: string }>) => {
     setProject(prev => {
-      if (getExactLocalizedText(prev.content, autoFixLanguage) === nextContent) return prev;
-      return { ...prev, content: setLocalizedText(prev.content, autoFixLanguage, nextContent) };
+      const current = getExactLocalizedText(prev.content, autoFixLanguage);
+      // Konten rich (HTML): terapkan koreksi per kata pada node teks, bukan string mentah.
+      const next = isRichHtml(current) && changes ? applyWordFixesToRichHtml(current, changes) : nextContent;
+      if (current === next) return prev;
+      return { ...prev, content: setLocalizedText(prev.content, autoFixLanguage, next) };
     });
   }, [autoFixLanguage]);
 
@@ -661,10 +666,37 @@ export function ProjectEditor() {
     );
   }
 
+
+  // Grup ribbon milik halaman ini (tab Review & View di editor bergaya Word).
+  const ribbonReviewGroups = (
+    <RibbonGroup label="Proofing">
+      <div className="flex items-center px-1 [&_span]:!text-[var(--wc-text-dim)]">
+        <AutoFixButton
+          text={contentForCounter}
+          onApply={handleAutoFixContent}
+          language={autoFixLanguage}
+          label="Auto Fix Spelling"
+          className="h-[30px] px-3 rounded-[4px] text-[12.5px] border border-[var(--wc-border-strong)] bg-[var(--wc-input)] text-[var(--wc-text)] hover:bg-[var(--wc-hover)] disabled:opacity-40"
+        />
+      </div>
+    </RibbonGroup>
+  );
+  const ribbonViewGroups = (
+    <RibbonGroup label="Views">
+      <BigButton
+        icon={showPreview ? <EyeOff /> : <Eye />}
+        label={'Live\nPreview'}
+        title="Tampilkan preview di samping editor"
+        active={showPreview}
+        onClick={() => setShowPreview(!showPreview)}
+      />
+    </RibbonGroup>
+  );
+
   return (
     <div className="flex flex-col min-h-screen bg-[#0F172A]">
       {/* Sticky Header */}
-      <header className="sticky top-0 z-40 bg-[#1E293B] border-b border-[#334155] py-3 px-4 sm:px-6">
+      <header className="sticky -top-6 lg:-top-8 z-40 bg-[#1E293B] border-b border-[#334155] py-3 px-4 sm:px-6">
         <div className="flex items-center justify-between max-w-[90rem] mx-auto">
           <div className="flex items-center gap-3 sm:gap-4">
             <button
@@ -684,18 +716,6 @@ export function ProjectEditor() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Word & Character Counter */}
-            <div className="hidden sm:flex items-center gap-4 text-xs text-[#94A3B8] border-r border-[#334155] pr-4">
-              <div>
-                <span className="font-medium text-[#F8FAFC]">{wordCount}</span>
-                <span className="ml-1">words</span>
-              </div>
-              <div>
-                <span className="font-medium text-[#F8FAFC]">{characterCount}</span>
-                <span className="ml-1">chars</span>
-              </div>
-            </div>
-
             {/* Autosave Indicator */}
             {autosave.status === 'saving' && (
               <span className="flex items-center text-amber-500 font-medium text-xs">
@@ -806,10 +826,10 @@ export function ProjectEditor() {
       )}
 
       {/* Main Content - 12 Column Grid */}
-      <main className="flex-1 p-4 sm:p-6 overflow-auto">
+      <main className="flex-1 p-4 sm:p-6">
         <div className="grid grid-cols-12 gap-4 sm:gap-6 lg:gap-8 max-w-[90rem] mx-auto">
           {/* Editor Area - col-span-8 on large screens */}
-          <div className="col-span-12 lg:col-span-8 space-y-4">
+          <div className="col-span-12 lg:col-span-8 space-y-4 flex flex-col">
             
             {/* Language Tabs & ID Display */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#334155] pb-2">
@@ -859,35 +879,6 @@ export function ProjectEditor() {
               />
             </div>
 
-            {/* Toolbar Area (Now handled inside RichTextEditor, we keep the flex layout for align actions) */}
-            <div className="flex items-center justify-end gap-2 flex-wrap">
-
-              <div className="flex items-center gap-2">
-                <AutoFixButton
-                  text={exactLocalizedContent}
-                  onApply={handleAutoFixContent}
-                  language={autoFixLanguage}
-                />
-
-                {/* Live Preview Toggle */}
-                <button
-                  onClick={() => setShowPreview(!showPreview)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    showPreview
-                      ? 'bg-[#1E40AF] text-white'
-                      : 'bg-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC] border border-[#334155]'
-                  }`}
-                >
-                  {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  <span className="hidden sm:inline">{showPreview ? 'Hide Preview' : 'Live Preview'}</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-xs text-[#94A3B8] px-1">
-              <span>Words: {wordCount}</span>
-              <span>Characters: {characterCount}</span>
-            </div>
 
             {/* Caret Suggestions */}
             {caretWord && caretSuggestions.length > 0 && (
@@ -915,7 +906,7 @@ export function ProjectEditor() {
 
             {/* Content Area - Editor or Split View */}
             {showPreview ? (
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="flex-1 grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {/* Editor */}
                 <div className="flex flex-col h-full">
                   <label className="text-xs text-[#94A3B8] font-medium mb-2">VISUAL EDITOR</label>
@@ -927,6 +918,9 @@ export function ProjectEditor() {
                     onOpenImageDialog={() => setImageDialogOpen(true)}
                     onOpenLinkDialog={() => setLinkDialogOpen(true)}
                     onOpenAssetReuser={() => setAssetReuserOpen(true)}
+                    reviewGroups={ribbonReviewGroups}
+                    viewGroups={ribbonViewGroups}
+                    language={autoFixLanguage}
                     className="flex-1 min-h-[60vh]"
                   />
                 </div>
@@ -962,7 +956,10 @@ export function ProjectEditor() {
                 onOpenImageDialog={() => setImageDialogOpen(true)}
                 onOpenLinkDialog={() => setLinkDialogOpen(true)}
                 onOpenAssetReuser={() => setAssetReuserOpen(true)}
-                className="w-full min-h-[70vh]"
+                reviewGroups={ribbonReviewGroups}
+                viewGroups={ribbonViewGroups}
+                language={autoFixLanguage}
+                className="w-full flex-1 min-h-[70vh]"
               />
             )}
           </div>
@@ -996,7 +993,7 @@ export function ProjectEditor() {
         isOpen={assetReuserOpen}
         onClose={() => setAssetReuserOpen(false)}
         sourceLanguage={autoFixLanguage === 'en' ? 'id' : 'en'}
-        otherLanguageContent={getExactLocalizedText(project.content, autoFixLanguage === 'en' ? 'id' : 'en')}
+        otherLanguageContent={contentForAssetReuse(getExactLocalizedText(project.content, autoFixLanguage === 'en' ? 'id' : 'en'))}
         onInsert={(markdown) => insertMarkdown(markdown)}
       />
 

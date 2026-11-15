@@ -11,8 +11,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@floating-ui/dom": "^1.7.6",
+    "@tiptap/extension-highlight": "^3.23.6",
     "@tiptap/extension-image": "^3.23.6",
     "@tiptap/extension-link": "^3.23.6",
+    "@tiptap/extension-subscript": "^3.23.6",
+    "@tiptap/extension-superscript": "^3.23.6",
+    "@tiptap/extension-table": "^3.23.6",
+    "@tiptap/extension-text-align": "^3.23.6",
+    "@tiptap/extension-text-style": "^3.23.6",
     "@tiptap/extension-youtube": "^3.23.6",
     "@tiptap/pm": "^3.23.6",
     "@tiptap/react": "^3.23.6",
@@ -20,6 +27,7 @@
     "@types/prismjs": "^1.26.6",
     "an-array-of-english-words": "^2.0.0",
     "clsx": "^2.1.1",
+    "dompurify": "^3.2.6",
     "katex": "^0.16.22",
     "lucide-react": "^0.475.0",
     "mermaid": "^11.5.0",

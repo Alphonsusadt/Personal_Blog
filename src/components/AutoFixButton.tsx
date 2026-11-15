@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { detectTextLanguage, type AutoFixLanguageOption, type TextFixResult } from '../utils/textAutoFix';
+import { detectTextLanguage, type AutoFixLanguageOption, type TextFixResult, type TextFixChange } from '../utils/textAutoFix';
 import { api, API_BASE } from '../lib/api';
 
 interface AutoFixButtonProps {
   text: string;
-  onApply: (nextText: string) => void;
+  /** `changes` dipakai editor rich (HTML) untuk menerapkan koreksi per kata. */
+  onApply: (nextText: string, changes: TextFixChange[]) => void;
   disabled?: boolean;
   className?: string;
   label?: string;
@@ -87,7 +88,7 @@ export function AutoFixButton({
     }
 
     if (resultPreview.text !== text) {
-      onApply(resultPreview.text);
+      onApply(resultPreview.text, resultPreview.changes);
       setStatus(`Applied ${resultPreview.changes.length} fix${resultPreview.changes.length === 1 ? '' : 'es'}`);
       return;
     }

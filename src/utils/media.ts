@@ -83,6 +83,14 @@ export function extractBase64Images(
     });
   }
 
+  // Konten rich (HTML dari editor ribbon): <img src="data:..." alt="...">
+  for (const tag of content.match(/<img\b[^>]*>/gi) || []) {
+    const src = tag.match(/\ssrc="(data:image\/[^"]+)"/i);
+    if (!src) continue;
+    const alt = tag.match(/\salt="([^"]*)"/i);
+    results.push({ altText: alt ? alt[1] : '', base64Data: src[1] });
+  }
+
   return results;
 }
 
@@ -106,6 +114,8 @@ export function replaceBase64WithUrl(
       new RegExp(`!\\[([^\\]]*)]\\(${escaped}\\)`, 'g'),
       `![$1](${url})`
     );
+    // Konten rich (HTML dari editor ribbon): ganti atribut src pada tag <img>.
+    result = result.split(`src="${base64}"`).join(`src="${url}"`);
   });
 
   return result;

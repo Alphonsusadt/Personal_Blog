@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api, getRuntimeCache, setRuntimeCache, invalidateRuntimeCache, ADMIN_PATH } from '../../lib/api';
-import { BookToolbar } from '../../components/BookToolbar';
+import { RichTextEditor, type RichTextEditorRef } from '../../components/RichTextEditor';
+import { RibbonGroup, BigButton } from '../../components/ribbon/primitives';
+import { isRichHtml, contentToPlainText, applyWordFixesToRichHtml, contentForAssetReuse } from '../../lib/richContent';
 import { BookSidebar } from '../../components/BookSidebar';
 import { ImageUploadDialog } from '../../components/ImageUploadDialog';
 import { LinkInsertDialog } from '../../components/LinkInsertDialog';
@@ -122,6 +124,7 @@ export function BookEditor() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<RichTextEditorRef>(null);
   const pendingCreateRef = useRef(false);
   const dbIdRef = useRef<string | undefined>(undefined);
   const justCreatedRef = useRef(false);
@@ -289,7 +292,7 @@ export function BookEditor() {
 
   // Use resolveLocalizedText with fallback to ensure counter works even when content
   // is stored in a different language than the currently selected one
-  const reviewForCounter = resolveLocalizedText(book.review, autoFixLanguage);
+  const reviewForCounter = contentToPlainText(resolveLocalizedText(book.review, autoFixLanguage));
   const plainContent = reviewForCounter
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`[^`]*`/g, ' ')
@@ -414,10 +417,13 @@ export function BookEditor() {
     setBook(prev => ({ ...prev, review: setLocalizedText(prev.review, autoFixLanguage, review) }));
   }, [autoFixLanguage]);
 
-  const handleAutoFixReview = useCallback((nextReview: string) => {
+  const handleAutoFixReview = useCallback((nextReview: string, changes?: Array<{ from: string; to: string }>) => {
     setBook(prev => {
-      if (getExactLocalizedText(prev.review, autoFixLanguage) === nextReview) return prev;
-      return { ...prev, review: setLocalizedText(prev.review, autoFixLanguage, nextReview) };
+      const current = getExactLocalizedText(prev.review, autoFixLanguage);
+      // Konten rich (HTML): terapkan koreksi per kata pada node teks, bukan string mentah.
+      const next = isRichHtml(current) && changes ? applyWordFixesToRichHtml(current, changes) : nextReview;
+      if (current === next) return prev;
+      return { ...prev, review: setLocalizedText(prev.review, autoFixLanguage, next) };
     });
   }, [autoFixLanguage]);
 
@@ -454,6 +460,7 @@ export function BookEditor() {
   }, [caretWord, handleAutoFixReview, updateCaretSuggestions]);
 
   const insertMarkdown = (before: string, after: string = '') => {
+    if (editorRef.current) { editorRef.current.insertMarkdown(before + after); return; }
     const textarea = textareaRef.current;
 
     if (!textarea) {
@@ -488,6 +495,12 @@ export function BookEditor() {
   };
 
   const insertImageMarkdown = (imageMarkdown: string) => {
+    const imgMatch = imageMarkdown.match(/!\[(.*?)\]\((.*?)\)/);
+    if (editorRef.current) {
+      if (imgMatch) editorRef.current.insertImage(imgMatch[1], imgMatch[2]);
+      else editorRef.current.insertMarkdown(imageMarkdown);
+      return;
+    }
     const textarea = textareaRef.current;
     if (!textarea) {
       setBook(prev => {
@@ -515,6 +528,12 @@ export function BookEditor() {
   };
 
   const insertLinkMarkdown = (linkMarkdown: string) => {
+    const linkMatch = linkMarkdown.match(/\[(.*?)\]\((.*?)\)/);
+    if (editorRef.current) {
+      if (linkMatch) editorRef.current.insertLink(linkMatch[1], linkMatch[2]);
+      else editorRef.current.insertMarkdown(linkMarkdown);
+      return;
+    }
     const textarea = textareaRef.current;
     if (!textarea) {
       setBook(prev => {
@@ -626,10 +645,37 @@ export function BookEditor() {
     );
   }
 
+
+  // Grup ribbon milik halaman ini (tab Review & View di editor bergaya Word).
+  const ribbonReviewGroups = (
+    <RibbonGroup label="Proofing">
+      <div className="flex items-center px-1 [&_span]:!text-[var(--wc-text-dim)]">
+        <AutoFixButton
+          text={reviewForCounter}
+          onApply={handleAutoFixReview}
+          language={autoFixLanguage}
+          label="Auto Fix Spelling"
+          className="h-[30px] px-3 rounded-[4px] text-[12.5px] border border-[var(--wc-border-strong)] bg-[var(--wc-input)] text-[var(--wc-text)] hover:bg-[var(--wc-hover)] disabled:opacity-40"
+        />
+      </div>
+    </RibbonGroup>
+  );
+  const ribbonViewGroups = (
+    <RibbonGroup label="Views">
+      <BigButton
+        icon={showPreview ? <EyeOff /> : <Eye />}
+        label={'Live\nPreview'}
+        title="Tampilkan preview di samping editor"
+        active={showPreview}
+        onClick={() => setShowPreview(!showPreview)}
+      />
+    </RibbonGroup>
+  );
+
   return (
     <div className="flex flex-col min-h-screen bg-[#0F172A]">
       {/* Sticky Header */}
-      <header className="sticky top-0 z-40 bg-[#1E293B] border-b border-[#334155] py-3 px-6">
+      <header className="sticky -top-6 lg:-top-8 z-40 bg-[#1E293B] border-b border-[#334155] py-3 px-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
@@ -648,18 +694,6 @@ export function BookEditor() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Word & Character Counter */}
-            <div className="hidden sm:flex items-center gap-4 text-xs text-[#94A3B8] border-r border-[#334155] pr-4">
-              <div>
-                <span className="font-medium text-[#F8FAFC]">{wordCount}</span>
-                <span className="ml-1">words</span>
-              </div>
-              <div>
-                <span className="font-medium text-[#F8FAFC]">{characterCount}</span>
-                <span className="ml-1">chars</span>
-              </div>
-            </div>
-
             {/* Autosave Indicator */}
             {autosave.status === 'saving' && (
               <span className="flex items-center text-amber-500 font-medium">
@@ -770,10 +804,10 @@ export function BookEditor() {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 p-6 overflow-auto">
+      <main className="flex-1 p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl">
           {/* Editor Area - Left */}
-          <div className="md:col-span-2 space-y-4">
+          <div className="md:col-span-2 space-y-4 flex flex-col">
             
             {/* Language Tabs & ID Display */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#334155] pb-2">
@@ -830,43 +864,6 @@ export function BookEditor() {
               />
             </div>
 
-            {/* Toolbar with Preview Toggle */}
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <BookToolbar 
-                textareaRef={textareaRef} 
-                onInsert={insertMarkdown}
-                onInsertImage={insertImageMarkdown}
-                onOpenImageDialog={() => setImageDialogOpen(true)}
-                onOpenLinkDialog={() => setLinkDialogOpen(true)}
-                onOpenAssetReuser={() => setAssetReuserOpen(true)}
-              />
-
-              <div className="flex items-center gap-2">
-                <AutoFixButton
-                  text={exactLocalizedReview}
-                  onApply={handleAutoFixReview}
-                  language={autoFixLanguage}
-                />
-
-                {/* Live Preview Toggle */}
-                <button
-                  onClick={() => setShowPreview(!showPreview)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    showPreview
-                      ? 'bg-[#1E40AF] text-white'
-                      : 'bg-[#1E293B] text-[#94A3B8] hover:text-[#F8FAFC] border border-[#334155]'
-                  }`}
-                >
-                  {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  <span className="hidden sm:inline">{showPreview ? 'Hide Preview' : 'Live Preview'}</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-xs text-[#94A3B8] px-1">
-              <span>Words: {wordCount}</span>
-              <span>Characters: {characterCount}</span>
-            </div>
 
             {/* Caret Suggestions */}
             {caretWord && caretSuggestions.length > 0 && (
@@ -894,54 +891,46 @@ export function BookEditor() {
 
             {/* Content Area - Editor or Split View */}
             {showPreview ? (
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                {/* Editor */}
+              <div className="flex-1 grid grid-cols-1 xl:grid-cols-2 gap-4">
                 <div className="flex flex-col h-full">
-                  <label className="text-xs text-[#94A3B8] font-medium mb-2">MARKDOWN</label>
-                  <IsolatedContentEditor
+                  <label className="text-xs text-[#94A3B8] font-medium mb-2">VISUAL EDITOR</label>
+                  <RichTextEditor
+                    ref={editorRef}
                     initialValue={exactLocalizedReview}
                     onCommit={handleReviewCommit}
                     id={`${book._id || book.id}-${autoFixLanguage}`}
-                    textareaRef={textareaRef}
-                    spellCheck
-                    lang={autoFixLanguage}
-                    placeholder="Book review... (Markdown, LaTeX $$...$$ supported)"
-                    className="flex-1 min-h-[60vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
+                    placeholder={autoFixLanguage === 'id' ? 'Tulis ulasan buku...' : 'Write your book review...'}
+                    onOpenImageDialog={() => setImageDialogOpen(true)}
+                    onOpenLinkDialog={() => setLinkDialogOpen(true)}
+                    onOpenAssetReuser={() => setAssetReuserOpen(true)}
+                    reviewGroups={ribbonReviewGroups}
+                    viewGroups={ribbonViewGroups}
+                    language={autoFixLanguage}
+                    className="flex-1 min-h-[60vh]"
                   />
                 </div>
-
-                {/* Preview */}
                 <div className="flex flex-col h-full">
                   <label className="text-xs text-[#94A3B8] font-medium mb-2">PREVIEW</label>
                   <div
-                    className="flex-1 min-h-[60vh] bg-white border border-[#E5E7EB] rounded-lg px-4 py-4 overflow-y-auto prose prose-sm max-w-none preview-scroll-light
-                      prose-h1:text-[#1A1A1A] prose-h2:text-[#2D3748] prose-h3:text-[#2D3748]
-                      prose-h1:font-bold prose-h2:font-semibold prose-h3:font-semibold
-                      prose-p:text-[#374151]
-                      prose-a:text-[#1E40AF] prose-a:hover:text-[#1E3A8A]
-                      prose-strong:text-[#1A1A1A] prose-strong:font-semibold
-                      prose-em:text-[#374151]
-                      prose-code:text-[#DC2626] prose-code:bg-[#FEE2E2] prose-code:px-2 prose-code:py-1 prose-code:rounded
-                      prose-pre:bg-[#F3F4F6] prose-pre:text-[#1F2937]
-                      prose-blockquote:text-[#4B5563] prose-blockquote:border-l-[#1E40AF]
-                      prose-ul:text-[#374151]
-                      prose-ol:text-[#374151]
-                      prose-li:text-[#374151]"
+                    className="flex-1 min-h-[60vh] bg-white border border-[#E5E7EB] rounded-lg px-4 py-4 overflow-y-auto max-w-none preview-scroll-light"
                     dangerouslySetInnerHTML={{ __html: previewHtml }}
                   />
                 </div>
               </div>
             ) : (
-              /* Full Editor (no preview) */
-              <IsolatedContentEditor
+              <RichTextEditor
+                ref={editorRef}
                 initialValue={exactLocalizedReview}
                 onCommit={handleReviewCommit}
                 id={`${book._id || book.id}-${autoFixLanguage}`}
-                textareaRef={textareaRef}
-                spellCheck
-                lang={autoFixLanguage}
-                placeholder="Book review... (Markdown, LaTeX $$...$$ supported)"
-                className="w-full min-h-[70vh] bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-4 py-4 text-sm font-mono focus:outline-none focus:border-[#60A5FA] resize-none"
+                placeholder={autoFixLanguage === 'id' ? 'Tulis ulasan buku...' : 'Write your book review...'}
+                onOpenImageDialog={() => setImageDialogOpen(true)}
+                onOpenLinkDialog={() => setLinkDialogOpen(true)}
+                onOpenAssetReuser={() => setAssetReuserOpen(true)}
+                reviewGroups={ribbonReviewGroups}
+                viewGroups={ribbonViewGroups}
+                language={autoFixLanguage}
+                className="w-full flex-1 min-h-[70vh]"
               />
             )}
           </div>
@@ -973,7 +962,7 @@ export function BookEditor() {
         isOpen={assetReuserOpen}
         onClose={() => setAssetReuserOpen(false)}
         sourceLanguage={autoFixLanguage === 'en' ? 'id' : 'en'}
-        otherLanguageContent={getExactLocalizedText(book.review, autoFixLanguage === 'en' ? 'id' : 'en')}
+        otherLanguageContent={contentForAssetReuse(getExactLocalizedText(book.review, autoFixLanguage === 'en' ? 'id' : 'en'))}
         onInsert={(markdown) => insertMarkdown(markdown)}
       />
 

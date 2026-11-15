@@ -3,6 +3,7 @@ import { ArrowLeft, Star, StarHalf, Book, User, Sparkles, CheckCircle, Calendar,
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { resolveLocalizedText } from '../lib/localized';
+import { useRenderedMarkdown } from '../hooks/useRenderedMarkdown';
 import { useSiteLanguage } from '../hooks/useSiteLanguage';
 import { t } from '../lib/translations';
 
@@ -121,6 +122,8 @@ export function BookDetail() {
   const { language } = useSiteLanguage();
   const [book, setBook] = useState<BookType | null>(null);
   const [loading, setLoading] = useState(true);
+  // Ulasan bisa berupa HTML dari editor ribbon atau Markdown lama; keduanya dirender.
+  const reviewHtml = useRenderedMarkdown(book ? resolveLocalizedText(book.review, language) : '');
 
   useEffect(() => {
     if (!id) {
@@ -276,9 +279,10 @@ export function BookDetail() {
             {t('library.myReview', language)}
           </h2>
           <div className="bg-surface-soft border border-hairline rounded-[24px] p-8 lg:p-12">
-            <p className="body-lg text-ink opacity-80 leading-relaxed serif-font">
-              {book.review}
-            </p>
+            <div
+              className="body-lg text-ink leading-relaxed serif-font"
+              dangerouslySetInnerHTML={{ __html: reviewHtml }}
+            />
           </div>
         </section>
 

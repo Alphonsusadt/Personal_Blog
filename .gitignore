@@ -42,3 +42,7 @@ cms/backups/
 /linkedin_banner_*.png
 /public/logo-designs/
 
+
+# Reference repo (Word-like ribbon), not part of this project
+/reference/
+cms/.env.dev

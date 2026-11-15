@@ -216,6 +216,42 @@ export async function renderContent(content: string): Promise<string> {
   return processedContent;
 }
 
+/** Satu blok kode → HTML ber-highlight (Prism) dengan gutter nomor baris. */
+function codeBlockHtml(rawLangInput: string, code: string, Prism: any | null): string {
+  const rawLang = rawLangInput.toLowerCase();
+  const prismLang = getPrismLang(rawLang);
+  let highlighted: string;
+  const grammar = Prism?.languages?.[prismLang];
+  try {
+    highlighted = grammar ? Prism.highlight(code, grammar, prismLang) : escapeHtml(code);
+  } catch {
+    highlighted = escapeHtml(code);
+  }
+  if (!grammar) highlighted = escapeHtml(code.trimEnd());
+
+  const highlightedLines = highlighted.split('\n');
+  const gutterWidth = String(highlightedLines.length).length;
+  const label = LANG_LABELS[prismLang] || (rawLang ? rawLang.charAt(0).toUpperCase() + rawLang.slice(1) : 'Code');
+  const colors = LANG_COLORS[prismLang] || { bg: '#f3f4f6', text: '#374151' };
+
+  const rowsHtml = highlightedLines.map((lineHtml, i) =>
+    `<tr><td style="user-select:none;text-align:right;padding:0 16px 0 16px;border-right:1px solid #3d3d3d;color:#555;vertical-align:top;white-space:nowrap;width:${gutterWidth + 3}ch;">${String(i + 1).padStart(gutterWidth)}</td><td style="padding:0 16px 0 16px;vertical-align:top;white-space:pre;color:#ccc;">${lineHtml || '&nbsp;'}</td></tr>`
+  ).join('');
+
+  return `<div style="margin:24px 0;border-radius:8px;overflow:hidden;border:1px solid #E5E7EB;box-shadow:0 1px 3px rgba(0,0,0,0.1);"><div style="display:flex;align-items:center;justify-content:space-between;background:#F8FAFC;padding:10px 16px;border-bottom:1px solid #E5E7EB;"><span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:9999px;font-size:13px;font-weight:500;background:${colors.bg};color:${colors.text};"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>${label}</span></div><div style="background:#1e1e1e;overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:13px;line-height:1.6;font-family:'JetBrains Mono','Courier New',monospace;"><tbody style="padding:16px 0;">${rowsHtml}</tbody></table></div></div>`;
+}
+
+/** Dipakai renderer konten rich (HTML): highlight satu blok kode. */
+export async function renderCodeBlockHtml(lang: string, code: string): Promise<string> {
+  let Prism: any = null;
+  try {
+    Prism = await getPrism();
+  } catch (e) {
+    console.error('[renderCodeBlockHtml] Failed to load Prism.js:', e);
+  }
+  return codeBlockHtml(lang, code, Prism);
+}
+
 /** Highlight code blocks with Prism.js and wrap in styled HTML using table layout for alignment */
 async function renderCodeBlocks(content: string): Promise<string> {
   const codeBlockRegex = /```(\w*)\r?\n([\s\S]*?)```/g;
@@ -227,56 +263,11 @@ async function renderCodeBlocks(content: string): Promise<string> {
     Prism = await getPrism();
   } catch (e) {
     console.error('[renderCodeBlocks] Failed to load Prism.js, falling back to plain code blocks:', e);
-    // Fallback: wrap code blocks in simple styled pre/code without highlighting
-    for (const match of matches) {
-      const rawLang = match[1].toLowerCase();
-      if (rawLang === 'mermaid') continue;
-      const code = match[2];
-      const label = LANG_LABELS[rawLang] || (rawLang ? rawLang.charAt(0).toUpperCase() + rawLang.slice(1) : 'Code');
-      const colors = LANG_COLORS[rawLang] || { bg: '#f3f4f6', text: '#374151' };
-      const escaped = escapeHtml(code.trimEnd());
-      const lines = escaped.split('\n');
-      const lineCount = lines.length;
-      const gutterWidth = String(lineCount).length;
-      const rowsHtml = lines.map((line, i) =>
-        `<tr><td style="user-select:none;text-align:right;padding:0 16px 0 16px;border-right:1px solid #3d3d3d;color:#555;vertical-align:top;white-space:nowrap;width:${gutterWidth + 3}ch;">${String(i + 1).padStart(gutterWidth)}</td><td style="padding:0 16px 0 16px;vertical-align:top;white-space:pre;color:#ccc;">${line || '&nbsp;'}</td></tr>`
-      ).join('');
-      const html = `<div style="margin:24px 0;border-radius:8px;overflow:hidden;border:1px solid #E5E7EB;box-shadow:0 1px 3px rgba(0,0,0,0.1);"><div style="display:flex;align-items:center;justify-content:space-between;background:#F8FAFC;padding:10px 16px;border-bottom:1px solid #E5E7EB;"><span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:9999px;font-size:13px;font-weight:500;background:${colors.bg};color:${colors.text};"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>${label}</span></div><div style="background:#1e1e1e;overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:13px;line-height:1.6;font-family:'JetBrains Mono','Courier New',monospace;"><tbody style="padding:16px 0;">${rowsHtml}</tbody></table></div></div>`;
-      content = content.replace(match[0], html);
-    }
-    return content;
   }
 
   for (const match of matches) {
-    const rawLang = match[1].toLowerCase();
-    if (rawLang === 'mermaid') continue;
-
-    const prismLang = getPrismLang(rawLang);
-    const code = match[2];
-    const grammar = Prism.languages[prismLang];
-
-    let highlighted: string;
-    try {
-      highlighted = grammar
-        ? Prism.highlight(code, grammar, prismLang)
-        : escapeHtml(code);
-    } catch {
-      highlighted = escapeHtml(code);
-    }
-
-    const highlightedLines = highlighted.split('\n');
-    const lineCount = highlightedLines.length;
-    const gutterWidth = String(lineCount).length;
-    const label = LANG_LABELS[prismLang] || (rawLang ? rawLang.charAt(0).toUpperCase() + rawLang.slice(1) : 'Code');
-    const colors = LANG_COLORS[prismLang] || { bg: '#f3f4f6', text: '#374151' };
-
-    const rowsHtml = highlightedLines.map((lineHtml, i) =>
-      `<tr><td style="user-select:none;text-align:right;padding:0 16px 0 16px;border-right:1px solid #3d3d3d;color:#555;vertical-align:top;white-space:nowrap;width:${gutterWidth + 3}ch;">${String(i + 1).padStart(gutterWidth)}</td><td style="padding:0 16px 0 16px;vertical-align:top;white-space:pre;color:#ccc;">${lineHtml || '&nbsp;'}</td></tr>`
-    ).join('');
-
-    const html = `<div style="margin:24px 0;border-radius:8px;overflow:hidden;border:1px solid #E5E7EB;box-shadow:0 1px 3px rgba(0,0,0,0.1);"><div style="display:flex;align-items:center;justify-content:space-between;background:#F8FAFC;padding:10px 16px;border-bottom:1px solid #E5E7EB;"><span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:9999px;font-size:13px;font-weight:500;background:${colors.bg};color:${colors.text};"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>${label}</span></div><div style="background:#1e1e1e;overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:13px;line-height:1.6;font-family:'JetBrains Mono','Courier New',monospace;"><tbody style="padding:16px 0;">${rowsHtml}</tbody></table></div></div>`;
-
-    content = content.replace(match[0], html);
+    if (match[1].toLowerCase() === 'mermaid') continue;
+    content = content.replace(match[0], codeBlockHtml(match[1], match[2], Prism));
   }
 
   return content;
