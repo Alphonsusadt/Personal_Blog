@@ -32,6 +32,8 @@ const PROTECTED = [
   /<pre\b[\s\S]*?<\/pre>/gi,
   /<div class="(?:math-block|tikz-block|social-embed)"[^>]*>[\s\S]*?<\/div>/gi,
   /<span class="math-inline"[^>]*>[\s\S]*?<\/span>/gi,
+  // Embed bergaya gambar: penanda media kosong di dalam span.wc-embed (keterangannya tetap diterjemahkan).
+  /<span class="social-embed"[^>]*>\s*<\/span>/gi,
   /<img\b[^>]*>/gi,
   /<code\b[^>]*>[\s\S]*?<\/code>/gi,
 ];

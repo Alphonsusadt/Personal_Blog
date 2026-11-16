@@ -239,6 +239,7 @@ Ketiga jenis tulisan (Writing, Project, ulasan Buku) memakai editor yang sama: r
 * **8 titik resize** dengan rasio terkunci; satu tarikan = satu langkah Undo.
 * **Picture Format**: Position, lebar (%), Reset Size, **Crop** (bebas atau 1:1/4:3/3:2/16:9), **Rotate/Flip** 90° (piksel ikut diputar, jadi kotak gambar tidak menutupi teks), Picture Styles (sudut bulat, bayangan, bingkai), **Alt Text**, dan **Caption** (keterangan di bawah gambar, ikut diterjemahkan).
 * **Responsif**: Posisi disimpan relatif terhadap paragraf dan lebar kolom, sehingga tetap proporsional di layar desktop mana pun. Di HP (≤ 640px) gambar mengambang/bebas otomatis menjadi lebar penuh di antara paragraf supaya teks tidak terjepit atau tertutup.
+* **Embed YouTube / Instagram / X ikut ditata seperti gambar**: tempel link (atau Insert → Embed), lalu klik embed untuk membuka tab **Embed Format**: Wrap Text (semua mode kecuali Tight), Position, lebar, Reset Size, Styles, dan Caption — plus drag bebas, 8 titik resize, dan tombol Layout Options yang sama. Crop/Rotate/Alt Text tidak tersedia untuk embed. Embed lama (format `<div class="social-embed">`) otomatis dibaca ke model baru saat tulisan dibuka; rata kiri/kanan menjadi Square, selain itu Top and Bottom. Di halaman publik video diputar langsung (youtube-nocookie), dan post X dimuat otomatis lewat widget resmi X.
 
 ### 🌍 11. Tampilan Publik
 * Konten HTML dibersihkan dengan **DOMPurify** sebelum ditampilkan (skrip dan atribut berbahaya dibuang), lalu rumus, kode, TikZ, Mermaid, dan embed dirender.

@@ -28,7 +28,7 @@ import {
 import { TableGridPicker, EmbedForm } from './panels';
 import { WRAP_OPTIONS, WrapIcon, STYLE_OPTIONS, transformImage, cropImage } from './imageLayout';
 import { PictureCropDialog } from './PictureCropDialog';
-import { isFreeWrap } from '../../lib/tiptap-extensions';
+import { isFreeWrap, defaultEmbedWidth } from '../../lib/tiptap-extensions';
 import { NodeSelection } from '@tiptap/pm/state';
 
 export type RibbonTabId = 'home' | 'insert' | 'review' | 'view' | 'table' | 'picture';
@@ -79,7 +79,7 @@ const DEAD_STATE = {
   highlight: null as string | null, color: null as string | null, font: 'Merriweather', size: 12,
   bullet: false, ordered: false, inList: false, quote: false, codeBlock: false,
   align: 'left' as 'left' | 'center' | 'right' | 'justify', lineHeight: null as string | null, block: 'p',
-  inTable: false, image: null as Record<string, any> | null, canUndo: false, canRedo: false, hasSelection: false, canMerge: false, canSplit: false,
+  inTable: false, image: null as Record<string, any> | null, mediaType: null as 'image' | 'socialEmbed' | null, canUndo: false, canRedo: false, hasSelection: false, canMerge: false, canSplit: false,
 };
 
 function StyleTile({ tile, active, onApply }: { tile: (typeof STYLE_TILES)[number]; active: boolean; onApply: (id: string) => void }) {
@@ -196,7 +196,10 @@ export const Ribbon = memo(function Ribbon(props: RibbonProps) {
           : e.isActive('blockquote') ? 'quote'
           : e.isActive('codeBlock') ? 'code' : 'p',
         inTable: e.isActive('table'),
-        image: e.isActive('image') ? { ...e.getAttributes('image') } : null,
+        // Gambar atau embed sosial terpilih: keduanya memakai tab Format yang sama.
+        image: e.isActive('image') ? { ...e.getAttributes('image') }
+          : e.isActive('socialEmbed') ? { ...e.getAttributes('socialEmbed') } : null,
+        mediaType: (e.isActive('image') ? 'image' : e.isActive('socialEmbed') ? 'socialEmbed' : null) as 'image' | 'socialEmbed' | null,
         canUndo: e.can().undo(),
         canRedo: e.can().redo(),
         hasSelection: !e.state.selection.empty,
@@ -543,11 +546,13 @@ export const Ribbon = memo(function Ribbon(props: RibbonProps) {
 
   /* ------------------------------------------------------------ Tab: Picture Format (kontekstual) */
   const img = s.image;
+  const mediaType = (s.mediaType ?? 'image') as 'image' | 'socialEmbed';
+  const isEmbed = mediaType === 'socialEmbed';
   // Gambar tetap terpilih setelah diubah (seperti Word), supaya tab ini tidak hilang.
   // focus() bawaan mengubah seleksi node menjadi kursor teks, jadi seleksinya dipulihkan.
   const setImage = (patch: Record<string, unknown>) => {
     const sel = editor.state.selection;
-    const pos = sel instanceof NodeSelection && sel.node.type.name === 'image' ? sel.from : null;
+    const pos = sel instanceof NodeSelection && sel.node.type.name === mediaType ? sel.from : null;
     // Mode bebas: gambar yang diperlebar tidak boleh keluar dari kolom.
     const cur = pos !== null ? (sel as NodeSelection).node.attrs : null;
     if (cur && isFreeWrap(patch.wrap ?? cur.wrap) && patch.width !== undefined) {
@@ -555,8 +560,8 @@ export const Ribbon = memo(function Ribbon(props: RibbonProps) {
       const x = Number(patch.offsetX ?? cur.offsetX) || 0;
       if (x + w > 100) patch = { ...patch, offsetX: Math.max(0, 100 - w) };
     }
-    chain().updateAttributes('image', patch).run();
-    if (pos !== null && editor.state.doc.nodeAt(pos)?.type.name === 'image') editor.commands.setNodeSelection(pos);
+    chain().updateAttributes(mediaType, patch).run();
+    if (pos !== null && editor.state.doc.nodeAt(pos)?.type.name === mediaType) editor.commands.setNodeSelection(pos);
   };
   // Pengolahan piksel (putar/balik/potong) bersifat async: simpan posisi node sekarang,
   // lalu ganti src hanya bila node di posisi itu masih gambar yang sama.
@@ -592,7 +597,7 @@ export const Ribbon = memo(function Ribbon(props: RibbonProps) {
           title="Wrap Text: atur hubungan gambar dengan teks"
           menu={(close) => (
             <>
-              {WRAP_OPTIONS.map(o => (
+              {WRAP_OPTIONS.filter(o => !(isEmbed && o.id === 'tight')).map(o => (
                 <MenuItem key={o.id} active={img.wrap === o.id} title={o.hint} icon={<WrapIcon wrap={o.id} />} onClick={() => { close(); setImage(o.apply(img)); }}>
                   {o.label}
                 </MenuItem>
@@ -653,13 +658,13 @@ export const Ribbon = memo(function Ribbon(props: RibbonProps) {
               icon={<RectangleHorizontal />}
               label="Reset Size"
               title="Kembalikan ke ukuran bawaan"
-              onClick={() => setImage({ width: floating || isFreeWrap(img.wrap) ? '45%' : img.wrap === 'inline' ? '30%' : '100%' })}
+              onClick={() => setImage({ width: floating || isFreeWrap(img.wrap) ? '45%' : img.wrap === 'inline' ? '30%' : isEmbed ? defaultEmbedWidth(img.type) : '100%' })}
             />
           </Row>
         </Stack>
       </RibbonGroup>
 
-      <RibbonGroup label="Adjust">
+      {!isEmbed && <RibbonGroup label="Adjust">
         <BigButton icon={<Crop />} label="Crop" title="Potong gambar" onClick={() => setCropSrc(img.src)} />
         <MenuButton
           big
@@ -676,9 +681,9 @@ export const Ribbon = memo(function Ribbon(props: RibbonProps) {
             </>
           )}
         />
-      </RibbonGroup>
+      </RibbonGroup>}
 
-      <RibbonGroup label="Picture Styles">
+      <RibbonGroup label={isEmbed ? 'Styles' : 'Picture Styles'}>
         <div className="flex items-center gap-1 h-[60px]">
           {STYLE_OPTIONS.map(o => (
             <button
@@ -695,8 +700,8 @@ export const Ribbon = memo(function Ribbon(props: RibbonProps) {
         </div>
       </RibbonGroup>
 
-      <RibbonGroup label="Accessibility">
-        <MenuButton
+      <RibbonGroup label={isEmbed ? 'Caption' : 'Accessibility'}>
+        {!isEmbed && <MenuButton
           big
           icon={<Type />}
           label="Alt Text"
@@ -713,7 +718,7 @@ export const Ribbon = memo(function Ribbon(props: RibbonProps) {
               />
             </div>
           )}
-        />
+        />}
         <BigButton
           icon={<Captions />}
           label="Caption"
@@ -774,7 +779,7 @@ export const Ribbon = memo(function Ribbon(props: RibbonProps) {
     { id: 'review', label: 'Review' },
     { id: 'view', label: 'View' },
     ...(s.inTable ? [{ id: 'table' as const, label: 'Table', contextual: true }] : []),
-    ...(s.image ? [{ id: 'picture' as const, label: 'Picture Format', contextual: true }] : []),
+    ...(s.image ? [{ id: 'picture' as const, label: s.mediaType === 'socialEmbed' ? 'Embed Format' : 'Picture Format', contextual: true }] : []),
   ];
 
   const content = { home, insert, review, view: viewTab, table, picture }[activeTab];

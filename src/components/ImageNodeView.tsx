@@ -14,6 +14,7 @@ import { LayoutGrid } from 'lucide-react';
 import { NodeSelection } from '@tiptap/pm/state';
 import { isFreeWrap, type ImageWrap } from '../lib/tiptap-extensions';
 import { WRAP_OPTIONS, WrapIcon } from './ribbon/imageLayout';
+import { EmbedPreview } from './SocialEmbedView';
 
 type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 const HANDLES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
@@ -36,8 +37,14 @@ export function ImageNodeView(props: NodeViewProps) {
     src: string; alt: string | null; width: string; wrap: ImageWrap; align: string; styleVariant: string; caption: string | null;
     offsetX: number; offsetY: number;
   };
+  // NodeView ini juga dipakai embed sosial (YouTube/Instagram/X): tata letaknya sama persis.
+  const isEmbed = node.type.name === 'socialEmbed';
+  const embedType = isEmbed ? String(node.attrs.type || '') : '';
+  const embedUrl = isEmbed ? String(node.attrs.url || '') : '';
+  // Embed tidak punya bentuk transparan, jadi Tight diperlakukan sebagai Square.
+  const wrapMode: ImageWrap = isEmbed && wrap === 'tight' ? 'square' : wrap;
   const free = isFreeWrap(wrap);
-  const imgRef = useRef<HTMLImageElement>(null);
+  const imgRef = useRef<HTMLSpanElement>(null); // bingkai media (gambar atau embed)
   const [liveWidth, setLiveWidth] = useState<number | null>(null); // % saat sedang ditarik
   const liveRef = useRef<number | null>(null);
   // Posisi sementara saat gambar bebas di-drag/di-resize (sebelum disimpan sebagai satu langkah Undo).
@@ -167,9 +174,9 @@ export function ImageNodeView(props: NodeViewProps) {
   const startResize = (handle: Handle) => (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const img = imgRef.current;
-    if (!img) return;
-    const rect = img.getBoundingClientRect();
+    const frame = imgRef.current;
+    if (!frame) return;
+    const rect = frame.getBoundingClientRect();
     const col = columnWidth() || rect.width;
     const startX = e.clientX, startY = e.clientY;
     const startW = rect.width, startH = rect.height || 1;
@@ -221,11 +228,12 @@ export function ImageNodeView(props: NodeViewProps) {
   };
 
   const shownWidth = liveWidth !== null ? `${liveWidth}%` : width;
-  const cls = ['wc-figure', `wc-wrap-${wrap}`];
-  if (wrap !== 'inline') cls.push(`wc-align-${align}`);
+  const cls = ['wc-figure', `wc-wrap-${wrapMode}`];
+  if (isEmbed) cls.push('wc-embed');
+  if (wrapMode !== 'inline') cls.push(`wc-align-${align}`);
   if (styleVariant && styleVariant !== 'none') cls.push(`wc-style-${styleVariant}`);
   const style: CSSProperties = { width: shownWidth };
-  if (wrap === 'tight' && src) Object.assign(style, { shapeOutside: `url("${src}")`, shapeImageThreshold: 0.3, shapeMargin: '0.75rem' });
+  if (wrapMode === 'tight' && src) Object.assign(style, { shapeOutside: `url("${src}")`, shapeImageThreshold: 0.3, shapeMargin: '0.75rem' });
   if (free) {
     const p = livePos ?? { x: offsetX || 0, y: offsetY || 0 };
     Object.assign(style, { left: `${p.x}%`, top: `${p.y}px` });
@@ -241,11 +249,13 @@ export function ImageNodeView(props: NodeViewProps) {
       onPointerDown={free ? startFreeDrag : undefined}
     >
       {snapGuide && <span className={`wc-snap-guide wc-snap-guide-${snapGuide}`} aria-hidden="true" />}
-      <span className="wc-figure-frame" data-drag-handle={free ? undefined : true}>
-        {broken ? (
+      <span ref={imgRef} className="wc-figure-frame" data-drag-handle={free ? undefined : true}>
+        {isEmbed ? (
+          <EmbedPreview type={embedType} url={embedUrl} />
+        ) : broken ? (
           <span className="wc-img-broken" title={src}>Gambar tidak dapat dimuat</span>
         ) : (
-          <img ref={imgRef} src={src} alt={alt || ''} draggable={false} onError={() => setBroken(true)} />
+          <img src={src} alt={alt || ''} draggable={false} onError={() => setBroken(true)} />
         )}
 
         {selected && (
@@ -277,12 +287,12 @@ export function ImageNodeView(props: NodeViewProps) {
               {menuOpen && (
                 <span className="wc-layout-menu" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}>
                   <span className="wc-layout-menu-title">Layout Options</span>
-                  {WRAP_OPTIONS.map(opt => (
+                  {WRAP_OPTIONS.filter(opt => !(isEmbed && opt.id === 'tight')).map(opt => (
                     <button
                       key={opt.id}
                       type="button"
                       title={opt.hint}
-                      className={`wc-layout-item ${wrap === opt.id ? 'is-active' : ''}`}
+                      className={`wc-layout-item ${wrapMode === opt.id ? 'is-active' : ''}`}
                       onClick={() => { updateAttributes(opt.apply(node.attrs)); setMenuOpen(false); }}
                     >
                       <WrapIcon wrap={opt.id} />
@@ -300,7 +310,7 @@ export function ImageNodeView(props: NodeViewProps) {
         <input
           className="wc-caption wc-caption-input"
           value={caption}
-          placeholder="Tulis keterangan gambar…"
+          placeholder={isEmbed ? 'Tulis keterangan…' : 'Tulis keterangan gambar…'}
           onChange={(e) => updateAttributes({ caption: e.target.value })}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); editor.commands.focus(); }

@@ -1,7 +1,6 @@
 import React, { useImperativeHandle, forwardRef, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { useEditor, useEditorState, EditorContent } from '@tiptap/react';
 import { flushSync } from 'react-dom';
-import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import { TextStyle, Color, FontFamily, FontSize, LineHeight } from '@tiptap/extension-text-style';
@@ -13,7 +12,7 @@ import { TableKit } from '@tiptap/extension-table';
 import { Placeholder } from '@tiptap/extensions';
 import { isFreeWrap } from '../lib/tiptap-extensions';
 import { NodeSelection } from '@tiptap/pm/state';
-import { CustomImage, SocialEmbed, CustomCodeBlock, MathBlock, MathInline, TikzBlock } from '../lib/tiptap-extensions';
+import { CustomImage, SocialEmbed, newEmbedAttrs, CustomCodeBlock, MathBlock, MathInline, TikzBlock } from '../lib/tiptap-extensions';
 import { SearchReplace } from '../lib/searchReplace';
 import { Indent } from '../lib/indent';
 import { detectSocialEmbed, markdownToEditorHtml } from '../lib/markdownConverter';
@@ -26,7 +25,7 @@ import { uploadImage } from '../lib/mediaUploader';
 import { API_BASE } from '../lib/api';
 
 const imageFiles = (list?: FileList | null) => Array.from(list || []).filter(f => /^image\/(png|jpe?g|gif|webp)$/i.test(f.type));
-import { AlignLeft, AlignCenter, AlignRight, Trash2, Minus, Plus } from 'lucide-react';
+import { Minus, Plus } from 'lucide-react';
 
 interface RichTextEditorProps {
   /** Konten tersimpan: HTML rich (berpenanda) atau Markdown lama. */
@@ -102,9 +101,9 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
   /** Zona jatuh untuk gambar yang sedang di-drag di dalam editor (null bila bukan gambar). */
   const dropZone = (pmView: { dragging: any; dom: HTMLElement } | null | undefined, ev: DragEvent | MouseEvent): Zone | null => {
     const dragged = pmView?.dragging?.slice?.content?.firstChild;
-    const isImage = dragged?.type?.name === 'image' || dragged?.firstChild?.type?.name === 'image';
-    if (!pmView || !isImage) return null;
-    const imageNode = dragged.type.name === 'image' ? dragged : dragged.firstChild;
+    const isMedia = (n: any) => n?.type?.name === 'image' || n?.type?.name === 'socialEmbed';
+    if (!pmView || !(isMedia(dragged) || isMedia(dragged?.firstChild))) return null;
+    const imageNode = isMedia(dragged) ? dragged : dragged.firstChild;
     const wrap = imageNode.attrs.wrap;
     if (wrap === 'inline') return null;
     const rect = pmView.dom.getBoundingClientRect();
@@ -118,8 +117,9 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
   };
   const applyDropZone = (zone: Zone) => {
     const ed = editorRef.current;
-    if (!ed || ed.isDestroyed || !ed.isActive('image')) return;
-    if (ed.getAttributes('image').align !== zone.align) ed.chain().updateAttributes('image', { align: zone.align }).run();
+    if (!ed || ed.isDestroyed) return;
+    const type = ed.isActive('image') ? 'image' : ed.isActive('socialEmbed') ? 'socialEmbed' : null;
+    if (type && ed.getAttributes(type).align !== zone.align) ed.chain().updateAttributes(type, { align: zone.align }).run();
   };
   const onOpenLinkDialogRef = useRef(onOpenLinkDialog);
   onOpenLinkDialogRef.current = onOpenLinkDialog;
@@ -245,7 +245,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         // Gambar bebas (In Front of / Behind Text) terpilih: panah menggeser 1px, Shift = 10px.
         const sel = view.state.selection as NodeSelection;
         const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
-        if (arrows[event.key] && sel.node?.type.name === 'image' && isFreeWrap(sel.node.attrs.wrap) && !event.ctrlKey && !event.metaKey) {
+        if (arrows[event.key] && (sel.node?.type.name === 'image' || sel.node?.type.name === 'socialEmbed') && isFreeWrap(sel.node.attrs.wrap) && !event.ctrlKey && !event.metaKey) {
           event.preventDefault();
           const step = event.shiftKey ? 10 : 1;
           const [dx, dy] = arrows[event.key];
@@ -290,7 +290,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
         // Link sosial yang ditempel langsung jadi embed.
         const social = !html ? detectSocialEmbed(text) : null;
         if (social) {
-          const node = view.state.schema.nodes.socialEmbed.create({ url: text.trim(), type: social.type, width: '100%', alignment: 'center' });
+          const node = view.state.schema.nodes.socialEmbed.create(newEmbedAttrs(text, social.type));
           view.dispatch(view.state.tr.replaceSelectionWith(node));
           return true;
         }
@@ -358,7 +358,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
       if (!editor) return;
       const social = detectSocialEmbed(url);
       if (social) {
-        editor.chain().focus().insertContent({ type: 'socialEmbed', attrs: { url, type: social.type, width: '100%', alignment: 'center' } }).run();
+        editor.chain().focus().insertContent({ type: 'socialEmbed', attrs: newEmbedAttrs(url, social.type) }).run();
       } else if (editor.state.selection.empty) {
         editor.chain().focus().insertContent({ type: 'text', text: text || url, marks: [{ type: 'link', attrs: { href: url } }] }).run();
       } else {
@@ -420,14 +420,6 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
   if (!editor || editor.isDestroyed) return null;
 
   const stickyStyle = { top: stickyTop };
-  const imageAttrs = editor.isActive('image') ? editor.getAttributes('image') : editor.isActive('socialEmbed') ? editor.getAttributes('socialEmbed') : {};
-  const updateMediaAttrs = (attrs: Record<string, unknown>) => {
-    if (editor.isActive('image')) editor.chain().focus().updateAttributes('image', attrs).run();
-    else if (editor.isActive('socialEmbed')) editor.chain().focus().updateAttributes('socialEmbed', attrs).run();
-  };
-  const bubbleBtn = (on: boolean) =>
-    `px-2 py-1 text-[11px] font-semibold rounded transition-colors ${on ? 'bg-[var(--wc-accent)] text-white' : 'text-[var(--wc-text)] hover:bg-[var(--wc-hover)]'}`;
-
   return (
     <RibbonThemeContext.Provider value={view.theme}>
       <div
@@ -463,27 +455,6 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
           />
         )}
         </div>
-
-        {/* Ukuran/perataan gambar & embed (muncul saat dipilih) */}
-        <BubbleMenu editor={editor} shouldShow={({ editor: e }) => e.isActive('socialEmbed')}>
-          <div className="wc-shell" data-wc-theme={view.theme}>
-            <div className="bg-[var(--wc-menu)] border border-[var(--wc-border-strong)] rounded-lg shadow-xl p-1 flex items-center gap-1 select-none">
-              {['33%', '50%', '75%', '100%'].map(w => (
-                <button key={w} type="button" onClick={() => updateMediaAttrs({ width: w })} className={bubbleBtn(imageAttrs.width === w || (w === '100%' && !imageAttrs.width))}>{w}</button>
-              ))}
-              <span className="w-px h-5 bg-[var(--wc-border)] mx-1" />
-              {([['left', AlignLeft, 'Kiri (teks membungkus)'], ['center', AlignCenter, 'Tengah'], ['right', AlignRight, 'Kanan (teks membungkus)']] as const).map(([a, Icon, t]) => (
-                <button key={a} type="button" title={t} onClick={() => updateMediaAttrs({ alignment: a })} className={bubbleBtn(imageAttrs.alignment === a || (a === 'center' && !imageAttrs.alignment))}>
-                  <Icon className="w-3.5 h-3.5" />
-                </button>
-              ))}
-              <span className="w-px h-5 bg-[var(--wc-border)] mx-1" />
-              <button type="button" title="Hapus" onClick={() => editor.chain().focus().deleteSelection().run()} className="p-1.5 text-[#d13b3b] hover:bg-[#d13b3b] hover:text-white rounded">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        </BubbleMenu>
 
         {/* Kanvas abu-abu + halaman putih (tampilan = halaman publik mode terang) */}
         <div className="flex-1 flex flex-col min-h-[60vh] overflow-x-auto px-4 py-6" onMouseDown={(e) => {

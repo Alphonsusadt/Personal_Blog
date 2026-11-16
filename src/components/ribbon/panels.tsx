@@ -4,6 +4,7 @@ import { useEditorState } from '@tiptap/react';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { searchPluginKey } from '../../lib/searchReplace';
 import { detectSocialEmbed } from '../../lib/markdownConverter';
+import { newEmbedAttrs } from '../../lib/tiptap-extensions';
 
 /* ---------------------------------------------------------------- Find & Replace */
 
@@ -125,7 +126,7 @@ export function EmbedForm({ editor, onDone }: { editor: Editor; onDone: () => vo
     }
     editor.chain().focus().insertContent({
       type: 'socialEmbed',
-      attrs: { url: url.trim(), type: social.type, width: '100%', alignment: 'center' },
+      attrs: newEmbedAttrs(url, social.type),
     }).run();
     onDone();
   };

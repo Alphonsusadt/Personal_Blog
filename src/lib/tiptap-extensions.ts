@@ -1,7 +1,6 @@
 import Image from '@tiptap/extension-image';
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer } from '@tiptap/react';
-import { SocialEmbedView } from '../components/SocialEmbedView';
 import { ImageNodeView } from '../components/ImageNodeView';
 import CodeBlock from '@tiptap/extension-code-block';
 import { CodeBlockNodeView } from '../components/CodeBlockNodeView';
@@ -132,79 +131,113 @@ export const CustomImage = Image.extend({
   },
 });
 
+/** Lebar awal embed: video selebar kolom, kartu post (IG/X) lebih ramping seperti aslinya. */
+export const defaultEmbedWidth = (type: string) => (type === 'youtube' ? '100%' : '60%');
+
+/** Atribut awal embed baru (dipakai paste URL, Insert → Embed, dan tautan). */
+export function newEmbedAttrs(url: string, type: string) {
+  return { url: url.trim(), type, width: defaultEmbedWidth(type), wrap: 'topBottom', align: 'center' };
+}
+
 /**
- * Custom Tiptap Node for rich social media embeds (YouTube, Instagram, X/Twitter).
+ * Embed YouTube / Instagram / X yang bisa ditata persis seperti gambar: Wrap Text, geser
+ * bebas, resize, gaya bingkai, dan keterangan. HTML yang disimpan (semua inline, karena
+ * berada di dalam paragraf):
+ *
+ *   <span class="wc-figure wc-embed wc-wrap-square wc-align-right" style="width: 45%">
+ *     <span class="social-embed" data-type="youtube" data-url="…"></span>
+ *     <span class="wc-caption">Keterangan</span>   (opsional)
+ *   </span>
+ *
+ * Halaman publik mengganti span.social-embed dengan iframe (lihat richRenderer).
+ * Embed lama (<div class="social-embed" data-alignment>) dibaca ke model ini saat dibuka.
  */
 export const SocialEmbed = Node.create({
   name: 'socialEmbed',
-  group: 'block',
-  atom: true, // This is a leaf node, user cannot edit text inside it directly
+  group: 'inline',
+  inline: true,
+  atom: true,
+  draggable: true,
 
   addAttributes() {
     return {
-      url: {
-        default: '',
-      },
-      type: {
-        default: '', // 'youtube' | 'instagram' | 'twitter'
-      },
-      width: {
-        default: '100%', // '33%' | '50%' | '75%' | '100%'
-      },
-      alignment: {
-        default: 'center', // 'left' | 'center' | 'right'
-      },
+      url: { default: '' },
+      type: { default: '' }, // 'youtube' | 'instagram' | 'twitter'
+      width: { default: '100%' },
+      wrap: { default: 'topBottom' },
+      align: { default: 'center' },
+      styleVariant: { default: 'none' },
+      caption: { default: null },
+      offsetX: { default: 0 },
+      offsetY: { default: 0 },
     };
   },
 
   parseHTML() {
     return [
       {
+        tag: 'span.wc-embed',
+        priority: 70, // sebelum aturan span.wc-figure milik gambar
+        getAttrs: (el) => {
+          const fig = el as HTMLElement;
+          const media = fig.querySelector('.social-embed');
+          if (!media) return false;
+          const cls = fig.classList;
+          const caption = fig.querySelector('.wc-caption');
+          return {
+            url: media.getAttribute('data-url') || '',
+            type: media.getAttribute('data-type') || '',
+            width: fig.style.width || '100%',
+            wrap: IMAGE_WRAPS.find(w => cls.contains(`wc-wrap-${w}`)) ?? 'topBottom',
+            align: (['left', 'center', 'right'] as ImageAlign[]).find(a => cls.contains(`wc-align-${a}`)) ?? 'center',
+            styleVariant: (['rounded', 'shadow', 'border', 'roundedShadow'] as ImageStyleVariant[]).find(s => cls.contains(`wc-style-${s}`)) ?? 'none',
+            caption: caption ? caption.textContent ?? '' : null,
+            offsetX: parseFloat(fig.style.left) || 0,
+            offsetY: parseFloat(fig.style.top) || 0,
+          };
+        },
+      },
+      {
+        // Format lama (blok mengambang). Rata kiri/kanan = Square, selain itu = Top and Bottom.
         tag: 'div.social-embed',
         getAttrs: (dom) => {
-          const element = dom as HTMLElement;
+          const el = dom as HTMLElement;
+          const a = el.getAttribute('data-alignment');
+          const side = a === 'left' || a === 'right';
           return {
-            url: element.getAttribute('data-url') || '',
-            type: element.getAttribute('data-type') || '',
-            width: element.getAttribute('data-width') || '100%',
-            alignment: element.getAttribute('data-alignment') || 'center',
+            url: el.getAttribute('data-url') || '',
+            type: el.getAttribute('data-type') || '',
+            width: el.getAttribute('data-width') || '100%',
+            wrap: side ? 'square' : 'topBottom',
+            align: side ? a : 'center',
           };
         },
       },
     ];
   },
 
-  renderHTML({ HTMLAttributes }) {
-    const { type, url, width, alignment } = HTMLAttributes;
-    let float = 'none';
-    let margin = '1.5rem auto';
-    let display = 'block';
-    
-    if (alignment === 'left') {
-      float = 'left';
-      margin = '0.5rem 1.5rem 1.5rem 0';
-    } else if (alignment === 'right') {
-      float = 'right';
-      margin = '0.5rem 0 1.5rem 1.5rem';
-    }
-    
-    const style = `width: ${width}; float: ${float}; margin: ${margin}; display: ${display}; max-width: 100%;`;
-    
-    return [
-      'div',
-      mergeAttributes(HTMLAttributes, {
-        class: 'social-embed',
-        'data-type': type,
-        'data-url': url,
-        'data-width': width,
-        'data-alignment': alignment,
-        style,
-      }),
-    ];
+  renderHTML({ node }) {
+    const { url, type, width, wrap, align, styleVariant, caption, offsetX, offsetY } = node.attrs;
+    const w = wrap === 'tight' ? 'square' : wrap; // Tight butuh bentuk gambar; embed = kotak
+    const cls = ['wc-figure', 'wc-embed', `wc-wrap-${w}`];
+    if (w !== 'inline') cls.push(`wc-align-${align}`);
+    if (styleVariant && styleVariant !== 'none') cls.push(`wc-style-${styleVariant}`);
+    let style = `width: ${width}`;
+    if (isFreeWrap(w)) style += `; left: ${Math.round((offsetX || 0) * 100) / 100}%; top: ${Math.round(offsetY || 0)}px`;
+    const children: any[] = [['span', { class: 'social-embed', 'data-type': type, 'data-url': url }]];
+    if (caption !== null && caption !== undefined) children.push(['span', { class: 'wc-caption' }, caption]);
+    return ['span', { class: cls.join(' '), style }, ...children];
   },
 
   addNodeView() {
-    return ReactNodeViewRenderer(SocialEmbedView);
+    return ReactNodeViewRenderer(ImageNodeView, {
+      stopEvent: ({ event }) => {
+        const t = event.target as HTMLElement | null;
+        if (!t) return false;
+        if (event.type.startsWith('drag') && t.closest?.('.wc-wrap-front, .wc-wrap-behind')) return true;
+        return t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || !!t.closest?.('[data-wc-handle]');
+      },
+    });
   },
 });
 

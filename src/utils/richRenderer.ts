@@ -9,6 +9,7 @@
 import { sanitizeRichHtml, unwrapRichHtml } from '../lib/richContent';
 import { renderCodeBlockHtml } from './renderers';
 import { renderSocialEmbedTags } from '../lib/socialEmbed';
+import { embedMarkup } from '../lib/embedMedia';
 
 export interface RichContentPart {
   type: 'html' | 'mermaid' | 'tikz';
@@ -61,7 +62,15 @@ async function renderSpecialNodes(root: HTMLElement): Promise<void> {
     pre.replaceWith(...Array.from(holder.childNodes));
   }
 
-  root.querySelectorAll<HTMLElement>('.social-embed').forEach(el => {
+  // Embed bergaya gambar (di dalam paragraf): diganti markup inline (span + iframe).
+  root.querySelectorAll<HTMLElement>('.wc-embed span.social-embed').forEach(el => {
+    const holder = doc.createElement('span');
+    holder.innerHTML = embedMarkup(el.getAttribute('data-type') || '', el.getAttribute('data-url') || '');
+    el.replaceWith(...Array.from(holder.childNodes));
+  });
+
+  // Embed format lama (blok <div> mengambang).
+  root.querySelectorAll<HTMLElement>('div.social-embed').forEach(el => {
     // Bangun ulang tag dengan urutan atribut yang dikenali renderSocialEmbedTags.
     const tag = `<div class="social-embed" data-type="${escapeAttr(el.getAttribute('data-type') || '')}" data-url="${escapeAttr(el.getAttribute('data-url') || '')}" data-width="${escapeAttr(el.getAttribute('data-width') || '100%')}" data-alignment="${escapeAttr(el.getAttribute('data-alignment') || 'center')}" style="${escapeAttr(el.getAttribute('style') || '')}"></div>`;
     const holder = doc.createElement('div');
