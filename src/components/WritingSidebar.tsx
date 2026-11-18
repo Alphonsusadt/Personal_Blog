@@ -508,6 +508,7 @@ export function WritingSidebar({ writing, onUpdate, onSave, isSaving, wordCount 
             contentType="writing"
             currentLanguage={language}
             onBeforeTranslate={onBeforeTranslate}
+            item={writing}
             onTranslationStart={() => {
               // Optional: show loading state
             }}

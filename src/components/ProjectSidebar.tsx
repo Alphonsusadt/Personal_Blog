@@ -565,6 +565,7 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
             contentType="project"
             currentLanguage={language}
             onBeforeTranslate={onBeforeTranslate}
+            item={project}
             onTranslationStart={() => {
               // Optional: show loading state
             }}

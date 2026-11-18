@@ -20,7 +20,7 @@ import { useAdminAutosave, clearLocalDraft, pruneStaleDrafts } from '../../hooks
 import { resolveLocalizedText, getExactLocalizedText, setLocalizedText, type LocalizedTextValue } from '../../lib/localized';
 import { AutosaveStatusBar } from '../../components/AutosaveStatusBar';
 import { RibbonGroup, BigButton } from '../../components/ribbon/primitives';
-import { isRichHtml, contentToPlainText, applyWordFixesToRichHtml, contentForAssetReuse } from '../../lib/richContent';
+import { isRichHtml, contentToPlainText, applyWordFixesToRichHtml } from '../../lib/richContent';
 
 interface Writing {
   _id?: string;
@@ -1029,8 +1029,9 @@ export function WritingEditor() {
         isOpen={assetReuserOpen}
         onClose={() => setAssetReuserOpen(false)}
         sourceLanguage={autoFixLanguage === 'en' ? 'id' : 'en'}
-        otherLanguageContent={contentForAssetReuse(getExactLocalizedText(writing.content, autoFixLanguage === 'en' ? 'id' : 'en'))}
-        onInsert={(markdown) => insertMarkdown(markdown)}
+        otherLanguageContent={getExactLocalizedText(writing.content, autoFixLanguage === 'en' ? 'id' : 'en')}
+        currentContent={getExactLocalizedText(writing.content, autoFixLanguage)}
+        editorRef={editorRef}
       />
 
       <LinkInsertDialog

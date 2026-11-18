@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { api, getRuntimeCache, setRuntimeCache, invalidateRuntimeCache, ADMIN_PATH } from '../../lib/api';
 import { RichTextEditor, type RichTextEditorRef } from '../../components/RichTextEditor';
 import { RibbonGroup, BigButton } from '../../components/ribbon/primitives';
-import { isRichHtml, contentToPlainText, applyWordFixesToRichHtml, contentForAssetReuse } from '../../lib/richContent';
+import { isRichHtml, contentToPlainText, applyWordFixesToRichHtml } from '../../lib/richContent';
 import { BookSidebar } from '../../components/BookSidebar';
 import { ImageUploadDialog } from '../../components/ImageUploadDialog';
 import { LinkInsertDialog } from '../../components/LinkInsertDialog';
@@ -982,8 +982,9 @@ export function BookEditor() {
         isOpen={assetReuserOpen}
         onClose={() => setAssetReuserOpen(false)}
         sourceLanguage={autoFixLanguage === 'en' ? 'id' : 'en'}
-        otherLanguageContent={contentForAssetReuse(getExactLocalizedText(book.review, autoFixLanguage === 'en' ? 'id' : 'en'))}
-        onInsert={(markdown) => insertMarkdown(markdown)}
+        otherLanguageContent={getExactLocalizedText(book.review, autoFixLanguage === 'en' ? 'id' : 'en')}
+        currentContent={getExactLocalizedText(book.review, autoFixLanguage)}
+        editorRef={editorRef}
       />
 
       <LinkInsertDialog

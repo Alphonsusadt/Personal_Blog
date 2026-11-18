@@ -500,6 +500,7 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, c
             contentType="book"
             currentLanguage={language}
             onBeforeTranslate={onBeforeTranslate}
+            item={book}
             onTranslationStart={() => {
               // Optional: show loading state
             }}

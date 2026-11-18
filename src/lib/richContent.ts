@@ -10,7 +10,7 @@
  * lama dibuka dan diedit, editor menyimpannya kembali sebagai HTML (migrasi bertahap).
  */
 import DOMPurify from 'dompurify';
-import { markdownToEditorHtml, editorHtmlToMarkdown } from './markdownConverter';
+import { markdownToEditorHtml } from './markdownConverter';
 
 export const RICH_HTML_MARKER = '<!--wc:html-->';
 
@@ -98,12 +98,4 @@ export function sanitizeRichHtml(html: string): string {
     ADD_ATTR: ['data-equation', 'data-code', 'data-type', 'data-url', 'data-width', 'data-alignment', 'target', 'colspan', 'rowspan', 'colwidth'],
     FORBID_TAGS: ['style', 'script', 'iframe', 'object', 'embed', 'form', 'input'],
   });
-}
-
-/**
- * AssetReuserDialog mencari gambar & blok kode dengan regex Markdown. Untuk konten rich,
- * ubah dulu HTML-nya ke Markdown supaya aset dari bahasa lain tetap bisa dipakai ulang.
- */
-export function contentForAssetReuse(content: string): string {
-  return isRichHtml(content) ? editorHtmlToMarkdown(unwrapRichHtml(content)) : content;
 }

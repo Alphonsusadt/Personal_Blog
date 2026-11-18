@@ -213,7 +213,7 @@ Ketiga jenis tulisan (Writing, Project, ulasan Buku) memakai editor yang sama: r
   * Bold, Italic, Underline, Strikethrough, Subscript, Superscript, kode inline, warna sorot (highlight), warna font.
   * Bullets, Numbering, Increase/Decrease Indent, rata kiri/tengah/kanan/justify, spasi baris, tanda paragraf (¶).
   * Galeri Styles (Normal, Heading 1–4, Quote), Find & Replace (Ctrl+F / Ctrl+H), Select All, Format Painter, Paste.
-* **Insert**: Tabel (pemilih grid), gambar, TikZ, video/post YouTube · Instagram · X, link (Ctrl+K), blok kode, garis horizontal, tanggal, rumus LaTeX (blok/inline), simbol, Reuse Assets.
+* **Insert**: Tabel (pemilih grid), gambar, TikZ, video/post YouTube · Instagram · X, link (Ctrl+K), blok kode, garis horizontal, tanggal, rumus LaTeX (blok/inline), simbol, Other Language (aset dari versi bahasa lain).
 * **Review**: Auto Fix ejaan (Indonesia/Inggris) yang hanya mengubah teks, tidak pernah tag atau kode.
 * **View**: Live Preview berdampingan, lebar halaman (Narrow/Normal/Wide). Zoom dan jumlah kata/karakter ada di status bar bawah.
 * **Tab seperti Word**:
@@ -240,6 +240,18 @@ Ketiga jenis tulisan (Writing, Project, ulasan Buku) memakai editor yang sama: r
 * **Picture Format**: Position, lebar (%), Reset Size, **Crop** (bebas atau 1:1/4:3/3:2/16:9), **Rotate/Flip** 90° (piksel ikut diputar, jadi kotak gambar tidak menutupi teks), Picture Styles (sudut bulat, bayangan, bingkai), **Alt Text**, dan **Caption** (keterangan di bawah gambar, ikut diterjemahkan).
 * **Responsif**: Posisi disimpan relatif terhadap paragraf dan lebar kolom, sehingga tetap proporsional di layar desktop mana pun. Di HP (≤ 640px) gambar mengambang/bebas otomatis menjadi lebar penuh di antara paragraf supaya teks tidak terjepit atau tertutup.
 * **Embed YouTube / Instagram / X ikut ditata seperti gambar**: tempel link (atau Insert → Embed), lalu klik embed untuk membuka tab **Embed Format**: Wrap Text (semua mode kecuali Tight), Position, lebar, Reset Size, Styles, dan Caption — plus drag bebas, 8 titik resize, dan tombol Layout Options yang sama. Crop/Rotate/Alt Text tidak tersedia untuk embed. Embed lama (format `<div class="social-embed">`) otomatis dibaca ke model baru saat tulisan dibuka; rata kiri/kanan menjadi Square, selain itu Top and Bottom. Di halaman publik video diputar langsung (youtube-nocookie), dan post X dimuat otomatis lewat widget resmi X.
+
+### 🔁 10b. Menulis Dua Bahasa Secara Manual
+* **Panel "Other Language"** (Insert → Other Language): berisi semua gambar, embed, tabel, blok kode, rumus, dan link dari versi bahasa satunya, urut sesuai posisinya di tulisan. Panel tidak menutupi editor, jadi bisa tetap terbuka sambil menulis.
+  * **Sisipkan** (di posisi kursor) atau **drag kartu** ke paragraf. Tata letak gambar (wrap, lebar, posisi, gaya, caption) ikut terbawa.
+  * **Link**: blok kata di editor, lalu klik **Pakai di teks terpilih**. Cuplikan kalimat dari bahasa lain ditampilkan supaya mudah mencari padanannya.
+  * **Salin semua ke posisi yang sama**: setiap aset yang belum dipakai ditaruh di paragraf dengan urutan yang sama (paragraf ke-3 ID → paragraf ke-3 EN). Bisa dibatalkan dengan Ctrl+Z.
+  * Tanda **✓ dipakai** menunjukkan aset yang sudah ada di versi yang sedang ditulis.
+* **Copy-paste antar bahasa**: pilih gambar/embed di tab Indonesia, Ctrl+C, pindah ke tab English, Ctrl+V. Semua pengaturan tata letaknya ikut.
+* **Translate saat versi tujuan sudah berisi**: tombol Translate/Hybrid/Smart AI menanyakan dulu:
+  * **Pertahankan tata letak gambarku**: teks diganti hasil terjemahan, tetapi gambar/embed yang sudah diatur di versi tujuan (dicocokkan lewat URL) memakai posisi, ukuran, wrap, dan caption lama, dan gambar yang hanya ada di versi tujuan tidak hilang.
+  * **Ganti semua**: versi tujuan disamakan dengan versi sumber.
+  * Setelah translate ada tombol **Kembalikan isi … sebelum terjemahan** untuk membatalkan.
 
 ### 🌍 11. Tampilan Publik
 * Konten HTML dibersihkan dengan **DOMPurify** sebelum ditampilkan (skrip dan atribut berbahaya dibuang), lalu rumus, kode, TikZ, Mermaid, dan embed dirender.

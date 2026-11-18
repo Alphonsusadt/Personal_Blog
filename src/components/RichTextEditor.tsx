@@ -48,6 +48,12 @@ export interface RichTextEditorRef {
   insertImage: (alt: string, url: string) => void;
   insertLink: (text: string, url: string) => void;
   insertMarkdown: (markdown: string) => void;
+  /** Sisipkan HTML editor apa adanya (aset dari bahasa lain: tata letak gambar ikut). */
+  insertHtml: (html: string) => void;
+  /** Ganti seluruh isi (tetap bisa di-Undo dengan Ctrl+Z). */
+  replaceHtml: (html: string) => void;
+  /** Pasang link ke teks terpilih. Mengembalikan false bila tidak ada teks yang dipilih. */
+  linkSelection: (href: string) => boolean;
   focus: () => void;
 }
 
@@ -348,6 +354,10 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     // addToHistory:false → isi dari luar (data dimuat, Auto Fix, pulihkan draf) bukan
     // langkah Undo; Ctrl+Z tidak boleh "mengembalikan" editor ke keadaan kosong/lama.
     editor.chain().setMeta('addToHistory', false).setContent(next, { emitUpdate: false }).run();
+    // Isi dari luar menggantikan dokumen: versi lama yang pernah dikirim editor ini bukan lagi
+    // "gema". Tanpa ini, mengembalikan isi sebelum terjemahan (yang sama dengan versi lama)
+    // akan diabaikan editor.
+    emittedRef.current = [];
   }, [initialValue, editor]);
 
   useImperativeHandle(ref, () => ({
@@ -367,6 +377,22 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     },
     insertMarkdown(markdown) {
       editor?.chain().focus().insertContent(markdownToEditorHtml(markdown)).run();
+    },
+    insertHtml(html) {
+      if (!editor || editor.isDestroyed) return;
+      editor.chain().focus().insertContent(html).run();
+      flushCommit(true);
+    },
+    replaceHtml(html) {
+      if (!editor || editor.isDestroyed) return;
+      editor.chain().focus().setContent(html, { emitUpdate: true }).run();
+      flushCommit(true);
+    },
+    linkSelection(href) {
+      if (!editor || editor.isDestroyed || editor.state.selection.empty) return false;
+      editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
+      flushCommit(true);
+      return true;
     },
     focus() {
       editor?.commands.focus();

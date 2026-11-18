@@ -494,7 +494,7 @@ export const Ribbon = memo(function Ribbon(props: RibbonProps) {
       </RibbonGroup>
       {props.onOpenAssetReuser && (
         <RibbonGroup label="Translation">
-          <BigButton icon={<Recycle />} label={'Reuse\nAssets'} title="Pakai ulang gambar & kode dari versi bahasa lain" onClick={props.onOpenAssetReuser} />
+          <BigButton icon={<Recycle />} label={'Other\nLanguage'} title="Gambar, embed, tabel, kode & link dari versi bahasa lain" onClick={props.onOpenAssetReuser} />
         </RibbonGroup>
       )}
     </>

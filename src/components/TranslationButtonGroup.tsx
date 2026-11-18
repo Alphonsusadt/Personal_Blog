@@ -1,6 +1,21 @@
 import React, { useState } from 'react';
-import { Loader, AlertCircle, CheckCircle, Copy } from 'lucide-react';
+import { Loader, AlertCircle, CheckCircle, Copy, Undo2 } from 'lucide-react';
 import { API_BASE } from '../lib/api';
+import { getExactLocalizedText } from '../lib/localized';
+import { hasMeaningfulContent, mergeTranslatedLayout } from '../lib/bilingualAssets';
+
+const LOCALIZED_FIELDS = ['title', 'excerpt', 'content', 'description', 'review', 'author'];
+const LANG_NAME = { id: 'Bahasa Indonesia', en: 'English' };
+
+/** Isi setiap field terjemahan untuk satu bahasa (snapshot sebelum translate). */
+function snapshotLanguage(item, lang) {
+  const out = {};
+  if (!item) return out;
+  for (const f of LOCALIZED_FIELDS) {
+    if (item[f] !== undefined) out[f] = getExactLocalizedText(item[f], lang);
+  }
+  return out;
+}
 
 /**
  * TranslationButtonGroup Component
@@ -15,6 +30,8 @@ export function TranslationButtonGroup({
   onTranslationComplete,
   onError,
   onBeforeTranslate,
+  /** Data tulisan/proyek/buku saat ini: dipakai untuk mode "pertahankan tata letak" & Undo. */
+  item = null,
   disabled = false,
   className = '',
 }) {
@@ -22,9 +39,29 @@ export function TranslationButtonGroup({
   const [currentAction, setCurrentAction] = useState(null); // 'translate', 'hybrid', 'smartai'
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+  // Bahasa tujuan sudah berisi -> tanya dulu mau diganti semua atau tata letaknya dipertahankan.
+  const [pending, setPending] = useState(null); // action yang menunggu pilihan mode
+  const [undo, setUndo] = useState(null); // { targetLanguage, translations } sebelum translate
 
-  const handleTranslation = async (action) => {
+  // Tujuan saat kedua bahasa sudah berisi: kunci dari terjemahan terakhir, atau tab yang aktif.
+  const predictedTarget = item?.translationMetadata?.language || (currentLanguage === 'en' ? 'en' : 'id');
+  const bothFilled = () => {
+    if (!item) return false;
+    const filled = (lang) => Object.values(snapshotLanguage(item, lang)).some(v => hasMeaningfulContent(v as string));
+    return filled('id') && filled('en');
+  };
+
+  const requestTranslation = (action) => {
     if (loading || disabled || !postId) return;
+    if (bothFilled()) { setPending(action); return; }
+    handleTranslation(action, 'replace');
+  };
+
+  const handleTranslation = async (action, mode = 'replace') => {
+    if (loading || disabled || !postId) return;
+    setPending(null);
+    // Snapshot kedua bahasa SEBELUM server menimpa bahasa tujuan.
+    const before = { id: snapshotLanguage(item, 'id'), en: snapshotLanguage(item, 'en') };
 
     setLoading(true);
     setCurrentAction(action);
@@ -62,6 +99,25 @@ export function TranslationButtonGroup({
       }
 
       const data = await response.json();
+      const target = data.targetLanguage === 'id' ? 'id' : 'en';
+      const prev = before[target] || {};
+      const translations = { ...(data.translations || {}) };
+
+      // Mode "pertahankan": gambar/embed yang sudah diatur di bahasa tujuan memakai
+      // tata letak lama (wrap, lebar, posisi, caption); gambar tambahanmu tidak hilang.
+      if (mode === 'keepLayout') {
+        for (const [field, text] of Object.entries(translations)) {
+          if (typeof text === 'string' && prev[field]) translations[field] = mergeTranslatedLayout(text, prev[field]);
+        }
+      }
+      data.translations = translations;
+      // Nilai lama (kompatibilitas) dibuang supaya halaman memakai translations yang sudah digabung.
+      delete data.title;
+      delete data.content;
+
+      const restorable = {};
+      for (const field of Object.keys(translations)) if (field in prev) restorable[field] = prev[field];
+      setUndo(Object.values(restorable).some(v => v && String(v).trim()) ? { targetLanguage: target, translations: restorable } : null);
       setResult(data);
 
       if (onTranslationComplete) {
@@ -97,7 +153,7 @@ export function TranslationButtonGroup({
       <div className="flex gap-2">
         {/* Button 1: Translate (Google) */}
         <button
-          onClick={() => handleTranslation('translate')}
+          onClick={() => requestTranslation('translate')}
           disabled={loading || disabled || notSaved}
           title={notSaved ? 'Simpan tulisan dulu sebelum menerjemahkan' : 'Fast translation using Google Translate'}
           className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -120,7 +176,7 @@ export function TranslationButtonGroup({
 
         {/* Button 2: Hybrid (Google + Polish) */}
         <button
-          onClick={() => handleTranslation('hybrid')}
+          onClick={() => requestTranslation('hybrid')}
           disabled={loading || disabled || notSaved}
           title={notSaved ? 'Simpan tulisan dulu sebelum menerjemahkan' : 'Google Translate + AI polish for better quality'}
           className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -143,7 +199,7 @@ export function TranslationButtonGroup({
 
         {/* Button 3: SmartAI (Full AI) */}
         <button
-          onClick={() => handleTranslation('smartai')}
+          onClick={() => requestTranslation('smartai')}
           disabled={loading || disabled || notSaved}
           title={notSaved ? 'Simpan tulisan dulu sebelum menerjemahkan' : 'Full AI translation with character unification'}
           className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -165,6 +221,33 @@ export function TranslationButtonGroup({
         </button>
       </div>
 
+      {/* Bahasa tujuan sudah berisi: pilih cara menerapkan terjemahan */}
+      {pending && (
+        <div className="p-3 rounded-lg bg-[#0F172A] border border-[#475569] space-y-2">
+          <p className="text-xs text-[#F8FAFC] font-semibold">Versi {LANG_NAME[predictedTarget]} sudah berisi.</p>
+          <p className="text-[11px] text-[#94A3B8] leading-snug">Teks akan diganti hasil terjemahan. Bagaimana dengan gambar &amp; embed yang sudah kamu atur di sana?</p>
+          <button
+            type="button"
+            onClick={() => handleTranslation(pending, 'keepLayout')}
+            className="w-full px-3 py-2 rounded-lg text-xs font-semibold bg-[#1E40AF] hover:bg-[#1E3A8A] text-white text-left"
+          >
+            Pertahankan tata letak gambarku
+            <span className="block font-normal opacity-80">Posisi, ukuran, wrap &amp; caption yang sudah diatur tetap; gambar tambahanmu tidak hilang.</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTranslation(pending, 'replace')}
+            className="w-full px-3 py-2 rounded-lg text-xs font-semibold border border-[#475569] text-[#CBD5E1] hover:bg-[#1E293B] text-left"
+          >
+            Ganti semua
+            <span className="block font-normal opacity-80">Isi disamakan dengan versi sumber, termasuk tata letak gambarnya.</span>
+          </button>
+          <button type="button" onClick={() => setPending(null)} className="w-full text-[11px] text-[#94A3B8] hover:text-[#F8FAFC] py-1">
+            Batal
+          </button>
+        </div>
+      )}
+
       {/* Error Message */}
       {error && (
         <div className="flex items-center gap-2 p-2 rounded-lg bg-red-500/10 border border-red-500/30">
@@ -185,6 +268,23 @@ export function TranslationButtonGroup({
             )}
           </div>
         </div>
+      )}
+
+      {/* Batalkan terjemahan: kembalikan isi bahasa tujuan seperti sebelum ditimpa */}
+      {undo && !loading && (
+        <button
+          type="button"
+          onClick={() => {
+            onTranslationComplete?.({ success: true, method: 'restore', targetLanguage: undo.targetLanguage, translations: { ...undo.translations } });
+            setUndo(null);
+            setResult(null);
+          }}
+          className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs border border-[#475569] text-[#CBD5E1] hover:bg-[#1E293B]"
+          title="Kembalikan isi versi ini seperti sebelum diterjemahkan"
+        >
+          <Undo2 className="w-3.5 h-3.5" />
+          Kembalikan isi {LANG_NAME[undo.targetLanguage]} sebelum terjemahan
+        </button>
       )}
 
       {/* Info Text */}

@@ -13,7 +13,7 @@ import { formatDraftTime } from '../../hooks/useLocalDraft';
 import { RichTextEditor, type RichTextEditorRef } from '../../components/RichTextEditor';
 import { AutoFixButton } from '../../components/AutoFixButton';
 import { RibbonGroup, BigButton } from '../../components/ribbon/primitives';
-import { isRichHtml, contentToPlainText, applyWordFixesToRichHtml, contentForAssetReuse } from '../../lib/richContent';
+import { isRichHtml, contentToPlainText, applyWordFixesToRichHtml } from '../../lib/richContent';
 import { AssetReuserDialog } from '../../components/AssetReuserDialog';
 import { useAutoFixLanguage } from '../../hooks/useAutoFixLanguage';
 import { getAutoFixSuggestionsForWord } from '../../utils/textAutoFix';
@@ -1013,8 +1013,9 @@ export function ProjectEditor() {
         isOpen={assetReuserOpen}
         onClose={() => setAssetReuserOpen(false)}
         sourceLanguage={autoFixLanguage === 'en' ? 'id' : 'en'}
-        otherLanguageContent={contentForAssetReuse(getExactLocalizedText(project.content, autoFixLanguage === 'en' ? 'id' : 'en'))}
-        onInsert={(markdown) => insertMarkdown(markdown)}
+        otherLanguageContent={getExactLocalizedText(project.content, autoFixLanguage === 'en' ? 'id' : 'en')}
+        currentContent={getExactLocalizedText(project.content, autoFixLanguage)}
+        editorRef={editorRef}
       />
 
       <LinkInsertDialog
