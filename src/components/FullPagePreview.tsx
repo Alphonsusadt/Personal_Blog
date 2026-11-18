@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { displayLinks, type ProjectLinkValue } from '../lib/projectLinks';
 import { useEffect } from 'react';
 import { useRenderedMarkdown } from '../hooks/useRenderedMarkdown';
 import { Star, CheckCircle, Calendar, Clock, Tag, Github, FileText, Globe } from 'lucide-react';
@@ -35,9 +36,11 @@ interface Project {
   content: string;
   devStatus?: string;
   date?: string;
-  githubUrl?: string;
-  paperUrl?: string;
-  demoUrl?: string;
+  githubUrl?: ProjectLinkValue;
+  paperUrl?: ProjectLinkValue;
+  demoUrl?: ProjectLinkValue;
+  /** Bahasa tab editor saat preview dibuka (urutan link dua bahasa). */
+  previewLanguage?: 'id' | 'en';
   createdAt?: string;
   updatedAt?: string;
 }
@@ -391,27 +394,27 @@ function ProjectPreview({ data }: { data: Project }) {
 
         {/* Links */}
         <div className="flex flex-wrap gap-3 mb-6">
-          {data.githubUrl && (
-            <a href={data.githubUrl} target="_blank" rel="noopener noreferrer" 
+          {displayLinks(data.githubUrl, data.previewLanguage ?? 'id').map(link => (
+            <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer" 
                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">
               <Github className="w-4 h-4" />
-              GitHub
+              GitHub{link.tag && ` (${link.tag})`}
             </a>
-          )}
-          {data.paperUrl && (
-            <a href={data.paperUrl} target="_blank" rel="noopener noreferrer"
+          ))}
+          {displayLinks(data.paperUrl, data.previewLanguage ?? 'id').map(link => (
+            <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer"
                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
               <FileText className="w-4 h-4" />
-              Paper
+              Paper{link.tag && ` (${link.tag})`}
             </a>
-          )}
-          {data.demoUrl && (
-            <a href={data.demoUrl} target="_blank" rel="noopener noreferrer"
+          ))}
+          {displayLinks(data.demoUrl, data.previewLanguage ?? 'id').map(link => (
+            <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer"
                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
               <Globe className="w-4 h-4" />
-              Demo
+              Demo{link.tag && ` (${link.tag})`}
             </a>
-          )}
+          ))}
         </div>
 
         {/* Tags */}

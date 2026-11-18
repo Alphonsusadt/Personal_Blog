@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { hasProjectLink, type ProjectLinkValue } from '../../lib/projectLinks';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api, getRuntimeCache, setRuntimeCache, invalidateRuntimeCache, ADMIN_PATH } from '../../lib/api';
 import { ProjectSidebar } from '../../components/ProjectSidebar';
@@ -35,9 +36,9 @@ interface Project {
   updatedAt?: string;
   devStatus?: 'planning' | 'ongoing' | 'completed';
   date?: string;
-  githubUrl?: string;
-  paperUrl?: string;
-  demoUrl?: string;
+  githubUrl?: ProjectLinkValue;
+  paperUrl?: ProjectLinkValue;
+  demoUrl?: ProjectLinkValue;
   // SEO Fields
   metaDescription?: string;
   ogImage?: string;
@@ -80,9 +81,9 @@ function hasMeaningfulProjectDraft(data: Project): boolean {
     hasDesc ||
     hasContent ||
     data.tags?.length ||
-    data.githubUrl?.trim() ||
-    data.paperUrl?.trim() ||
-    data.demoUrl?.trim() ||
+    hasProjectLink(data.githubUrl) ||
+    hasProjectLink(data.paperUrl) ||
+    hasProjectLink(data.demoUrl) ||
     data.metaDescription?.trim() ||
     data.ogImage?.trim() ||
     data.keywords?.trim() ||
@@ -1034,6 +1035,7 @@ export function ProjectEditor() {
           title: resolveLocalizedText(project.title, autoFixLanguage),
           description: resolveLocalizedText(project.description, autoFixLanguage),
           content: resolveLocalizedText(project.content, autoFixLanguage),
+          previewLanguage: autoFixLanguage,
         } as never}
       />
 

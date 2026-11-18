@@ -18,7 +18,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const UPLOAD_DIR = path.join(__dirname, '../../public/uploads');
 const ICONS_DIR = path.join(__dirname, '../../public/uploads/icons');
-const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
+// 10 MB = batas gambar Cloudinary paket gratis; frontend memakai batas yang sama.
+const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
 
 async function getFileHash(filePath) {
   const buffer = await fs.readFile(filePath);
@@ -102,19 +103,26 @@ async function persistUpload(db, file, altText, uploadedBy) {
         .jpeg({ quality: 75 })
         .toFile(thumbPath);
 
-      // Optimize main image: resize if wider than 1600 and recompress
+      // Gambar utama: hanya diperkecil bila sisi terpanjangnya > 3840 px. Dulu dipaksa ke
+      // 1600 px, sehingga diagram/skema berteks kecil menjadi kabur.
       const image = sharp(filePath);
       const metadata = await image.metadata();
-      const resized = (metadata.width || 0) > 1600 ? image.resize({ width: 1600 }) : image;
+      const longest = Math.max(metadata.width || 0, metadata.height || 0);
+      const resized = longest > 3840 ? image.resize({ width: 3840, height: 3840, fit: 'inside', withoutEnlargement: true }) : image;
       // Pertahankan format yang punya transparansi: dulu semuanya dipaksa JPEG, sehingga
       // PNG/WebP berlatar transparan (logo, diagram, gambar "Tight") berubah berlatar hitam.
-      const encoded = metadata.format === 'png'
+      // Tidak perlu diperkecil → file asli disimpan apa adanya (tanpa kompres ulang).
+      const encoded = longest <= 3840 ? null : metadata.format === 'png'
         ? resized.png({ compressionLevel: 9 })
         : metadata.format === 'webp'
-          ? resized.webp({ quality: 85 })
-          : resized.jpeg({ quality: 85 });
-      await encoded.toFile(filePath + '.opt');
-      await fs.rename(filePath + '.opt', filePath);
+          ? resized.webp({ quality: 92 })
+          : metadata.format === 'gif'
+            ? null // GIF dibiarkan apa adanya (animasi tidak boleh hilang)
+            : resized.jpeg({ quality: 92, mozjpeg: true });
+      if (encoded) {
+        await encoded.toFile(filePath + '.opt');
+        await fs.rename(filePath + '.opt', filePath);
+      }
 
       // Update DB with new size and thumbnail info
       const stats = await fs.stat(filePath);

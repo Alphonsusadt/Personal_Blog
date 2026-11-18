@@ -118,7 +118,7 @@ async function canvasToUploadedUrl(canvas: HTMLCanvasElement, src: string, name:
   if (!blob) throw new Error('Gagal membuat gambar baru');
   const ext = type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg';
   const file = new File([blob], `${name}.${ext}`, { type });
-  return uploadImage(file, { apiBaseUrl: API_BASE, maxWidth: 2000, quality: 0.92 });
+  return uploadImage(file, { apiBaseUrl: API_BASE });
 }
 
 /** Putar 90° (kanan/kiri) atau balik (horizontal/vertikal), lalu unggah sebagai gambar baru. */

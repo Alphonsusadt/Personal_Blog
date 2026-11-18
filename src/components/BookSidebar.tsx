@@ -505,7 +505,8 @@ export function BookSidebar({ book, onUpdate, onSave, isSaving, wordCount = 0, c
               // Optional: show loading state
             }}
             onTranslationComplete={(result: any) => {
-              setTranslationStatus({
+              // Isi dikembalikan ke sebelum terjemahan -> status 'selesai' tidak berlaku lagi.
+              setTranslationStatus(result.method === 'restore' ? null : {
                 status: 'completed',
                 method: result.method,
                 language: result.targetLanguage || 'en',

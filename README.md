@@ -201,7 +201,7 @@ Sistem ini didesain sebagai portofolio premium dengan Content Management System 
 ### ☁️ 8. Integrasi Layanan Cloud (Supabase & Cloudinary)
 * **MongoDB = Sumber Kebenaran**: Semua data dibaca dan ditulis ke MongoDB.
 * **Supabase (Cadangan Satu Arah)**: Setiap simpanan disalin ke PostgreSQL Supabase sebagai cadangan. Aplikasi **tidak pernah membaca** dari Supabase, sehingga isi cadangan tidak bisa menimpa data utama.
-* **Cloudinary (Manajemen Aset Media)**: Unggah gambar, sampul buku, dan ikon ke Cloudinary CDN. PNG/WebP transparan tetap transparan (tidak diubah menjadi JPEG berlatar hitam). Bila Cloudinary tidak dikonfigurasi atau gagal, gambar disimpan di `cms/public/uploads`.
+* **Cloudinary (Manajemen Aset Media)**: Unggah gambar, sampul buku, dan ikon ke Cloudinary CDN. PNG/WebP transparan tetap transparan (tidak diubah menjadi JPEG berlatar hitam). **Kualitas asli dipertahankan**: gambar dengan sisi terpanjang ≤ 3840 px dan ≤ 10 MB diunggah persis seperti filenya (tanpa diperkecil atau dikompres ulang), sehingga skema rangkaian, diagram, dan screenshot berteks kecil tetap tajam. Hanya gambar yang lebih besar yang diperkecil ke 3840 px (PNG tetap PNG; GIF tidak pernah diubah). Aturan ini berlaku untuk tombol Pictures, paste, drag, crop/rotate. Bila Cloudinary tidak dikonfigurasi atau gagal, gambar disimpan di `cms/public/uploads`.
 * **Konfigurasi API Keamanan**: Menggunakan variabel lingkungan (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`) di dalam berkas `.env` lokal untuk keamanan autentikasi.
 
 ### 📝 9. Editor Bergaya Microsoft Word (Writings, Projects, Library)
@@ -252,6 +252,11 @@ Ketiga jenis tulisan (Writing, Project, ulasan Buku) memakai editor yang sama: r
   * **Pertahankan tata letak gambarku**: teks diganti hasil terjemahan, tetapi gambar/embed yang sudah diatur di versi tujuan (dicocokkan lewat URL) memakai posisi, ukuran, wrap, dan caption lama, dan gambar yang hanya ada di versi tujuan tidak hilang.
   * **Ganti semua**: versi tujuan disamakan dengan versi sumber.
   * Setelah translate ada tombol **Kembalikan isi … sebelum terjemahan** untuk membatalkan.
+* **Project Links per bahasa** (GitHub, Paper/Documentation, Live Demo): kotak isian mengikuti tab bahasa yang aktif, dan link versi bahasa lain ditampilkan kecil di bawahnya. Di web:
+  * hanya diisi di satu bahasa → tampil di kedua bahasa;
+  * diisi di dua bahasa dengan URL berbeda → keduanya tampil dengan label (ID) / (EN), bahasa halaman lebih dulu;
+  * URL sama → tampil sekali; kosong → tidak tampil.
+  * Link lama (sebelum fitur ini) tetap berlaku untuk kedua bahasa sampai diubah.
 
 ### 🌍 11. Tampilan Publik
 * Konten HTML dibersihkan dengan **DOMPurify** sebelum ditampilkan (skrip dan atribut berbahaya dibuang), lalu rumus, kode, TikZ, Mermaid, dan embed dirender.

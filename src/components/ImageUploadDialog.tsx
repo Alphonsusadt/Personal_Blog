@@ -1,5 +1,8 @@
 import { X, Upload, AlertCircle } from 'lucide-react';
 import { useState, useRef } from 'react';
+import { uploadImage } from '../lib/mediaUploader';
+import { API_BASE } from '../lib/api';
+import { MAX_IMAGE_DIMENSION, MAX_IMAGE_UPLOAD_MB } from '../utils/media';
 
 interface ImageUploadDialogProps {
   isOpen: boolean;
@@ -22,72 +25,37 @@ export function ImageUploadDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [fileSize, setFileSize] = useState<{ original: number; compressed: number }>({ original: 0, compressed: 0 });
+  // File asli disimpan apa adanya; diunggah lewat uploadImage (kualitas asli dipertahankan).
+  const [file, setFile] = useState<File | null>(null);
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
 
-  const handleFileSelect = async (file?: File) => {
-    if (!file) return;
+  const handleFileSelect = async (picked?: File) => {
+    if (!picked) return;
 
     setError('');
     setIsLoading(true);
 
-    // Validate file
-    if (!file.type.startsWith('image/')) {
+    if (!picked.type.startsWith('image/')) {
       setError('Pilihan file harus berupa gambar');
       setIsLoading(false);
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Ukuran gambar maksimal 5MB');
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      // Create canvas for compression
-      const img = new Image();
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Cannot get canvas context');
-
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
+      const url = URL.createObjectURL(picked);
+      const size = await new Promise<{ w: number; h: number }>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
         img.onerror = () => reject(new Error('Gagal membaca gambar'));
-        img.src = URL.createObjectURL(file);
+        img.src = url;
       });
-
-      // Set max dimensions (800px for width, maintain aspect ratio)
-      const maxWidth = 800;
-      const maxHeight = 800;
-      let width = img.width;
-      let height = img.height;
-
-      if (width > height) {
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-      } else {
-        if (height > maxHeight) {
-          width = Math.round((width * maxHeight) / height);
-          height = maxHeight;
-        }
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-      ctx.drawImage(img, 0, 0, width, height);
-
-      // Compress to JPEG with quality 0.5 (lebih aggressive)
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
-
-      setFileName(file.name);
-      setPreview(dataUrl);
-      setAltText(file.name.replace(/\.[^.]+$/, '').replace(/[^\w\s-]/g, '').trim());
-
-      // Calculate sizes for display
-      const originalSize = file.size;
-      const compressedSize = Math.round((dataUrl.length * 3) / 4); // Rough estimate of base64 to bytes
-      setFileSize({ original: originalSize, compressed: compressedSize });
+      if (preview.startsWith('blob:')) URL.revokeObjectURL(preview);
+      setFile(picked);
+      setDims(size);
+      setFileName(picked.name);
+      setPreview(url);
+      setAltText(picked.name.replace(/\.[^.]+$/, '').replace(/[^\w\s-]/g, '').trim());
+      setFileSize({ original: picked.size, compressed: picked.size });
     } catch (err) {
       setError('Gagal membaca file gambar');
       console.error(err);
@@ -97,7 +65,7 @@ export function ImageUploadDialog({
   };
 
   const handleInsert = async () => {
-    if (!preview || !altText) {
+    if (!file || !altText) {
       setError('Alt text harus diisi');
       return;
     }
@@ -106,34 +74,10 @@ export function ImageUploadDialog({
     setError('');
 
     try {
-      // Convert base64 preview to blob
-      const response = await fetch(preview);
-      const blob = await response.blob();
-      
-      // Create FormData with the blob
-      const formData = new FormData();
-      formData.append('file', blob, `${altText}.jpg`);
-      formData.append('altText', altText);
-
-      // Upload to server
-      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
-      const uploadResponse = await fetch(`${apiBaseUrl}/api/media/upload`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('cms_token') || ''}`,
-        },
-      });
-
-      if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json();
-        throw new Error(errorData.error || 'Upload gagal');
-      }
-
-      const data = await uploadResponse.json();
-      
-      // Insert markdown with URL instead of base64
-      const imageMarkdown = `\n![${altText}](${data.imageUrl})\n`;
+      // Sama dengan paste/drag di editor: gambar diunggah dengan kualitas aslinya.
+      const named = new File([file], `${altText}.${(file.name.split('.').pop() || 'png').toLowerCase()}`, { type: file.type });
+      const imageUrl = await uploadImage(named, { apiBaseUrl: API_BASE });
+      const imageMarkdown = `\n![${altText}](${imageUrl})\n`;
       onInsert(imageMarkdown);
       onScheduleChange?.(scheduleImage);
       resetForm();
@@ -147,7 +91,10 @@ export function ImageUploadDialog({
   };
 
   const resetForm = () => {
+    if (preview.startsWith('blob:')) URL.revokeObjectURL(preview);
     setPreview('');
+    setFile(null);
+    setDims(null);
     setFileName('');
     setAltText('');
     setScheduleImage(false);
@@ -200,7 +147,7 @@ export function ImageUploadDialog({
           >
             <Upload className="w-10 h-10 text-[#94A3B8] mx-auto mb-3" />
             <p className="text-sm font-medium text-[#F8FAFC] mb-1">Klik atau drag gambar di sini</p>
-            <p className="text-xs text-[#94A3B8]">PNG, JPG, GIF (Max 5MB)</p>
+            <p className="text-xs text-[#94A3B8]">PNG, JPG, GIF, WebP (maks. {MAX_IMAGE_UPLOAD_MB} MB) — kualitas asli dipertahankan</p>
           </div>
         ) : (
           <>
@@ -209,7 +156,7 @@ export function ImageUploadDialog({
               <img
                 src={preview}
                 alt="Preview"
-                className="w-full max-h-48 object-cover"
+                className="w-full max-h-48 object-contain bg-white"
               />
             </div>
 
@@ -219,9 +166,11 @@ export function ImageUploadDialog({
               <p className="text-sm text-[#F8FAFC] font-medium truncate">{fileName}</p>
               {fileSize.original > 0 && (
                 <p className="text-xs text-[#60A5FA] mt-2">
-                  {(fileSize.original / 1024).toFixed(1)} KB → {(fileSize.compressed / 1024).toFixed(1)} KB
+                  {(fileSize.original / 1024).toFixed(1)} KB{dims ? ` · ${dims.w}×${dims.h} px` : ''}
                   <span className="text-green-400 ml-2">
-                    ({Math.round(((fileSize.original - fileSize.compressed) / fileSize.original) * 100)}% smaller)
+                    {dims && Math.max(dims.w, dims.h) > MAX_IMAGE_DIMENSION
+                      ? `diperkecil ke ${MAX_IMAGE_DIMENSION} px (tetap tajam)`
+                      : 'kualitas asli dipertahankan'}
                   </span>
                 </p>
               )}
@@ -263,7 +212,10 @@ export function ImageUploadDialog({
           {preview && (
             <button
               onClick={() => {
+                if (preview.startsWith('blob:')) URL.revokeObjectURL(preview);
                 setPreview('');
+                setFile(null);
+                setDims(null);
                 setFileName('');
                 setFileSize({ original: 0, compressed: 0 });
                 setError('');

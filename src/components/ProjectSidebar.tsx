@@ -6,6 +6,7 @@ import { IsolatedInput, IsolatedTextarea, IsolatedTagInput } from './IsolatedInp
 import { useAutoFixLanguage } from '../hooks/useAutoFixLanguage';
 import { resolveLocalizedText, setLocalizedText, type LocalizedTextValue } from '../lib/localized';
 import { TranslationButtonGroup } from './TranslationButtonGroup';
+import { linkForLanguage, otherLanguageLink, setLinkForLanguage, type ProjectLinkValue } from '../lib/projectLinks';
 import { TranslationStatusBadge } from './TranslationStatusBadge';
 import { api } from '../lib/api';
 
@@ -23,9 +24,9 @@ interface Project {
   publishAt?: string;
   createdAt?: string;
   updatedAt?: string;
-  githubUrl?: string;
-  paperUrl?: string;
-  demoUrl?: string;
+  githubUrl?: ProjectLinkValue;
+  paperUrl?: ProjectLinkValue;
+  demoUrl?: ProjectLinkValue;
   // SEO Fields
   metaDescription?: string;
   ogImage?: string;
@@ -88,6 +89,17 @@ function SidebarCard({
       </h3>
       {!collapsed[cardKey] && <div>{children}</div>}
     </div>
+  );
+}
+
+/** Keterangan link versi bahasa lain di bawah kotak isian. */
+function OtherLanguageLinkHint({ value, language }: { value: ProjectLinkValue; language: 'id' | 'en' }) {
+  const other = otherLanguageLink(value, language);
+  if (!other) return null;
+  return (
+    <p className="mt-1 text-[11px] text-[#94A3B8] truncate" title={other}>
+      {language === 'id' ? 'EN' : 'ID'}: <span className="text-[#60A5FA]">{other}</span>
+    </p>
   );
 }
 
@@ -154,16 +166,19 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
   }, [language, onUpdate]);
 
   const handleGithubUrlCommit = useCallback((value: string) => {
-    onUpdate({ ...projectRef.current, githubUrl: value });
-  }, [onUpdate]);
+    // Link disimpan per bahasa: hanya bahasa tab yang aktif yang berubah.
+    onUpdate({ ...projectRef.current, githubUrl: setLinkForLanguage(projectRef.current.githubUrl, language, value) });
+  }, [language, onUpdate]);
 
   const handlePaperUrlCommit = useCallback((value: string) => {
-    onUpdate({ ...projectRef.current, paperUrl: value });
-  }, [onUpdate]);
+    // Link disimpan per bahasa: hanya bahasa tab yang aktif yang berubah.
+    onUpdate({ ...projectRef.current, paperUrl: setLinkForLanguage(projectRef.current.paperUrl, language, value) });
+  }, [language, onUpdate]);
 
   const handleDemoUrlCommit = useCallback((value: string) => {
-    onUpdate({ ...projectRef.current, demoUrl: value });
-  }, [onUpdate]);
+    // Link disimpan per bahasa: hanya bahasa tab yang aktif yang berubah.
+    onUpdate({ ...projectRef.current, demoUrl: setLinkForLanguage(projectRef.current.demoUrl, language, value) });
+  }, [language, onUpdate]);
 
   const handleAddTag = useCallback((tag: string) => {
     onUpdate({ ...projectRef.current, tags: [...projectRef.current.tags, tag] });
@@ -366,19 +381,24 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
       {/* Project Links Card */}
       <SidebarCard title="Project Links" cardKey="links" collapsed={collapsed} onToggle={toggleCard}>
         <div className="space-y-3">
+          <p className="text-[11px] leading-snug text-[#94A3B8]">
+            Link untuk versi <span className="text-[#F8FAFC] font-medium">{language === 'id' ? 'Indonesia' : 'English'}</span>.
+            Kalau hanya diisi di satu bahasa, link tampil di kedua bahasa; kalau keduanya diisi dan berbeda, keduanya tampil.
+          </p>
           <div>
             <label className="flex items-center gap-2 text-xs text-[#94A3B8] mb-1">
               <Github className="w-3.5 h-3.5" />
               GitHub Repository
             </label>
             <IsolatedInput
-              id={project.id}
+              id={`${project.id}-githubUrl-${language}`}
               type="url"
-              initialValue={project.githubUrl || ''}
+              initialValue={linkForLanguage(project.githubUrl, language)}
               onCommit={handleGithubUrlCommit}
               placeholder="https://github.com/..."
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />
+            <OtherLanguageLinkHint value={project.githubUrl} language={language} />
           </div>
           <div>
             <label className="flex items-center gap-2 text-xs text-[#94A3B8] mb-1">
@@ -386,13 +406,14 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
               Paper / Documentation
             </label>
             <IsolatedInput
-              id={project.id}
+              id={`${project.id}-paperUrl-${language}`}
               type="url"
-              initialValue={project.paperUrl || ''}
+              initialValue={linkForLanguage(project.paperUrl, language)}
               onCommit={handlePaperUrlCommit}
               placeholder="https://..."
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />
+            <OtherLanguageLinkHint value={project.paperUrl} language={language} />
           </div>
           <div>
             <label className="flex items-center gap-2 text-xs text-[#94A3B8] mb-1">
@@ -400,13 +421,14 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
               Live Demo
             </label>
             <IsolatedInput
-              id={project.id}
+              id={`${project.id}-demoUrl-${language}`}
               type="url"
-              initialValue={project.demoUrl || ''}
+              initialValue={linkForLanguage(project.demoUrl, language)}
               onCommit={handleDemoUrlCommit}
               placeholder="https://..."
               className="w-full bg-[#0F172A] border border-[#334155] text-[#F8FAFC] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#60A5FA]"
             />
+            <OtherLanguageLinkHint value={project.demoUrl} language={language} />
           </div>
         </div>
       </SidebarCard>
@@ -570,7 +592,8 @@ export function ProjectSidebar({ project, onUpdate, onSave, isSaving, wordCount 
               // Optional: show loading state
             }}
             onTranslationComplete={(result: any) => {
-              setTranslationStatus({
+              // Isi dikembalikan ke sebelum terjemahan -> status 'selesai' tidak berlaku lagi.
+              setTranslationStatus(result.method === 'restore' ? null : {
                 status: 'completed',
                 method: result.method,
                 language: result.targetLanguage || 'en',

@@ -4,7 +4,7 @@
  * Menangani: drag-drop, paste, dan dialog upload
  */
 
-import { compressImage, validateFile } from '../utils/media';
+import { compressImage, validateFile, prepareImageForUpload, MAX_IMAGE_UPLOAD_MB } from '../utils/media';
 
 interface UploadConfig {
   apiBaseUrl?: string;
@@ -31,30 +31,25 @@ export async function uploadImage(
     apiBaseUrl = process.env.VITE_API_URL || 'http://localhost:5001',
     onProgress,
     onError,
-    maxSizeMB = 5,
-    maxWidth = 800,
-    quality = 0.8,
+    maxSizeMB = MAX_IMAGE_UPLOAD_MB,
   } = config;
 
-  // Validate file
-  const validation = validateFile(file, maxSizeMB);
-  if (!validation.valid) {
-    onError?.(validation.error || 'Validation failed');
-    throw new Error(validation.error);
-  }
-
   try {
-    // Compress image
+    // Kualitas asli dipertahankan; hanya gambar yang sangat besar yang diperkecil
+    // (lihat prepareImageForUpload). maxWidth/quality lama sengaja tidak dipakai lagi:
+    // memperkecil ke 800–1600 px merusak diagram & teks kecil.
     onProgress?.(10);
-    const compressed = await compressImage(file, maxWidth, quality);
+    const blob = await prepareImageForUpload(file);
     onProgress?.(30);
 
-    // Create FormData for upload
-    const formData = new FormData();
+    // Validasi ukuran SETELAH diperkecil (foto kamera besar tetap bisa diunggah).
+    const validation = validateFile(new File([blob], file.name, { type: blob.type || file.type }), maxSizeMB);
+    if (!validation.valid) {
+      onError?.(validation.error || 'Validation failed');
+      throw new Error(validation.error);
+    }
 
-    // Convert base64 to blob
-    const response = await fetch(compressed);
-    const blob = await response.blob();
+    const formData = new FormData();
     formData.append('file', blob, file.name);
     formData.append('altText', file.name.replace(/\.[^.]+$/, ''));
 
@@ -249,7 +244,10 @@ export async function sanitizeContent(
     try {
       // Convert base64 ke File object
       const blob = dataURLtoBlob(image.base64Data);
-      const file = new File([blob], `${image.altText || 'image'}.jpg`, { type: 'image/jpeg' });
+      // Pakai format aslinya (PNG tetap PNG), bukan selalu JPEG.
+      const type = blob.type || 'image/png';
+      const ext = type.split('/')[1]?.replace('jpeg', 'jpg') || 'png';
+      const file = new File([blob], `${image.altText || 'image'}.${ext}`, { type });
 
       // Upload
       const imageUrl = await uploadImage(file, config);

@@ -1,9 +1,17 @@
 import { Router } from 'express';
 import { ObjectId } from 'mongodb';
+import { toObjectId } from '../utils/objectId.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 export default function categoriesRoutes(db) {
   const router = Router();
+
+  // Id kategori tidak valid -> 400. Tanpa ini, new ObjectId() melempar error di handler async
+  // yang tidak ditangkap Express 4, dan seluruh proses server ikut mati.
+  router.param('id', (req, res, next, id) => {
+    if (!toObjectId(id)) return res.status(400).json({ error: 'Invalid id' });
+    next();
+  });
   const col = db.collection('categories');
 
   // Public: get categories for a specific section

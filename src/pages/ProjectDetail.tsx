@@ -1,4 +1,5 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { displayLinks, hasProjectLink, type ProjectLinkValue } from '../lib/projectLinks';
 import { ArrowLeft, Calendar, Tag, ExternalLink, Clock } from 'lucide-react';
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { api } from '../lib/api';
@@ -26,9 +27,9 @@ interface Project {
   updatedAt?: string;
   devStatus?: 'planning' | 'ongoing' | 'completed';
   date?: string;
-  githubUrl?: string;
-  paperUrl?: string;
-  demoUrl?: string;
+  githubUrl?: ProjectLinkValue;
+  paperUrl?: ProjectLinkValue;
+  demoUrl?: ProjectLinkValue;
 }
 
 function formatDateTimeDetailed(dateString?: string) {
@@ -459,45 +460,48 @@ export function ProjectDetail() {
           </div>
 
           {/* Project Links */}
-          {(project.githubUrl || project.paperUrl || project.demoUrl) && (
+          {(hasProjectLink(project.githubUrl) || hasProjectLink(project.paperUrl) || hasProjectLink(project.demoUrl)) && (
             <div className="bg-canvas rounded-[24px] p-8 border border-hairline shadow-sm">
               <h3 className="card-title text-ink mb-6 flex items-center gap-2">
                 <ExternalLink className="w-5 h-5 text-ink" />
                 {t('engineering.projectLinks', language)}
               </h3>
               <div className="flex flex-wrap gap-4">
-                {project.githubUrl && (
+                {displayLinks(project.githubUrl, language).map(link => (
                   <a
-                    href={project.githubUrl}
+                    key={link.url}
+                    href={link.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn btn-secondary inline-flex items-center"
                   >
-                    {t('engineering.githubRepo', language)}
+                    {t('engineering.githubRepo', language)}{link.tag && ` (${link.tag})`}
                   </a>
-                )}
+                ))}
 
-                {project.paperUrl && (
+                {displayLinks(project.paperUrl, language).map(link => (
                   <a
-                    href={project.paperUrl}
+                    key={link.url}
+                    href={link.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn btn-primary inline-flex items-center"
                   >
-                    {t('engineering.researchPaper', language)}
+                    {t('engineering.researchPaper', language)}{link.tag && ` (${link.tag})`}
                   </a>
-                )}
+                ))}
 
-                {project.demoUrl && (
+                {displayLinks(project.demoUrl, language).map(link => (
                   <a
-                    href={project.demoUrl}
+                    key={link.url}
+                    href={link.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn btn-secondary inline-flex items-center"
                   >
-                    {t('engineering.liveDemo', language)}
+                    {t('engineering.liveDemo', language)}{link.tag && ` (${link.tag})`}
                   </a>
-                )}
+                ))}
               </div>
             </div>
           )}

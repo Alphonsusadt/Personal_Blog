@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { ObjectId } from 'mongodb';
+import { toObjectId } from '../utils/objectId.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { dualWrite } from '../utils/dataSync.js';
 import { isSectionEnabled } from '../utils/settingsCache.js';
@@ -102,7 +103,8 @@ export default function booksRoutes(db) {
     }
 
     const enabled = await isSectionEnabled(db, 'books');
-    const targetId = new ObjectId(req.params.id);
+    const targetId = toObjectId(req.params.id);
+    if (!targetId) return res.status(400).json({ error: 'Invalid id' });
     const existing = await col.findOne({ _id: targetId });
     if (!existing) return res.status(404).json({ error: 'Not found' });
 
@@ -151,7 +153,8 @@ export default function booksRoutes(db) {
   });
 
   router.delete('/:id', authMiddleware, async (req, res) => {
-    const targetId = new ObjectId(req.params.id);
+    const targetId = toObjectId(req.params.id);
+    if (!targetId) return res.status(400).json({ error: 'Invalid id' });
 
     const existing = await col.findOne({ _id: targetId });
     if (!existing) return res.status(404).json({ error: 'Not found' });

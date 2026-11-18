@@ -1,3 +1,4 @@
+import type { ProjectLinkValue } from '../lib/projectLinks';
 import type { LocalizedTextValue } from '../lib/localized';
 
 export interface Project {
@@ -14,9 +15,9 @@ export interface Project {
   updatedAt?: string;
   devStatus?: 'planning' | 'ongoing' | 'completed';
   date?: string;
-  githubUrl?: string;
-  paperUrl?: string;
-  demoUrl?: string;
+  githubUrl?: ProjectLinkValue;
+  paperUrl?: ProjectLinkValue;
+  demoUrl?: ProjectLinkValue;
   translationGroupId?: string;
   translationOfId?: string;
   contentLanguage?: 'en' | 'id' | 'bilingual';

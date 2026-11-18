@@ -180,7 +180,7 @@ export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>
     for (const [i, file] of files.entries()) {
       setUploadStatus(`Mengunggah gambar ${i + 1}/${files.length}…`);
       try {
-        const url = await uploadImage(file, { apiBaseUrl: API_BASE, maxWidth: 1600 });
+        const url = await uploadImage(file, { apiBaseUrl: API_BASE });
         const ed = editorRef.current;
         if (!ed || ed.isDestroyed) return;
         const at = Math.min(pos, ed.state.doc.content.size);
